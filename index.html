@@ -1,0 +1,3215 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSPM WorkDrive - Critical Services Site Photo & Album Repository</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --cspm-red: #EB2D2D;
+      --cspm-red-dark: #C8141B;
+      --cspm-dark: #161B22;
+      --cspm-navy: #1E2530;
+      --cspm-surface: #F5F7FA;
+    }
+    body {
+      font-family: 'Prompt', sans-serif;
+      background-color: var(--cspm-surface);
+      color: #1E2530;
+    }
+    /* Corporate Data Center subtle technical grid background matching cspm.co.th */
+    .cspm-hero-bg {
+      background-color: #141920;
+      background-image:
+        radial-gradient(circle at 18% 20%, rgba(237, 28, 36, 0.16) 0%, transparent 42%),
+        radial-gradient(circle at 85% 80%, rgba(30, 41, 59, 0.85) 0%, transparent 50%),
+        linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+    }
+    .btn-cspm-primary {
+      background-color: var(--cspm-red);
+      color: #ffffff;
+      transition: all 0.2s ease;
+    }
+    .btn-cspm-primary:hover {
+      background-color: var(--cspm-red-dark);
+      box-shadow: 0 8px 20px -4px rgba(237, 28, 36, 0.38);
+    }
+    .text-cspm-red {
+      color: var(--cspm-red);
+    }
+    .bg-cspm-red {
+      background-color: var(--cspm-red);
+    }
+    .border-cspm-red {
+      border-color: var(--cspm-red);
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #F5F7FA;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #CBD5E1;
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94A3B8;
+    }
+  </style>
+</head>
+<body class="antialiased selection:bg-[#EB2D2D] selection:text-white">
+
+  <!-- ==================== LOGIN SCREEN (CSPM CORPORATE THEME) ==================== -->
+  <div id="login-screen" class="min-h-screen flex flex-col justify-between cspm-hero-bg relative overflow-hidden">
+    <!-- Top Corporate Accent Bar -->
+    <div class="w-full h-1.5 bg-cspm-red"></div>
+
+    <!-- Top Corporate Mini Header -->
+    <div class="max-w-6xl w-full mx-auto px-6 pt-5 flex items-center justify-between text-xs text-slate-400">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-cspm-red animate-pulse"></span>
+        <span class="tracking-wide uppercase font-medium text-slate-300">CSPM (Thailand) Co., Ltd.</span>
+      </div>
+      <div class="hidden sm:flex items-center gap-4 text-slate-400">
+        <span>ISO 9001:2015 Certified</span>
+        <span>•</span>
+        <span>One-Stop Data Center Solution</span>
+      </div>
+    </div>
+
+    <!-- Center Corporate Card -->
+    <div class="flex-1 flex items-center justify-center p-4 my-4">
+      <div class="max-w-4xl w-full bg-white rounded-2xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-12 border border-white/10">
+
+        <!-- Left Corporate Branding Panel (Matches cspm.co.th visual identity) -->
+        <div class="md:col-span-5 bg-[#1B212C] text-white p-8 flex flex-col justify-between relative overflow-hidden">
+          <div class="absolute -right-12 -bottom-12 w-48 h-48 rounded-full bg-[#EB2D2D]/15 blur-2xl pointer-events-none"></div>
+
+          <div>
+            <div class="bg-white rounded-xl p-4 w-full shadow-md mb-6 flex items-center justify-center">
+              <img src="data:image/png;base64,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" alt="CSPM Logo" class="h-16 sm:h-20 w-auto object-contain" />
+            </div>
+
+            <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded bg-[#EB2D2D]/20 border border-[#EB2D2D]/50 text-[#FF6B70] text-base font-bold tracking-wider uppercase mb-1">
+              CSPM WorkDrive
+            </div>
+            <p class="text-slate-300 text-sm leading-relaxed mt-2.5">
+              ระบบจัดเก็บภาพถ่ายหน้างานและอัลบั้มโครงการ สำหรับบริษัท CSPM
+            </p>
+          </div>
+
+          <!-- Service Categories Pillars -->
+          <div class="mt-8 pt-6 border-t border-white/10 space-y-2.5 text-xs text-slate-300">
+            <div class="flex items-center gap-2.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-cspm-red"></span>
+              <span>Power Quality</span>
+            </div>
+            <div class="flex items-center gap-2.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-cspm-red"></span>
+              <span>Cooling Systems</span>
+            </div>
+            <div class="flex items-center gap-2.5">
+              <span class="w-1.5 h-1.5 rounded-full bg-cspm-red"></span>
+              <span>Fire Protection</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Login & Register Form Panel -->
+        <div class="md:col-span-7 p-8 sm:p-10 bg-white flex flex-col justify-center">
+          <!-- Mode Switcher Banner -->
+          <div class="flex items-center justify-between gap-2 p-1 bg-[#F5F7FA] rounded-xl border border-slate-200/80 mb-5">
+            <button id="tab-login" type="button" onclick="switchAuthTab('login')"
+              class="flex-1 py-2 px-3 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-2xs transition cursor-pointer flex items-center justify-center gap-1.5">
+              <i data-lucide="log-in" class="w-3.5 h-3.5 text-[#EB2D2D]"></i>
+              เข้าสู่ระบบ (Sign In)
+            </button>
+            <button id="tab-register" type="button" onclick="switchAuthTab('register')"
+              class="flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center justify-center gap-1.5">
+              <i data-lucide="user-plus" class="w-3.5 h-3.5 text-[#EB2D2D]"></i>
+              ลงทะเบียนเข้าใช้งานใหม่
+            </button>
+          </div>
+
+          <!-- Status Message Box -->
+          <div id="auth-message" class="hidden mb-4 p-3 rounded-xl text-xs font-medium flex items-start gap-2"></div>
+
+          <!-- ==================== LOGIN FORM ==================== -->
+          <form id="login-form-box" onsubmit="handleLoginSubmit(event)" class="space-y-4">
+            <div class="mb-2">
+              <h1 class="text-xl font-bold text-slate-900">เข้าสู่ระบบ CSPM WorkDrive</h1>
+              <p class="text-slate-500 text-xs mt-1">กรอกชื่อผู้ใช้งานและรหัสผ่านที่ลงทะเบียนไว้ (หากยังไม่มีบัญชี กรุณากดลงทะเบียนด้านบนก่อน)</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5">ชื่อผู้ใช้งาน (Username) *</label>
+                <div class="relative">
+                  <i data-lucide="user" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                  <input id="login-username" type="text" required placeholder="เช่น sarunchana.h"
+                    class="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] focus:ring-2 focus:ring-[#EB2D2D]/15 outline-none text-sm transition" />
+                </div>
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-600 mb-1.5">รหัสผ่าน (Password) *</label>
+                <div class="relative">
+                  <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                  <input id="login-password" type="password" required placeholder="••••••••"
+                    class="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] focus:ring-2 focus:ring-[#EB2D2D]/15 outline-none text-sm transition" />
+                  <button type="button" onclick="togglePasswordVisibility('login-password')" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer">
+                    <i data-lucide="eye" class="w-4 h-4"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="block text-xs font-semibold text-slate-600">สังกัด *</label>
+                <button type="button" onclick="toggleAddDeptBox('login')" class="text-[11px] font-semibold text-[#EB2D2D] hover:underline flex items-center gap-1 cursor-pointer">
+                  <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> เพิ่มสังกัดใหม่
+                </button>
+              </div>
+              <div class="relative">
+                <i data-lucide="building-2" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                <select id="login-dept" class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] focus:ring-2 focus:ring-[#EB2D2D]/15 outline-none text-sm transition"></select>
+              </div>
+              <div id="login-add-dept-box" class="hidden mt-2 flex gap-2">
+                <input id="login-new-dept-input" type="text" placeholder="พิมพ์ชื่อสังกัดใหม่..."
+                  class="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:border-[#EB2D2D] outline-none" />
+                <button type="button" onclick="addNewDepartment('login')" class="px-3 py-1.5 rounded-lg bg-[#1B212C] hover:bg-slate-800 text-white text-xs font-medium cursor-pointer">บันทึก</button>
+                <button type="button" onclick="toggleAddDeptBox('login')" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs cursor-pointer">ยกเลิก</button>
+              </div>
+            </div>
+
+            <!-- Remember Me Checkbox -->
+            <div class="flex items-center justify-between pt-0.5">
+              <label class="inline-flex items-center gap-2 cursor-pointer select-none group">
+                <input id="login-remember" type="checkbox" checked class="w-4 h-4 rounded border-slate-300 accent-[#EB2D2D] cursor-pointer" />
+                <span class="text-xs font-medium text-slate-600 group-hover:text-slate-900 transition">จดจำการเข้าสู่ระบบ (Remember me)</span>
+              </label>
+              <span class="text-[11px] text-slate-400">จำชื่อผู้ใช้และรหัสผ่านไว้ครั้งถัดไป</span>
+            </div>
+
+            <button type="submit"
+              class="w-full py-3 px-4 btn-cspm-primary font-medium rounded-xl flex items-center justify-center gap-2 cursor-pointer mt-2">
+              <i data-lucide="log-in" class="w-5 h-5"></i>
+              เข้าสู่ระบบบันทึกภาพหน้างาน
+            </button>
+
+            <div class="flex items-center justify-between pt-1 text-xs">
+              <span class="text-slate-500">ยังไม่มีบัญชีผู้ใช้งานใช่ไหม?</span>
+              <button type="button" onclick="switchAuthTab('register')" class="font-semibold text-[#EB2D2D] hover:underline flex items-center gap-1 cursor-pointer">
+                <i data-lucide="user-plus" class="w-3.5 h-3.5"></i>
+                ลงทะเบียนด้วยอีเมลบริษัทก่อนเข้าใช้งาน
+              </button>
+            </div>
+
+
+          </form>
+
+          <!-- ==================== REGISTER FORM ==================== -->
+          <form id="register-form-box" onsubmit="handleRegisterSubmit(event)" class="hidden space-y-4">
+            <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
+              <div>
+                <h1 class="text-xl font-bold text-slate-900">ลงทะเบียนผู้ใช้งานใหม่</h1>
+                <p class="text-slate-500 text-xs mt-1">ลงทะเบียนทีละคน หรือนำเข้าหลายคนพร้อมกันจากไฟล์ Excel</p>
+              </div>
+              <button type="button" onclick="openBulkExcelModal()"
+                class="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shrink-0">
+                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
+                นำเข้าจาก Excel หลายคน
+              </button>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1.5">อีเมลองค์กร (Company Email) *</label>
+              <div class="relative">
+                <i data-lucide="mail" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                <input id="reg-email" type="email" required oninput="updateUsernamePreview()"
+                  placeholder="เช่น sarunchana.h@cspm.co.th"
+                  class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] focus:ring-2 focus:ring-[#EB2D2D]/15 outline-none text-sm transition" />
+              </div>
+              <div class="mt-2 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200/80 flex items-center justify-between text-xs">
+                <span class="text-slate-500">ชื่อผู้ใช้งาน (Username) ที่จะได้รับ:</span>
+                <span id="reg-username-preview" class="font-mono font-bold text-[#EB2D2D]">-</span>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1.5">ตั้งรหัสผ่าน (Password) *</label>
+              <div class="relative">
+                <i data-lucide="lock" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                <input id="reg-password" type="password" required minlength="4" placeholder="กำหนดรหัสผ่านอย่างน้อย 4 ตัวอักษร"
+                  class="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] focus:ring-2 focus:ring-[#EB2D2D]/15 outline-none text-sm transition" />
+                <button type="button" onclick="togglePasswordVisibility('reg-password')" class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <i data-lucide="eye" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div class="flex items-center justify-between mb-1.5">
+                <label class="block text-xs font-semibold text-slate-600">สังกัด *</label>
+                <button type="button" onclick="toggleAddDeptBox('reg')" class="text-[11px] font-semibold text-[#EB2D2D] hover:underline flex items-center gap-1 cursor-pointer">
+                  <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i> เพิ่มสังกัดใหม่
+                </button>
+              </div>
+              <div class="relative">
+                <i data-lucide="building-2" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+                <select id="reg-dept" class="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] focus:ring-2 focus:ring-[#EB2D2D]/15 outline-none text-sm transition"></select>
+              </div>
+              <div id="reg-add-dept-box" class="hidden mt-2 flex gap-2">
+                <input id="reg-new-dept-input" type="text" placeholder="พิมพ์ชื่อสังกัดใหม่..."
+                  class="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:border-[#EB2D2D] outline-none" />
+                <button type="button" onclick="addNewDepartment('reg')" class="px-3 py-1.5 rounded-lg bg-[#1B212C] hover:bg-slate-800 text-white text-xs font-medium cursor-pointer">บันทึก</button>
+                <button type="button" onclick="toggleAddDeptBox('reg')" class="px-2.5 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs cursor-pointer">ยกเลิก</button>
+              </div>
+            </div>
+
+            <button type="submit"
+              class="w-full py-3 px-4 btn-cspm-primary font-medium rounded-xl flex items-center justify-center gap-2 cursor-pointer mt-2">
+              <i data-lucide="check-circle-2" class="w-5 h-5"></i>
+              ยืนยันการลงทะเบียน
+            </button>
+
+            <div class="text-center pt-1">
+              <button type="button" onclick="switchAuthTab('login')" class="text-xs font-medium text-slate-500 hover:text-slate-800 underline cursor-pointer">
+                มีบัญชีอยู่แล้ว? กลับไปหน้าเข้าสู่ระบบ
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Corporate Footer -->
+    <footer class="max-w-6xl w-full mx-auto px-6 pb-5 flex flex-col sm:flex-row items-center justify-between text-[11px] text-slate-400 gap-2">
+      <span>บริษัท ซีเอสพีเอ็ม (ประเทศไทย) จำกัด • Critical Services Product & Management</span>
+      <span>Tel: 0-2503-9953 | www.cspm.co.th</span>
+    </footer>
+  </div>
+
+  <!-- ==================== MAIN APP ==================== -->
+  <div id="app-screen" class="hidden min-h-screen flex flex-col">
+    <!-- Corporate Top Red Line -->
+    <div class="w-full h-1 bg-cspm-red"></div>
+
+    <!-- Top Navbar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3 cursor-pointer" onclick="goHome()">
+          <img src="data:image/png;base64,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" alt="CSPM Logo" class="h-11 sm:h-12 object-contain" />
+          <div class="hidden sm:block border-l border-slate-200 pl-3">
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-base text-slate-900 leading-none">WorkDrive</span>
+              <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-[#EB2D2D]/10 text-[#EB2D2D] border border-[#EB2D2D]/20">ENTERPRISE</span>
+            </div>
+            <p class="text-[11px] text-slate-400 mt-0.5">Site Photo & Project Repository</p>
+          </div>
+        </div>
+
+        <!-- Global Search -->
+        <div class="hidden md:flex flex-1 max-w-md relative">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+          <input id="search-input" type="text" oninput="renderCurrentView()"
+            placeholder="ค้นหาชื่อลูกค้า, สังกัด, Product, วันที่ พ.ศ. หรือรหัสงาน..."
+            class="w-full pl-10 pr-4 py-2 bg-[#F5F7FA] hover:bg-slate-200/60 focus:bg-white rounded-xl text-sm border border-transparent focus:border-[#EB2D2D] outline-none transition" />
+        </div>
+
+        <!-- User Profile, Online Presence & Actions -->
+        <div class="flex items-center gap-2.5 sm:gap-3">
+          <!-- Online Users Indicator Pill + Popover -->
+          <div class="relative" id="online-presence-wrapper">
+            <button type="button" onclick="toggleOnlinePopover(event)"
+              class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-50/90 hover:bg-emerald-100/80 border border-emerald-200/90 flex items-center gap-2 transition cursor-pointer"
+              title="ดูรายชื่อผู้ใช้งานที่ออนไลน์อยู่ขณะนี้">
+              <span class="relative flex h-2.5 w-2.5 shrink-0">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+              </span>
+              <span class="text-xs font-semibold text-emerald-800 whitespace-nowrap">
+                ออนไลน์ <span id="online-count-badge">1</span>
+              </span>
+              <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-emerald-700 hidden sm:inline"></i>
+            </button>
+
+            <!-- Dropdown Popover -->
+            <div id="online-popover" class="hidden absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50">
+              <div class="px-4 py-3 bg-[#1B212C] text-white flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <h4 class="text-xs font-semibold tracking-wide">ผู้ใช้งานที่ออนไลน์ขณะนี้</h4>
+                </div>
+                <span id="online-popover-total" class="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold">1 คน</span>
+              </div>
+
+              <div id="online-users-list" class="max-h-72 overflow-y-auto divide-y divide-slate-100 p-1">
+                <!-- Rendered dynamically -->
+              </div>
+
+              <div class="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                <span>อัปเดตสถานะอัตโนมัติ (Real-time)</span>
+                <span class="text-emerald-600 font-medium flex items-center gap-1">
+                  <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> เชื่อมต่ออยู่
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <button onclick="openNewAlbumModal()"
+            class="btn-cspm-primary text-sm font-medium px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer">
+            <i data-lucide="folder-plus" class="w-4 h-4"></i>
+            <span class="hidden sm:inline">สร้างอัลบั้มงาน</span>
+          </button>
+
+          <div class="flex items-center gap-2.5 pl-2 border-l border-slate-200">
+            <div class="relative">
+              <div id="user-avatar" class="w-9 h-9 rounded-full bg-[#1B212C] text-white font-semibold text-sm flex items-center justify-center shadow-xs border-2 border-[#EB2D2D]">
+                U
+              </div>
+              <span title="กำลังออนไลน์" class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+            </div>
+            <div class="hidden lg:block text-left">
+              <div class="flex items-center gap-1.5">
+                <p id="user-display-name" class="text-xs font-semibold text-slate-800 leading-tight">User</p>
+              </div>
+              <p id="user-display-dept" class="text-[11px] text-slate-400">สังกัด</p>
+            </div>
+            <button onclick="logout()" title="ออกจากระบบ" class="p-2 text-slate-400 hover:text-[#EB2D2D] hover:bg-red-50 rounded-lg transition cursor-pointer">
+              <i data-lucide="log-out" class="w-4 h-4"></i>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mobile Search -->
+      <div class="md:hidden px-4 pb-3">
+        <div class="relative">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2"></i>
+          <input id="search-input-mobile" type="text" oninput="syncSearch(this.value)"
+            placeholder="ค้นหาชื่อลูกค้า, สังกัด, Product, วันที่ พ.ศ...."
+            class="w-full pl-10 pr-4 py-2 bg-[#F5F7FA] rounded-xl text-sm outline-none" />
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+
+      <!-- ==================== VIEW 1: 4-LEVEL HIERARCHICAL FOLDER EXPLORER ==================== -->
+      <div id="dashboard-view">
+        <!-- Stats Banner -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+          <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
+            <div class="w-11 h-11 rounded-xl bg-[#EB2D2D]/10 text-[#EB2D2D] flex items-center justify-center shrink-0">
+              <i data-lucide="building-2" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p class="text-xs text-slate-400">ลูกค้าทั้งหมด</p>
+              <p id="stat-customers" class="text-xl font-bold text-slate-900">0</p>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
+            <div class="w-11 h-11 rounded-xl bg-[#1B212C] text-white flex items-center justify-center shrink-0">
+              <i data-lucide="folder-tree" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p class="text-xs text-slate-400">อัลบั้มวันที่ทั้งหมด</p>
+              <p id="stat-albums" class="text-xl font-bold text-slate-900">0</p>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
+            <div class="w-11 h-11 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <i data-lucide="images" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p class="text-xs text-slate-400">รูปภาพหน้างานรวม</p>
+              <p id="stat-photos" class="text-xl font-bold text-slate-900">0</p>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
+            <div class="w-11 h-11 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <i data-lucide="hard-drive" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <p class="text-xs text-slate-400">พื้นที่ใช้งานจริง</p>
+              <p id="stat-storage" class="text-xl font-bold text-slate-900">0 KB</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hierarchical Breadcrumb & Action Toolbar -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-4 mb-5 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center flex-wrap gap-1.5 text-xs sm:text-sm" id="folder-breadcrumb">
+            <!-- Rendered dynamically -->
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button id="contextual-add-btn" onclick="openNewAlbumModal()"
+              class="px-3.5 py-2 rounded-xl bg-[#1B212C] hover:bg-slate-800 text-white text-xs font-medium flex items-center gap-1.5 transition cursor-pointer">
+              <i data-lucide="folder-plus" class="w-4 h-4 text-[#EB2D2D]"></i>
+              <span id="contextual-add-label">เพิ่มลูกค้าใหม่</span>
+            </button>
+
+            <div class="flex items-center gap-1 bg-[#F5F7FA] p-1 rounded-xl border border-slate-200">
+              <button id="btn-grid" onclick="setViewMode('grid')" class="p-1.5 rounded-lg bg-white text-[#EB2D2D] shadow-2xs transition cursor-pointer" title="มุมมองตาราง">
+                <i data-lucide="layout-grid" class="w-4 h-4"></i>
+              </button>
+              <button id="btn-list" onclick="setViewMode('list')" class="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 transition cursor-pointer" title="มุมมองรายการ">
+                <i data-lucide="list" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Level Indicator Banner -->
+        <div class="flex items-center justify-between mb-3 px-1">
+          <div class="flex items-center gap-2">
+            <span id="level-badge" class="px-2.5 py-0.5 rounded-md bg-[#EB2D2D]/10 text-[#EB2D2D] text-[11px] font-bold">ขั้นตอนที่ 1 / 4</span>
+            <h2 id="level-heading" class="text-sm font-bold text-slate-800">รายชื่อลูกค้า (Customer)</h2>
+          </div>
+          <span id="level-count-text" class="text-xs text-slate-400">0 รายการ</span>
+        </div>
+
+        <!-- Folders Container -->
+        <div id="albums-container"></div>
+      </div>
+
+      <!-- ==================== VIEW 2: DATE ALBUM DETAIL & PHOTO UPLOAD ==================== -->
+      <div id="album-detail-view" class="hidden">
+        <!-- Breadcrumb & Header -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-5 mb-6 shadow-2xs">
+          <!-- Full 4-Level Breadcrumb inside Photo View -->
+          <div id="detail-breadcrumb" class="flex items-center flex-wrap gap-1.5 text-xs mb-3 pb-3 border-b border-slate-100"></div>
+
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <div class="flex flex-wrap items-center gap-2.5">
+                <span id="detail-date-badge" class="px-3 py-1 rounded-lg bg-[#EB2D2D] text-white text-xs font-mono font-bold flex items-center gap-1.5">
+                  <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                  <span>20/11/2569</span>
+                </span>
+                <h2 id="detail-title" class="text-lg sm:text-xl font-bold text-slate-900">ชื่อลูกค้า</h2>
+                <span id="detail-dept-badge" class="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#1B212C] text-white">F&S</span>
+                <span id="detail-product-badge" class="px-2.5 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">Product</span>
+              </div>
+              <p id="detail-meta" class="text-xs text-slate-500 mt-2 flex flex-wrap items-center gap-3">
+                <span>รายละเอียด: -</span>
+              </p>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="flex flex-wrap items-center gap-2.5">
+              <input id="camera-input" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleFilesSelected(event)" />
+              <input id="gallery-input" type="file" accept="image/*" multiple class="hidden" onchange="handleFilesSelected(event)" />
+
+              <button onclick="document.getElementById('camera-input').click()"
+                class="px-4 py-2.5 btn-cspm-primary text-sm font-medium rounded-xl flex items-center gap-2 cursor-pointer">
+                <i data-lucide="camera" class="w-4 h-4"></i>
+                ถ่ายรูปทันที
+              </button>
+
+              <button onclick="document.getElementById('gallery-input').click()"
+                class="px-4 py-2.5 bg-[#1B212C] hover:bg-slate-800 text-white text-sm font-medium rounded-xl shadow-xs flex items-center gap-2 transition cursor-pointer">
+                <i data-lucide="upload" class="w-4 h-4"></i>
+                อัปโหลดรูปจากเครื่อง
+              </button>
+
+              <button onclick="openNasExportModal('single')"
+                class="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl shadow-xs flex items-center gap-1.5 transition cursor-pointer" title="เลือกโฟลเดอร์ NAS ของบริษัท ระบบจะสร้างโฟลเดอร์ย่อย ชื่อลูกค้า / สังกัด / Product / วันที่ พ.ศ. ให้อัตโนมัติ">
+                <i data-lucide="server" class="w-4 h-4"></i>
+                <span>บันทึกลง NAS โดยตรง</span>
+              </button>
+
+              <button onclick="downloadAlbumZip()"
+                class="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-sm font-medium rounded-xl flex items-center gap-1.5 transition cursor-pointer" title="ดาวน์โหลดทั้งอัลบั้มวันที่นี้เป็นไฟล์ ZIP">
+                <i data-lucide="archive" class="w-4 h-4"></i>
+                <span class="hidden sm:inline">โหลด ZIP</span>
+              </button>
+
+              <button onclick="deleteCurrentAlbum()"
+                class="p-2.5 text-slate-400 hover:text-[#EB2D2D] hover:bg-red-50 rounded-xl border border-slate-200 transition cursor-pointer" title="ลบอัลบั้มวันที่นี้">
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Upload Settings Bar -->
+          <div class="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-600">
+            <label class="inline-flex items-center gap-2 cursor-pointer select-none">
+              <input id="watermark-toggle" type="checkbox" checked class="w-4 h-4 rounded accent-[#EB2D2D]" />
+              <span>ประทับชื่อลูกค้า สังกัด Product วัน/เดือน/ปีพ.ศ. และชื่อผู้ถ่ายลงบนภาพอัตโนมัติ</span>
+            </label>
+            <span class="text-slate-400">ระบบย่อขนาดและบีบอัดอัตโนมัติ (~150–250 KB/รูป) เพื่อประหยัดพื้นที่องค์กร</span>
+          </div>
+        </div>
+
+        <!-- Photos Grid -->
+        <div id="photos-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"></div>
+      </div>
+
+
+      <!-- ==================== CLOUD SYNC STATUS BAR ==================== -->
+      <div id="cloud-sync-bar" class="mt-8 bg-white rounded-2xl border border-slate-200/90 p-4 shadow-2xs flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div class="flex items-center gap-2.5">
+          <span id="cloud-status-dot" class="w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0"></span>
+          <div>
+            <p id="cloud-status-title" class="font-bold text-slate-800">โหมด Local (เครื่องนี้เท่านั้น)</p>
+            <p id="cloud-status-desc" class="text-slate-500 text-[11px]">กรอก Supabase URL & Anon Key เพื่อแชร์อัลบั้ม รูปภาพ สังกัด และสถานะออนไลน์ข้ามเครื่องทั้งทีม</p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" onclick="openBulkExcelModal()" class="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold border border-emerald-200 transition cursor-pointer flex items-center gap-1.5" title="นำเข้ารายชื่อพนักงานจากไฟล์ Excel เพื่อลงทะเบียนหลายคนพร้อมกัน">
+            <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> ลงทะเบียนจาก Excel
+          </button>
+          <button type="button" onclick="openNasExportModal('all')" class="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold border border-blue-200 transition cursor-pointer flex items-center gap-1.5" title="เมื่อเชื่อมต่อเน็ตออฟฟิศ สามารถย้ายอัลบั้มทั้งหมดลง NAS ได้ในคลิกเดียว">
+            <i data-lucide="server" class="w-3.5 h-3.5"></i> บันทึกทั้งหมดลง NAS
+          </button>
+          <button type="button" onclick="syncFromCloud(true)" class="px-3 py-1.5 rounded-xl bg-[#F5F7FA] hover:bg-slate-200/70 text-slate-700 font-medium border border-slate-200 transition cursor-pointer flex items-center gap-1">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> รีเฟรชข้อมูลทีม
+          </button>
+          <button type="button" onclick="openCloudConfigModal()" class="px-3.5 py-1.5 rounded-xl bg-[#1B212C] hover:bg-slate-800 text-white font-medium transition cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="cloud-cog" class="w-3.5 h-3.5 text-[#EB2D2D]"></i> ตั้งค่า Cloud แชร์ทั้งทีม
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ==================== MODAL: CREATE NEW HIERARCHICAL ALBUM ==================== -->
+  <div id="new-album-modal" class="hidden fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100">
+      <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
+        <h3 class="font-semibold text-sm flex items-center gap-2">
+          <i data-lucide="folder-plus" class="w-5 h-5 text-[#EB2D2D]"></i>
+          <span id="modal-album-heading">สร้างโฟลเดอร์อัลบั้มงานใหม่</span>
+        </h3>
+        <button onclick="closeNewAlbumModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form onsubmit="createAlbum(event)" class="p-6 space-y-4">
+        <!-- Step 1: Customer Name -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">1. ชื่อลูกค้า (Customer Name) *</label>
+          <input id="album-client" type="text" list="customer-suggestions" required placeholder="พิมพ์หรือเลือกชื่อลูกค้า เช่น บจก. สยามคลาวด์ เซอร์วิส"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-[#EB2D2D] outline-none" />
+          <datalist id="customer-suggestions"></datalist>
+        </div>
+
+        <!-- Step 2: สังกัด -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold text-slate-600">2. สังกัด *</label>
+            <button type="button" onclick="toggleModalNewDept()" class="text-[11px] font-semibold text-[#EB2D2D] hover:underline flex items-center gap-1 cursor-pointer">
+              <i data-lucide="plus-circle" class="w-3 h-3"></i> เพิ่มสังกัดใหม่
+            </button>
+          </div>
+          <select id="album-dept" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] outline-none"></select>
+          <div id="modal-add-dept-box" class="hidden mt-2 flex gap-2">
+            <input id="modal-new-dept-input" type="text" placeholder="พิมพ์ชื่อสังกัดใหม่..."
+              class="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:border-[#EB2D2D] outline-none" />
+            <button type="button" onclick="saveModalNewDept()" class="px-3 py-1.5 rounded-lg bg-[#1B212C] text-white text-xs font-medium cursor-pointer">บันทึก</button>
+            <button type="button" onclick="toggleModalNewDept()" class="px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-600 text-xs cursor-pointer">ยกเลิก</button>
+          </div>
+        </div>
+
+        <!-- Step 3: Product -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">3. Product *</label>
+          <input id="album-product" type="text" list="product-suggestions" required placeholder="พิมพ์หรือเลือก Product เช่น Clean Agent (IG-100 / Novec 1230)"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-[#EB2D2D] outline-none" />
+          <datalist id="product-suggestions">
+            <option value="Fire Protection - Clean Agent (IG-100 / Novec 1230)"></option>
+            <option value="Fire Protection - VESDA Aspirating Smoke Detection"></option>
+            <option value="Power Quality - Uninterruptible Power Supply (UPS)"></option>
+            <option value="Power Quality - Generator & Battery Monitoring"></option>
+            <option value="Cooling System - Data Center Cooling (CRAC / AHU)"></option>
+            <option value="Liquid Leak Detection System (RAYCHEM)"></option>
+            <option value="Building Management & Security System (BMS / CCTV)"></option>
+            <option value="Micro Data Center & DCIM"></option>
+          </datalist>
+        </div>
+
+        <!-- Step 4: วัน/เดือน/ปีพ.ศ. -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">4. เลือกวันที่ (ปฏิทิน) *</label>
+            <input id="album-date-picker" type="date" onchange="syncThaiDateFromPicker()"
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-[#EB2D2D] outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">วัน/เดือน/ปีพ.ศ. ที่จะบันทึก *</label>
+            <input id="album-thai-date" type="text" required placeholder="เช่น 20/11/2569"
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-red-50/40 font-mono font-semibold text-[#EB2D2D] text-sm focus:border-[#EB2D2D] outline-none" />
+          </div>
+        </div>
+
+        <!-- Optional Note / Location -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">รายละเอียดงาน / รหัสงาน / สถานที่ (ไม่บังคับ)</label>
+          <input id="album-note" type="text" placeholder="เช่น JOB-2026-101 • สำรวจหน้างาน อาคาร Data Center"
+            class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:border-[#EB2D2D] outline-none" />
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeNewAlbumModal()" class="px-4 py-2 rounded-xl text-sm text-slate-600 hover:bg-slate-100 cursor-pointer">ยกเลิก</button>
+          <button type="submit" class="px-5 py-2 rounded-xl text-sm font-medium btn-cspm-primary cursor-pointer">เปิดโฟลเดอร์อัลบั้ม</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: UPLOAD PREVIEW & CAPTION ==================== -->
+  <div id="upload-modal" class="hidden fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden">
+      <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
+        <h3 class="font-semibold text-sm flex items-center gap-2">
+          <i data-lucide="image-plus" class="w-5 h-5 text-[#EB2D2D]"></i>
+          ตรวจสอบภาพและใส่คำอธิบายก่อนบันทึก
+        </h3>
+        <button onclick="closeUploadModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        <div id="upload-preview-list" class="space-y-3"></div>
+      </div>
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+        <span id="upload-summary-text" class="text-xs text-slate-500">กำลังเตรียมไฟล์...</span>
+        <div class="flex gap-2">
+          <button onclick="closeUploadModal()" class="px-4 py-2 rounded-xl text-sm text-slate-600 hover:bg-slate-200/70 cursor-pointer">ยกเลิก</button>
+          <button id="confirm-upload-btn" onclick="confirmSavePhotos()" class="px-5 py-2 rounded-xl text-sm font-medium btn-cspm-primary cursor-pointer">
+            บันทึกเข้าอัลบั้ม
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: LIGHTBOX VIEWER ==================== -->
+  <div id="lightbox-modal" class="hidden fixed inset-0 z-50 bg-[#0D1117]/95 backdrop-blur-sm flex flex-col">
+    <div class="px-6 py-4 flex items-center justify-between text-white border-b border-white/10">
+      <div>
+        <p id="lb-title" class="font-semibold text-sm">คำอธิบายภาพ</p>
+        <p id="lb-meta" class="text-xs text-slate-400">ผู้ถ่าย • วันเวลา • ขนาดไฟล์</p>
+      </div>
+      <div class="flex items-center gap-2">
+        <button onclick="editLightboxCaption()" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs flex items-center gap-1.5 cursor-pointer">
+          <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> แก้ไขคำอธิบาย
+        </button>
+        <button onclick="downloadCurrentPhoto()" class="px-3 py-1.5 rounded-lg btn-cspm-primary text-xs flex items-center gap-1.5 cursor-pointer">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i> ดาวน์โหลด
+        </button>
+        <button onclick="deleteCurrentPhoto()" class="p-2 rounded-lg bg-red-500/20 hover:bg-red-500/40 text-red-300 cursor-pointer" title="ลบรูปนี้">
+          <i data-lucide="trash-2" class="w-4 h-4"></i>
+        </button>
+        <button onclick="closeLightbox()" class="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white ml-2 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+    </div>
+    <div class="flex-1 flex items-center justify-center p-4 overflow-hidden">
+      <img id="lb-image" src="" alt="Preview" class="max-h-full max-w-full object-contain rounded-lg shadow-2xl" />
+    </div>
+  </div>
+
+  <script>
+    // ==================== STATE, STORAGE & CLOUD SYNC ====================
+    const STORAGE_KEY = 'cspm_workdrive_hierarchy_v2';
+    const USER_KEY = 'cspm_workdrive_user_v1';
+    const ACCOUNTS_KEY = 'cspm_workdrive_accounts_v1';
+    const DEPTS_KEY = 'cspm_workdrive_depts_v1';
+    const REMEMBER_KEY = 'cspm_workdrive_remember_v1';
+    const PRESENCE_KEY = 'cspm_workdrive_presence_v1';
+    const CLOUD_CFG_KEY = 'cspm_workdrive_supabase_cfg_v1';
+
+    // ใส่ค่า Supabase URL และ anon key ของทีมไว้ที่นี่เพื่อให้เพื่อนทุกคนแชร์ข้อมูลได้ทันทีโดยไม่ต้องกรอกซ้ำ
+    const EMBEDDED_SUPABASE_CONFIG = {
+      url: '',
+      anonKey: ''
+    };
+
+    const TAB_SESSION_ID = 'tab-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
+    const PHOTO_BUCKET = 'workdrive-photos';
+    const DEFAULT_DEPTS = ['F&S', 'RPS', 'UPS', 'AIR', 'BS', 'Facility Services'];
+
+    let supabaseClient = null;
+    let isCloudConnected = false;
+    let isSyncingCloud = false;
+    let presenceTimer = null;
+    let cloudPollTimer = null;
+
+    let currentUser = null;
+    let albums = [];
+    let viewMode = 'grid';
+
+    // 4-Level Navigation Path:
+    // Level 1 (Root): { client: null, dept: null, product: null } -> Shows ชื่อลูกค้า
+    // Level 2: { client: '...', dept: null, product: null } -> Shows สังกัด
+    // Level 3: { client: '...', dept: '...', product: null } -> Shows Product
+    // Level 4: { client: '...', dept: '...', product: '...' } -> Shows วัน/เดือน/ปีพ.ศ.
+    let navPath = { client: null, dept: null, product: null };
+    let activeAlbumId = null;
+    let activePhotoId = null;
+    let pendingUploadItems = [];
+
+    const defaultAlbums = [
+      {
+        id: 'alb-1',
+        client: 'บจก. สยามคลาวด์ เซอร์วิส',
+        dept: 'F&S',
+        product: 'Fire Protection - Clean Agent (IG-100 / Novec 1230)',
+        thaiDate: '20/11/2569',
+        note: 'JOB-2026-101 • สำรวจหน้างานติดตั้งระบบ Clean Agent Data Center บางนา-ตราด',
+        photos: []
+      },
+      {
+        id: 'alb-2',
+        client: 'บจก. สยามคลาวด์ เซอร์วิส',
+        dept: 'UPS',
+        product: 'Power Quality - Uninterruptible Power Supply (UPS)',
+        thaiDate: '19/11/2569',
+        note: 'JOB-2026-102 • ตรวจสอบโหลดและแบตเตอรี่ห้อง UPS Main',
+        photos: []
+      },
+      {
+        id: 'alb-3',
+        client: 'บริษัท ไทยดิจิทัล โฮลดิ้งส์ จำกัด',
+        dept: 'AIR',
+        product: 'Cooling System - Data Center Cooling (CRAC / AHU)',
+        thaiDate: '18/11/2569',
+        note: 'JOB-2026-098 • ติดตั้งเครื่องปรับอากาศควบคุมความชื้นห้อง Server B',
+        photos: []
+      }
+    ];
+
+    const SUPABASE_SETUP_SQL = `-- รันคำสั่งนี้ใน Supabase SQL Editor เพื่อเปิดใช้งานระบบแชร์อัลบั้ม รูปภาพ และสถานะออนไลน์ทั้งทีม
+create table if not exists public.workdrive_state (
+  id text primary key,
+  albums jsonb not null default '[]'::jsonb,
+  depts jsonb not null default '["F&S","RPS","UPS","AIR","BS","Facility Services"]'::jsonb,
+  accounts jsonb not null default '[]'::jsonb,
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.workdrive_presence (
+  session_id text primary key,
+  username text not null,
+  dept text not null,
+  activity text not null,
+  last_seen bigint not null
+);
+
+insert into public.workdrive_state (id, albums, depts, accounts)
+values ('cspm-team-main', '[]'::jsonb, '["F&S","RPS","UPS","AIR","BS","Facility Services"]'::jsonb, '[]'::jsonb)
+on conflict (id) do nothing;
+
+alter table public.workdrive_state enable row level security;
+alter table public.workdrive_presence enable row level security;
+
+drop policy if exists "Allow team read/write state" on public.workdrive_state;
+create policy "Allow team read/write state" on public.workdrive_state
+  for all using (true) with check (true);
+
+drop policy if exists "Allow team read/write presence" on public.workdrive_presence;
+create policy "Allow team read/write presence" on public.workdrive_presence
+  for all using (true) with check (true);
+
+insert into storage.buckets (id, name, public)
+values ('workdrive-photos', 'workdrive-photos', true)
+on conflict (id) do nothing;
+
+drop policy if exists "Public Access workdrive-photos" on storage.objects;
+create policy "Public Access workdrive-photos" on storage.objects
+  for all using (bucket_id = 'workdrive-photos') with check (bucket_id = 'workdrive-photos');`;
+
+    function getActiveCloudConfig() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(CLOUD_CFG_KEY) || '{}');
+        const url = (saved.url || EMBEDDED_SUPABASE_CONFIG.url || '').trim();
+        const anonKey = (saved.anonKey || EMBEDDED_SUPABASE_CONFIG.anonKey || '').trim();
+        if (url && anonKey) return { url, anonKey };
+      } catch (e) {}
+      return null;
+    }
+
+    function updateCloudBannerUI(statusText, subText, colorClass) {
+      const dot = document.getElementById('cloud-status-dot');
+      const title = document.getElementById('cloud-status-title');
+      const desc = document.getElementById('cloud-status-desc');
+      if (dot) dot.className = `w-2.5 h-2.5 rounded-full shrink-0 ${colorClass || 'bg-amber-400'}`;
+      if (title && statusText) title.textContent = statusText;
+      if (desc && subText) desc.textContent = subText;
+    }
+
+    function openCloudConfigModal() {
+      const cfg = getActiveCloudConfig();
+      document.getElementById('sb-url-input').value = cfg ? cfg.url : '';
+      document.getElementById('sb-key-input').value = cfg ? cfg.anonKey : '';
+      const msg = document.getElementById('cloud-config-msg');
+      msg.classList.add('hidden');
+      document.getElementById('cloud-config-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeCloudConfigModal() {
+      document.getElementById('cloud-config-modal').classList.add('hidden');
+    }
+
+    function copySupabaseSql() {
+      navigator.clipboard.writeText(SUPABASE_SETUP_SQL).then(() => {
+        alert('คัดลอกสคริปต์ SQL เรียบร้อยแล้ว นำไปวางและกด Run ใน Supabase SQL Editor ได้เลยครับ');
+      }).catch(() => {
+        prompt('คัดลอกสคริปต์ SQL ด้านล่าง:', SUPABASE_SETUP_SQL);
+      });
+    }
+
+    function showCloudConfigMsg(isError, text) {
+      const msg = document.getElementById('cloud-config-msg');
+      msg.classList.remove('hidden', 'bg-red-50', 'text-red-700', 'border-red-200', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-200', 'border');
+      msg.classList.add('border');
+      if (isError) {
+        msg.classList.add('bg-red-50', 'text-red-700', 'border-red-200');
+      } else {
+        msg.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
+      }
+      msg.textContent = text;
+    }
+
+    async function saveAndConnectCloud() {
+      const url = document.getElementById('sb-url-input').value.trim().replace(/\/+$/, '');
+      const anonKey = document.getElementById('sb-key-input').value.trim();
+      if (!url || !anonKey) {
+        showCloudConfigMsg(true, 'กรุณากรอกทั้ง Supabase Project URL และ anon public Key');
+        return;
+      }
+
+      localStorage.setItem(CLOUD_CFG_KEY, JSON.stringify({ url, anonKey }));
+      const connected = initSupabaseClient();
+      if (!connected) {
+        showCloudConfigMsg(true, 'รูปแบบ URL หรือ Key ไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง');
+        return;
+      }
+
+      showCloudConfigMsg(false, 'กำลังทดสอบการเชื่อมต่อและซิงก์ข้อมูลกับ Supabase...');
+      const ok = await syncFromCloud(false, true);
+      if (ok) {
+        showCloudConfigMsg(false, 'เชื่อมต่อสำเร็จ! ข้อมูลและรูปภาพจะแชร์ถึงกันข้ามเครื่องทั้งทีมแล้ว');
+        setTimeout(() => {
+          closeCloudConfigModal();
+          renderCurrentView();
+          renderDepartmentDropdowns();
+        }, 900);
+      } else {
+        showCloudConfigMsg(true, 'เชื่อมต่อฐานข้อมูลไม่สำเร็จ กรุณาตรวจสอบว่าได้รัน SQL สร้างตารางและ Bucket ใน Supabase แล้วหรือยัง');
+      }
+    }
+
+    function disconnectCloudConfig() {
+      localStorage.removeItem(CLOUD_CFG_KEY);
+      supabaseClient = null;
+      isCloudConnected = false;
+      if (cloudPollTimer) {
+        clearInterval(cloudPollTimer);
+        cloudPollTimer = null;
+      }
+      updateCloudBannerUI(
+        'โหมด Local (เครื่องนี้เท่านั้น)',
+        'กรอก Supabase URL & Anon Key เพื่อแชร์อัลบั้ม รูปภาพ สังกัด และสถานะออนไลน์ข้ามเครื่องทั้งทีม',
+        'bg-amber-400'
+      );
+      closeCloudConfigModal();
+    }
+
+    function initSupabaseClient() {
+      const cfg = getActiveCloudConfig();
+      if (!cfg || !window.supabase) {
+        isCloudConnected = false;
+        updateCloudBannerUI(
+          'โหมด Local (เครื่องนี้เท่านั้น)',
+          'กด "ตั้งค่า Cloud แชร์ทั้งทีม" เพื่อเชื่อมต่อ Supabase ฟรีและแชร์ข้อมูลให้เพื่อนเห็นพร้อมกัน',
+          'bg-amber-400'
+        );
+        return false;
+      }
+      try {
+        supabaseClient = window.supabase.createClient(cfg.url, cfg.anonKey);
+        isCloudConnected = true;
+        updateCloudBannerUI(
+          'เชื่อมต่อ Cloud สำเร็จ (แชร์ทั้งทีมแบบเรียลไทม์)',
+          `ซิงก์อัลบั้ม รูปภาพ สังกัด และสถานะออนไลน์ผ่าน ${cfg.url}`,
+          'bg-emerald-500'
+        );
+        if (cloudPollTimer) clearInterval(cloudPollTimer);
+        cloudPollTimer = setInterval(() => {
+          if (currentUser && !activePhotoId && document.getElementById('upload-modal').classList.contains('hidden')) {
+            syncFromCloud(false, false);
+          }
+        }, 6000);
+        return true;
+      } catch (e) {
+        isCloudConnected = false;
+        return false;
+      }
+    }
+
+    function dataUrlToBlob(dataUrl) {
+      const parts = dataUrl.split(',');
+      const mimeMatch = parts[0].match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : 'image/jpeg';
+      const byteString = atob(parts[1]);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      return new Blob([ab], { type: mime });
+    }
+
+    async function uploadPhotoBlobToStorage(albumId, photoObj) {
+      if (!isCloudConnected || !supabaseClient) return photoObj;
+      if (!photoObj.dataUrl || !photoObj.dataUrl.startsWith('data:')) return photoObj;
+
+      try {
+        const blob = dataUrlToBlob(photoObj.dataUrl);
+        const filePath = `${albumId}/${photoObj.id}.jpg`;
+        const { error: upErr } = await supabaseClient.storage
+          .from(PHOTO_BUCKET)
+          .upload(filePath, blob, { contentType: 'image/jpeg', upsert: true });
+        if (upErr) throw upErr;
+
+        const { data: pubData } = supabaseClient.storage
+          .from(PHOTO_BUCKET)
+          .getPublicUrl(filePath);
+
+        return {
+          ...photoObj,
+          dataUrl: pubData.publicUrl,
+          storagePath: filePath
+        };
+      } catch (err) {
+        console.warn('Fallback to inline image due to storage error:', err);
+        return photoObj;
+      }
+    }
+
+    async function pushTeamStateToCloud() {
+      if (!isCloudConnected || !supabaseClient || isSyncingCloud) return;
+      try {
+        const payload = {
+          id: 'cspm-team-main',
+          albums: albums,
+          depts: getDepartments(),
+          accounts: getRegisteredAccounts(),
+          updated_at: new Date().toISOString()
+        };
+        const { error } = await supabaseClient
+          .from('workdrive_state')
+          .upsert(payload, { onConflict: 'id' });
+        if (!error) {
+          updateCloudBannerUI(
+            'เชื่อมต่อ Cloud สำเร็จ (แชร์ทั้งทีมแบบเรียลไทม์)',
+            `ซิงก์ล่าสุดเมื่อ ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} น.`,
+            'bg-emerald-500'
+          );
+        }
+      } catch (e) {
+        console.warn('Cloud push error:', e);
+      }
+    }
+
+    async function syncFromCloud(showAlertWhenDone = false, pushLocalIfEmpty = false) {
+      if (!isCloudConnected || !supabaseClient || isSyncingCloud) return false;
+      isSyncingCloud = true;
+      try {
+        const { data, error } = await supabaseClient
+          .from('workdrive_state')
+          .select('*')
+          .eq('id', 'cspm-team-main')
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+          const cloudAlbums = Array.isArray(data.albums) ? data.albums : [];
+          const cloudDepts = Array.isArray(data.depts) && data.depts.length > 0 ? data.depts : null;
+          const cloudAccounts = Array.isArray(data.accounts) ? data.accounts : null;
+
+          if (cloudAlbums.length === 0 && albums.length > 0 && pushLocalIfEmpty) {
+            await pushTeamStateToCloud();
+          } else {
+            albums = cloudAlbums;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(albums));
+          }
+
+          if (cloudDepts) {
+            localStorage.setItem(DEPTS_KEY, JSON.stringify(cloudDepts));
+            renderDepartmentDropdowns();
+          }
+          if (cloudAccounts) {
+            localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(cloudAccounts));
+          }
+
+          if (currentUser) {
+            updateStats();
+            if (activeAlbumId) {
+              const stillExists = albums.some(a => a.id === activeAlbumId);
+              if (stillExists) {
+                renderPhotos();
+              } else {
+                navigateToLevel('product');
+              }
+            } else {
+              renderBreadcrumbAndHeaders();
+              renderCurrentLevelFolders();
+            }
+          }
+        } else if (pushLocalIfEmpty) {
+          await pushTeamStateToCloud();
+        }
+
+        if (showAlertWhenDone) {
+          alert('อัปเดตข้อมูลล่าสุดจากทีมเรียบร้อยแล้วครับ');
+        }
+        return true;
+      } catch (e) {
+        console.warn('Cloud sync error:', e);
+        if (showAlertWhenDone) {
+          alert('ไม่สามารถดึงข้อมูลจาก Cloud ได้ กรุณาตรวจสอบการตั้งค่า Supabase');
+        }
+        return false;
+      } finally {
+        isSyncingCloud = false;
+      }
+    }
+
+    function getTodayIsoAndThai() {
+      const now = new Date();
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const beYear = yyyy + 543;
+      return {
+        iso: `${yyyy}-${mm}-${dd}`,
+        thai: `${dd}/${mm}/${beYear}`
+      };
+    }
+
+    function isoToThaiDate(isoStr) {
+      if (!isoStr || !isoStr.includes('-')) return '';
+      const [y, m, d] = isoStr.split('-');
+      const beYear = parseInt(y, 10) + 543;
+      return `${d}/${m}/${beYear}`;
+    }
+
+    function getDepartments() {
+      const raw = localStorage.getItem(DEPTS_KEY);
+      if (!raw) {
+        localStorage.setItem(DEPTS_KEY, JSON.stringify(DEFAULT_DEPTS));
+        return [...DEFAULT_DEPTS];
+      }
+      return JSON.parse(raw);
+    }
+
+    function saveDepartments(list) {
+      localStorage.setItem(DEPTS_KEY, JSON.stringify(list));
+      pushTeamStateToCloud();
+    }
+
+    function renderDepartmentDropdowns(selectedValue) {
+      const depts = getDepartments();
+      ['login-dept', 'reg-dept', 'album-dept'].forEach(selectId => {
+        const el = document.getElementById(selectId);
+        if (!el) return;
+        const prev = selectedValue || el.value || depts[0];
+        el.innerHTML = depts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+        if (depts.includes(prev)) el.value = prev;
+      });
+    }
+
+    function toggleAddDeptBox(prefix) {
+      const box = document.getElementById(`${prefix}-add-dept-box`);
+      const inp = document.getElementById(`${prefix}-new-dept-input`);
+      box.classList.toggle('hidden');
+      if (!box.classList.contains('hidden')) {
+        inp.value = '';
+        inp.focus();
+      }
+    }
+
+    function addNewDepartment(prefix) {
+      const inp = document.getElementById(`${prefix}-new-dept-input`);
+      const newName = inp.value.trim();
+      if (!newName) return;
+
+      const depts = getDepartments();
+      const exists = depts.find(d => d.toLowerCase() === newName.toLowerCase());
+      if (!exists) {
+        depts.push(newName);
+        saveDepartments(depts);
+      }
+      const finalVal = exists || newName;
+      renderDepartmentDropdowns(finalVal);
+      document.getElementById(`${prefix}-dept`).value = finalVal;
+      toggleAddDeptBox(prefix);
+    }
+
+    function toggleModalNewDept() {
+      const box = document.getElementById('modal-add-dept-box');
+      const inp = document.getElementById('modal-new-dept-input');
+      box.classList.toggle('hidden');
+      if (!box.classList.contains('hidden')) {
+        inp.value = '';
+        inp.focus();
+      }
+    }
+
+    function saveModalNewDept() {
+      const inp = document.getElementById('modal-new-dept-input');
+      const newName = inp.value.trim();
+      if (!newName) return;
+
+      const depts = getDepartments();
+      const exists = depts.find(d => d.toLowerCase() === newName.toLowerCase());
+      if (!exists) {
+        depts.push(newName);
+        saveDepartments(depts);
+      }
+      const finalVal = exists || newName;
+      renderDepartmentDropdowns(finalVal);
+      document.getElementById('album-dept').value = finalVal;
+      toggleModalNewDept();
+    }
+
+    function applyRememberedCredentials() {
+      const rememberedRaw = localStorage.getItem(REMEMBER_KEY);
+      if (rememberedRaw) {
+        try {
+          const rem = JSON.parse(rememberedRaw);
+          document.getElementById('login-username').value = rem.username || '';
+          document.getElementById('login-password').value = rem.password || '';
+          if (rem.dept) {
+            renderDepartmentDropdowns(rem.dept);
+            document.getElementById('login-dept').value = rem.dept;
+          }
+          document.getElementById('login-remember').checked = true;
+        } catch (e) {}
+      } else {
+        document.getElementById('login-remember').checked = false;
+      }
+    }
+
+    async function init() {
+      renderDepartmentDropdowns();
+      applyRememberedCredentials();
+      const savedUser = localStorage.getItem(USER_KEY) || sessionStorage.getItem(USER_KEY);
+      const savedAlbums = localStorage.getItem(STORAGE_KEY);
+      albums = savedAlbums ? JSON.parse(savedAlbums) : defaultAlbums;
+      if (!savedAlbums) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(albums));
+      }
+
+      initSupabaseClient();
+      if (isCloudConnected) {
+        await syncFromCloud(false, false);
+      }
+
+      if (savedUser) {
+        currentUser = JSON.parse(savedUser);
+        showApp();
+      }
+      lucide.createIcons();
+    }
+
+    function saveAlbums() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(albums));
+      } catch (e) {
+        alert('พื้นที่จัดเก็บในเบราว์เซอร์เต็ม กรุณาดาวน์โหลด ZIP และลบอัลบั้มเก่าออกบางส่วน หรือเชื่อมต่อ Supabase/Cloud Storage');
+      }
+      pushTeamStateToCloud();
+    }
+
+    // ==================== AUTHENTICATION & REGISTRATION ====================
+    function getRegisteredAccounts() {
+      const raw = localStorage.getItem(ACCOUNTS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    }
+
+    function saveRegisteredAccounts(list) {
+      localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list));
+      pushTeamStateToCloud();
+    }
+
+    function showAuthMessage(type, text) {
+      const box = document.getElementById('auth-message');
+      box.classList.remove('hidden', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-200', 'bg-red-50', 'text-red-700', 'border-red-200', 'border');
+      if (type === 'success') {
+        box.classList.add('bg-emerald-50', 'text-emerald-700', 'border', 'border-emerald-200');
+      } else {
+        box.classList.add('bg-red-50', 'text-red-700', 'border', 'border-red-200');
+      }
+      box.textContent = text;
+    }
+
+    function clearAuthMessage() {
+      const box = document.getElementById('auth-message');
+      box.classList.add('hidden');
+    }
+
+    function switchAuthTab(mode) {
+      clearAuthMessage();
+      const loginBox = document.getElementById('login-form-box');
+      const regBox = document.getElementById('register-form-box');
+      const tabLogin = document.getElementById('tab-login');
+      const tabReg = document.getElementById('tab-register');
+
+      if (mode === 'register') {
+        loginBox.classList.add('hidden');
+        regBox.classList.remove('hidden');
+        tabReg.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-2xs transition cursor-pointer flex items-center justify-center gap-1.5';
+        tabLogin.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center justify-center gap-1.5';
+      } else {
+        regBox.classList.add('hidden');
+        loginBox.classList.remove('hidden');
+        tabLogin.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-2xs transition cursor-pointer flex items-center justify-center gap-1.5';
+        tabReg.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center justify-center gap-1.5';
+      }
+      lucide.createIcons();
+    }
+
+    function togglePasswordVisibility(inputId) {
+      const inp = document.getElementById(inputId);
+      inp.type = inp.type === 'password' ? 'text' : 'password';
+    }
+
+    function extractUsernameFromEmail(email) {
+      const clean = (email || '').trim().toLowerCase();
+      if (!clean.includes('@')) return clean;
+      return clean.split('@')[0];
+    }
+
+    function updateUsernamePreview() {
+      const email = document.getElementById('reg-email').value;
+      const username = extractUsernameFromEmail(email);
+      document.getElementById('reg-username-preview').textContent = username || '-';
+    }
+
+    async function handleRegisterSubmit(e) {
+      e.preventDefault();
+      if (isCloudConnected) {
+        await syncFromCloud(false, false);
+      }
+      const email = document.getElementById('reg-email').value.trim().toLowerCase();
+      const password = document.getElementById('reg-password').value;
+      const dept = document.getElementById('reg-dept').value;
+      const username = extractUsernameFromEmail(email);
+
+      if (!username) {
+        showAuthMessage('error', 'กรุณากรอกอีเมลองค์กรให้ถูกต้อง เช่น sarunchana.h@cspm.co.th');
+        return;
+      }
+
+      const accounts = getRegisteredAccounts();
+      const existingIdx = accounts.findIndex(acc => acc.username === username || acc.email === email);
+
+      if (existingIdx !== -1) {
+        accounts[existingIdx] = { username, email, password, dept };
+      } else {
+        accounts.push({ username, email, password, dept });
+      }
+      saveRegisteredAccounts(accounts);
+
+      e.target.reset();
+      document.getElementById('reg-username-preview').textContent = '-';
+      switchAuthTab('login');
+      document.getElementById('login-username').value = username;
+      document.getElementById('login-dept').value = dept;
+      document.getElementById('login-password').value = '';
+      document.getElementById('login-password').focus();
+      showAuthMessage('success', `ลงทะเบียนสำเร็จ! ชื่อผู้ใช้งานของคุณคือ "${username}" กรุณากรอกรหัสผ่านเพื่อเข้าสู่ระบบ`);
+    }
+
+    async function handleLoginSubmit(e) {
+      e.preventDefault();
+      if (isCloudConnected) {
+        await syncFromCloud(false, false);
+      }
+      const rawInput = document.getElementById('login-username').value.trim().toLowerCase();
+      const password = document.getElementById('login-password').value;
+      const selectedDept = document.getElementById('login-dept').value;
+
+      if (!rawInput || !password) {
+        showAuthMessage('error', 'กรุณากรอกชื่อผู้ใช้งานและรหัสผ่านให้ครบถ้วน');
+        return;
+      }
+
+      const username = extractUsernameFromEmail(rawInput);
+      const accounts = getRegisteredAccounts();
+      const matched = accounts.find(acc => acc.username === username);
+
+      if (!matched) {
+        showAuthMessage('error', `ไม่พบบัญชี "${username}" ในระบบ กรุณากดแท็บ "ลงทะเบียนเข้าใช้งานใหม่" ด้านบนก่อนครับ`);
+        return;
+      }
+
+      if (matched.password !== password) {
+        showAuthMessage('error', 'รหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง');
+        return;
+      }
+
+      const isRemember = document.getElementById('login-remember').checked;
+      const finalDept = selectedDept || matched.dept;
+
+      currentUser = {
+        name: matched.username,
+        email: matched.email,
+        dept: finalDept,
+        type: 'registered'
+      };
+
+      if (isRemember) {
+        localStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+        sessionStorage.removeItem(USER_KEY);
+        localStorage.setItem(REMEMBER_KEY, JSON.stringify({
+          username: matched.username,
+          password: password,
+          dept: finalDept
+        }));
+      } else {
+        sessionStorage.setItem(USER_KEY, JSON.stringify(currentUser));
+        localStorage.removeItem(USER_KEY);
+        localStorage.removeItem(REMEMBER_KEY);
+      }
+      showApp();
+    }
+
+    function logout() {
+      stopPresenceTracking();
+      localStorage.removeItem(USER_KEY);
+      sessionStorage.removeItem(USER_KEY);
+      currentUser = null;
+      document.getElementById('app-screen').classList.add('hidden');
+      document.getElementById('login-screen').classList.remove('hidden');
+
+      if (!localStorage.getItem(REMEMBER_KEY)) {
+        document.getElementById('login-username').value = '';
+        document.getElementById('login-password').value = '';
+        document.getElementById('login-remember').checked = false;
+      } else {
+        applyRememberedCredentials();
+      }
+    }
+
+    // ==================== ONLINE PRESENCE INDICATOR (LOCAL + CLOUD) ====================
+    function getCurrentActivityLabel() {
+      if (activeAlbumId) {
+        const alb = albums.find(a => a.id === activeAlbumId);
+        if (alb) return `อัลบั้ม: ${alb.client} (${alb.thaiDate})`;
+      }
+      if (navPath.product) return `ดู Product: ${navPath.product}`;
+      if (navPath.dept) return `ดูสังกัด: ${navPath.client} > ${navPath.dept}`;
+      if (navPath.client) return `ดูลูกค้า: ${navPath.client}`;
+      return 'หน้าหลักลูกค้าทั้งหมด';
+    }
+
+    async function sendPresenceHeartbeat() {
+      if (!currentUser) return;
+      const now = Date.now();
+      const activityStr = getCurrentActivityLabel();
+
+      let presenceMap = {};
+      try {
+        presenceMap = JSON.parse(localStorage.getItem(PRESENCE_KEY) || '{}');
+      } catch (e) {}
+
+      Object.keys(presenceMap).forEach(sid => {
+        if (now - (presenceMap[sid].lastSeen || 0) > 20000) {
+          delete presenceMap[sid];
+        }
+      });
+
+      const myRecord = {
+        sessionId: TAB_SESSION_ID,
+        name: currentUser.name,
+        dept: currentUser.dept,
+        activity: activityStr,
+        lastSeen: now
+      };
+      presenceMap[TAB_SESSION_ID] = myRecord;
+      localStorage.setItem(PRESENCE_KEY, JSON.stringify(presenceMap));
+
+      if (isCloudConnected && supabaseClient) {
+        try {
+          await supabaseClient.from('workdrive_presence').upsert({
+            session_id: TAB_SESSION_ID,
+            username: currentUser.name,
+            dept: currentUser.dept,
+            activity: activityStr,
+            last_seen: now
+          }, { onConflict: 'session_id' });
+
+          await supabaseClient.from('workdrive_presence').delete().lt('last_seen', now - 25000);
+
+          const { data: cloudRows } = await supabaseClient
+            .from('workdrive_presence')
+            .select('*')
+            .gte('last_seen', now - 20000);
+
+          if (Array.isArray(cloudRows)) {
+            const merged = { ...presenceMap };
+            cloudRows.forEach(r => {
+              merged[r.session_id] = {
+                sessionId: r.session_id,
+                name: r.username,
+                dept: r.dept,
+                activity: r.activity,
+                lastSeen: Number(r.last_seen)
+              };
+            });
+            localStorage.setItem(PRESENCE_KEY, JSON.stringify(merged));
+          }
+        } catch (e) {}
+      }
+
+      renderOnlineUsers();
+    }
+
+    function removePresenceSession() {
+      try {
+        const presenceMap = JSON.parse(localStorage.getItem(PRESENCE_KEY) || '{}');
+        delete presenceMap[TAB_SESSION_ID];
+        localStorage.setItem(PRESENCE_KEY, JSON.stringify(presenceMap));
+      } catch (e) {}
+      if (isCloudConnected && supabaseClient) {
+        supabaseClient.from('workdrive_presence').delete().eq('session_id', TAB_SESSION_ID).then(() => {});
+      }
+    }
+
+    function startPresenceTracking() {
+      sendPresenceHeartbeat();
+      if (presenceTimer) clearInterval(presenceTimer);
+      presenceTimer = setInterval(sendPresenceHeartbeat, 4000);
+    }
+
+    function stopPresenceTracking() {
+      if (presenceTimer) {
+        clearInterval(presenceTimer);
+        presenceTimer = null;
+      }
+      removePresenceSession();
+    }
+
+    function toggleOnlinePopover(e) {
+      if (e) e.stopPropagation();
+      const pop = document.getElementById('online-popover');
+      pop.classList.toggle('hidden');
+      if (!pop.classList.contains('hidden')) {
+        sendPresenceHeartbeat();
+      }
+    }
+
+    function renderOnlineUsers() {
+      const now = Date.now();
+      let presenceMap = {};
+      try {
+        presenceMap = JSON.parse(localStorage.getItem(PRESENCE_KEY) || '{}');
+      } catch (e) {}
+
+      const activeSessions = Object.values(presenceMap).filter(s => now - (s.lastSeen || 0) <= 20000);
+      activeSessions.sort((a, b) => {
+        if (a.sessionId === TAB_SESSION_ID) return -1;
+        if (b.sessionId === TAB_SESSION_ID) return 1;
+        return a.name.localeCompare(b.name);
+      });
+
+      const onlineUsernames = new Set(activeSessions.map(s => s.name.toLowerCase()));
+      const registeredOffline = getRegisteredAccounts().filter(acc => !onlineUsernames.has(acc.username.toLowerCase()));
+
+      const badge = document.getElementById('online-count-badge');
+      const totalLabel = document.getElementById('online-popover-total');
+      const listEl = document.getElementById('online-users-list');
+
+      if (badge) badge.textContent = activeSessions.length;
+      if (totalLabel) totalLabel.textContent = `${activeSessions.length} คนออนไลน์`;
+      if (!listEl) return;
+
+      let rowsHtml = activeSessions.map(s => {
+        const isMe = s.sessionId === TAB_SESSION_ID;
+        const initial = (s.name || 'U').charAt(0).toUpperCase();
+        return `
+          <div class="p-3 hover:bg-slate-50 flex items-start justify-between gap-2.5 rounded-xl transition">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <div class="relative shrink-0">
+                <div class="w-9 h-9 rounded-full ${isMe ? 'bg-[#EB2D2D]' : 'bg-[#1B212C]'} text-white font-semibold text-xs flex items-center justify-center">
+                  ${escapeHtml(initial)}
+                </div>
+                <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white"></span>
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <p class="text-xs font-bold text-slate-900 truncate">${escapeHtml(s.name)}</p>
+                  ${isMe ? '<span class="px-1.5 py-0.2 rounded bg-red-50 text-[#EB2D2D] text-[10px] font-semibold border border-red-100">คุณ</span>' : ''}
+                </div>
+                <p class="text-[11px] text-slate-500 truncate">สังกัด: ${escapeHtml(s.dept || '-')}</p>
+                <p class="text-[10px] text-emerald-600 truncate mt-0.5">${escapeHtml(s.activity || 'กำลังใช้งาน')}</p>
+              </div>
+            </div>
+            <span class="shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-[10px] font-semibold border border-emerald-200">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span> Online
+            </span>
+          </div>
+        `;
+      }).join('');
+
+      if (registeredOffline.length > 0) {
+        rowsHtml += `
+          <div class="px-3 py-1.5 bg-slate-50/80 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+            สมาชิกที่ลงทะเบียนแล้ว (ออฟไลน์ ${registeredOffline.length})
+          </div>
+        ` + registeredOffline.map(acc => `
+          <div class="p-3 opacity-65 flex items-center justify-between gap-2.5">
+            <div class="flex items-center gap-2.5 min-w-0">
+              <div class="relative shrink-0">
+                <div class="w-8 h-8 rounded-full bg-slate-300 text-slate-700 font-semibold text-xs flex items-center justify-center">
+                  ${escapeHtml((acc.username || 'U').charAt(0).toUpperCase())}
+                </div>
+                <span class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-slate-400 ring-2 ring-white"></span>
+              </div>
+              <div class="min-w-0">
+                <p class="text-xs font-semibold text-slate-700 truncate">${escapeHtml(acc.username)}</p>
+                <p class="text-[11px] text-slate-400 truncate">สังกัด: ${escapeHtml(acc.dept || '-')}</p>
+              </div>
+            </div>
+            <span class="shrink-0 px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[10px] font-medium">
+              Offline
+            </span>
+          </div>
+        `).join('');
+      }
+
+      listEl.innerHTML = rowsHtml;
+    }
+
+    window.addEventListener('storage', (e) => {
+      if (e.key === PRESENCE_KEY && currentUser) {
+        renderOnlineUsers();
+      } else if (e.key === STORAGE_KEY && currentUser) {
+        albums = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        updateStats();
+        renderCurrentView();
+      }
+    });
+
+    window.addEventListener('beforeunload', () => {
+      removePresenceSession();
+    });
+
+    document.addEventListener('click', (e) => {
+      const wrapper = document.getElementById('online-presence-wrapper');
+      const pop = document.getElementById('online-popover');
+      if (wrapper && pop && !wrapper.contains(e.target)) {
+        pop.classList.add('hidden');
+      }
+    });
+
+    function showApp() {
+      document.getElementById('login-screen').classList.add('hidden');
+      document.getElementById('app-screen').classList.remove('hidden');
+      document.getElementById('user-display-name').textContent = currentUser.name;
+      document.getElementById('user-display-dept').textContent = currentUser.dept;
+      document.getElementById('user-avatar').textContent = currentUser.name.charAt(0).toUpperCase();
+      goHome();
+      startPresenceTracking();
+    }
+
+    // ==================== 4-LEVEL HIERARCHICAL NAVIGATION ====================
+    function goHome() {
+      navPath = { client: null, dept: null, product: null };
+      activeAlbumId = null;
+      showFolderDashboard();
+    }
+
+    function navigateToLevel(level) {
+      activeAlbumId = null;
+      if (level === 'root') {
+        navPath = { client: null, dept: null, product: null };
+      } else if (level === 'client') {
+        navPath = { client: navPath.client, dept: null, product: null };
+      } else if (level === 'dept') {
+        navPath = { client: navPath.client, dept: navPath.dept, product: null };
+      } else if (level === 'product') {
+        navPath = { client: navPath.client, dept: navPath.dept, product: navPath.product };
+      }
+      showFolderDashboard();
+    }
+
+    function enterCustomer(clientName) {
+      navPath = { client: clientName, dept: null, product: null };
+      activeAlbumId = null;
+      showFolderDashboard();
+    }
+
+    function enterDept(deptName) {
+      navPath.dept = deptName;
+      navPath.product = null;
+      activeAlbumId = null;
+      showFolderDashboard();
+    }
+
+    function enterProduct(productName) {
+      navPath.product = productName;
+      activeAlbumId = null;
+      showFolderDashboard();
+    }
+
+    function showFolderDashboard() {
+      document.getElementById('album-detail-view').classList.add('hidden');
+      document.getElementById('dashboard-view').classList.remove('hidden');
+      updateStats();
+      renderBreadcrumbAndHeaders();
+      renderCurrentLevelFolders();
+      sendPresenceHeartbeat();
+      lucide.createIcons();
+    }
+
+    function syncSearch(val) {
+      document.getElementById('search-input').value = val;
+      renderCurrentView();
+    }
+
+    function renderCurrentView() {
+      if (activeAlbumId) {
+        renderPhotos();
+      } else {
+        renderBreadcrumbAndHeaders();
+        renderCurrentLevelFolders();
+      }
+    }
+
+    function setViewMode(mode) {
+      viewMode = mode;
+      document.getElementById('btn-grid').className = mode === 'grid'
+        ? 'p-1.5 rounded-lg bg-white text-[#EB2D2D] shadow-2xs transition cursor-pointer'
+        : 'p-1.5 rounded-lg text-slate-400 hover:text-slate-700 transition cursor-pointer';
+      document.getElementById('btn-list').className = mode === 'list'
+        ? 'p-1.5 rounded-lg bg-white text-[#EB2D2D] shadow-2xs transition cursor-pointer'
+        : 'p-1.5 rounded-lg text-slate-400 hover:text-slate-700 transition cursor-pointer';
+      renderCurrentLevelFolders();
+    }
+
+    function updateStats() {
+      const uniqueCustomers = new Set(albums.map(a => a.client).filter(Boolean));
+      const totalAlbums = albums.length;
+      let totalPhotos = 0;
+      let totalBytes = 0;
+      albums.forEach(a => {
+        totalPhotos += a.photos.length;
+        a.photos.forEach(p => totalBytes += (p.sizeBytes || 0));
+      });
+      document.getElementById('stat-customers').textContent = uniqueCustomers.size;
+      document.getElementById('stat-albums').textContent = totalAlbums;
+      document.getElementById('stat-photos').textContent = totalPhotos;
+      document.getElementById('stat-storage').textContent = formatBytes(totalBytes);
+    }
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 KB';
+      const k = 1024;
+      const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function renderBreadcrumbAndHeaders() {
+      const bc = document.getElementById('folder-breadcrumb');
+      const addLabel = document.getElementById('contextual-add-label');
+      const levelBadge = document.getElementById('level-badge');
+      const levelHeading = document.getElementById('level-heading');
+
+      let parts = [
+        `<button onclick="navigateToLevel('root')" class="inline-flex items-center gap-1 font-semibold ${!navPath.client ? 'text-slate-900' : 'text-[#EB2D2D] hover:underline'} cursor-pointer">
+          <i data-lucide="home" class="w-3.5 h-3.5"></i>
+          <span>ลูกค้าทั้งหมด</span>
+        </button>`
+      ];
+
+      if (navPath.client) {
+        parts.push(`<i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-400"></i>`);
+        parts.push(
+          `<button onclick="navigateToLevel('client')" class="font-semibold ${!navPath.dept ? 'text-slate-900' : 'text-[#EB2D2D] hover:underline'} cursor-pointer truncate max-w-[180px] sm:max-w-xs">
+            ${escapeHtml(navPath.client)}
+          </button>`
+        );
+      }
+
+      if (navPath.dept) {
+        parts.push(`<i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-400"></i>`);
+        parts.push(
+          `<button onclick="navigateToLevel('dept')" class="font-semibold ${!navPath.product ? 'text-slate-900' : 'text-[#EB2D2D] hover:underline'} cursor-pointer">
+            ${escapeHtml(navPath.dept)}
+          </button>`
+        );
+      }
+
+      if (navPath.product) {
+        parts.push(`<i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-400"></i>`);
+        parts.push(
+          `<span class="font-semibold text-slate-900 truncate max-w-[200px] sm:max-w-sm">
+            ${escapeHtml(navPath.product)}
+          </span>`
+        );
+      }
+
+      bc.innerHTML = parts.join('');
+
+      if (!navPath.client) {
+        levelBadge.textContent = 'ขั้นตอนที่ 1 / 4';
+        levelHeading.textContent = 'เลือกชื่อลูกค้า (Customer)';
+        addLabel.textContent = 'เพิ่มลูกค้า / อัลบั้มใหม่';
+      } else if (!navPath.dept) {
+        levelBadge.textContent = 'ขั้นตอนที่ 2 / 4';
+        levelHeading.textContent = `เลือกสังกัด — ${navPath.client}`;
+        addLabel.textContent = 'เพิ่มสังกัดในลูกค้านี้';
+      } else if (!navPath.product) {
+        levelBadge.textContent = 'ขั้นตอนที่ 3 / 4';
+        levelHeading.textContent = `เลือก Product — สังกัด ${navPath.dept}`;
+        addLabel.textContent = 'เพิ่ม Product ใหม่';
+      } else {
+        levelBadge.textContent = 'ขั้นตอนที่ 4 / 4';
+        levelHeading.textContent = `เลือกวัน/เดือน/ปีพ.ศ. — ${navPath.product}`;
+        addLabel.textContent = 'เพิ่มวันที่เข้าหน้างาน';
+      }
+    }
+
+    function escapeHtml(str) {
+      return String(str || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function renderCurrentLevelFolders() {
+      const query = (document.getElementById('search-input').value || '').trim().toLowerCase();
+      const container = document.getElementById('albums-container');
+      const countText = document.getElementById('level-count-text');
+
+      if (!navPath.client) {
+        const customerMap = new Map();
+        albums.forEach(a => {
+          const cName = a.client || 'ไม่ระบุชื่อลูกค้า';
+          if (!customerMap.has(cName)) {
+            customerMap.set(cName, {
+              name: cName,
+              depts: new Set(),
+              products: new Set(),
+              dateAlbums: [],
+              photoCount: 0,
+              cover: null
+            });
+          }
+          const entry = customerMap.get(cName);
+          entry.depts.add(a.dept);
+          entry.products.add(a.product);
+          entry.dateAlbums.push(a);
+          entry.photoCount += a.photos.length;
+          if (!entry.cover && a.photos.length > 0) {
+            entry.cover = a.photos[0].dataUrl;
+          }
+        });
+
+        let items = Array.from(customerMap.values());
+        if (query) {
+          items = items.filter(item =>
+            item.name.toLowerCase().includes(query) ||
+            Array.from(item.depts).some(d => d.toLowerCase().includes(query)) ||
+            Array.from(item.products).some(p => p.toLowerCase().includes(query)) ||
+            item.dateAlbums.some(a => a.thaiDate.includes(query) || (a.note && a.note.toLowerCase().includes(query)))
+          );
+        }
+
+        countText.textContent = `${items.length} ลูกค้า`;
+        if (items.length === 0) {
+          renderEmptyState('ไม่พบโฟลเดอร์ชื่อลูกค้า', 'กดปุ่ม "สร้างอัลบั้มงาน" เพื่อเริ่มต้นสร้างโฟลเดอร์ลูกค้าใหม่');
+          return;
+        }
+
+        if (viewMode === 'grid') {
+          container.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5';
+          container.innerHTML = items.map(item => `
+            <div onclick="enterCustomer('${escapeHtml(item.name).replace(/'/g, "\'")}')"
+              class="group bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs hover:shadow-md hover:border-[#EB2D2D]/40 transition cursor-pointer flex flex-col">
+              <div class="h-40 bg-slate-100 relative overflow-hidden flex items-center justify-center">
+                ${item.cover
+                  ? `<img src="${item.cover}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />`
+                  : `<div class="text-center text-slate-400">
+                      <div class="w-14 h-14 rounded-2xl bg-[#EB2D2D]/10 text-[#EB2D2D] flex items-center justify-center mx-auto mb-1.5">
+                        <i data-lucide="building-2" class="w-7 h-7"></i>
+                      </div>
+                      <span class="text-[11px]">โฟลเดอร์ลูกค้า</span>
+                    </div>`
+                }
+                <span class="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-[#1B212C]/90 text-white text-[11px] font-semibold flex items-center gap-1">
+                  <i data-lucide="building-2" class="w-3 h-3 text-[#EB2D2D]"></i> ลูกค้า
+                </span>
+                <span class="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-white/95 text-slate-700 text-[11px] font-medium shadow-2xs">
+                  ${item.depts.size} สังกัด
+                </span>
+              </div>
+              <div class="p-4 flex-1 flex flex-col justify-between">
+                <div>
+                  <h3 class="font-bold text-base text-slate-900 group-hover:text-[#EB2D2D] transition line-clamp-1">${escapeHtml(item.name)}</h3>
+                  <p class="text-xs text-slate-500 mt-1 line-clamp-1">
+                    สังกัด: ${Array.from(item.depts).join(', ')}
+                  </p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+                  <span class="flex items-center gap-1 font-medium text-slate-600">
+                    <i data-lucide="images" class="w-3.5 h-3.5 text-[#EB2D2D]"></i>
+                    ${item.photoCount} รูป (${item.dateAlbums.length} วัน)
+                  </span>
+                  <span class="text-[#EB2D2D] font-medium flex items-center gap-0.5">เปิดดูสังกัด <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></span>
+                </div>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          container.className = 'bg-white rounded-2xl border border-slate-200 overflow-hidden divide-y divide-slate-100';
+          container.innerHTML = items.map(item => `
+            <div onclick="enterCustomer('${escapeHtml(item.name).replace(/'/g, "\'")}')"
+              class="p-4 hover:bg-red-50/40 flex items-center justify-between gap-4 transition cursor-pointer">
+              <div class="flex items-center gap-3.5 min-w-0">
+                <div class="w-11 h-11 rounded-xl bg-[#EB2D2D]/10 text-[#EB2D2D] flex items-center justify-center shrink-0">
+                  <i data-lucide="building-2" class="w-5 h-5"></i>
+                </div>
+                <div class="min-w-0">
+                  <h4 class="font-bold text-sm text-slate-900 truncate">${escapeHtml(item.name)}</h4>
+                  <p class="text-xs text-slate-500 truncate">สังกัด: ${Array.from(item.depts).join(', ')} • ${item.products.size} Product</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-4 shrink-0 text-xs">
+                <span class="font-semibold text-slate-700">${item.photoCount} รูป</span>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+              </div>
+            </div>
+          `).join('');
+        }
+        lucide.createIcons();
+        return;
+      }
+
+      if (!navPath.dept) {
+        const clientAlbums = albums.filter(a => a.client === navPath.client);
+        const deptMap = new Map();
+        clientAlbums.forEach(a => {
+          const dName = a.dept || 'ทั่วไป';
+          if (!deptMap.has(dName)) {
+            deptMap.set(dName, {
+              name: dName,
+              products: new Set(),
+              dateAlbums: [],
+              photoCount: 0,
+              cover: null
+            });
+          }
+          const entry = deptMap.get(dName);
+          entry.products.add(a.product);
+          entry.dateAlbums.push(a);
+          entry.photoCount += a.photos.length;
+          if (!entry.cover && a.photos.length > 0) entry.cover = a.photos[0].dataUrl;
+        });
+
+        let items = Array.from(deptMap.values());
+        if (query) {
+          items = items.filter(item =>
+            item.name.toLowerCase().includes(query) ||
+            Array.from(item.products).some(p => p.toLowerCase().includes(query))
+          );
+        }
+
+        countText.textContent = `${items.length} สังกัด`;
+        if (items.length === 0) {
+          renderEmptyState('ยังไม่มีโฟลเดอร์สังกัดในลูกค้านี้', 'กดปุ่ม "+ เพิ่มสังกัดในลูกค้านี้" เพื่อสร้างโฟลเดอร์');
+          return;
+        }
+
+        if (viewMode === 'grid') {
+          container.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5';
+          container.innerHTML = items.map(item => `
+            <div onclick="enterDept('${escapeHtml(item.name).replace(/'/g, "\'")}')"
+              class="group bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs hover:shadow-md hover:border-[#EB2D2D]/40 transition cursor-pointer flex flex-col">
+              <div class="h-36 bg-[#1B212C] relative overflow-hidden flex items-center justify-center">
+                ${item.cover
+                  ? `<img src="${item.cover}" class="w-full h-full object-cover opacity-55 group-hover:scale-105 transition duration-300" />`
+                  : `<div class="w-14 h-14 rounded-2xl bg-white/10 text-white flex items-center justify-center">
+                      <i data-lucide="layers" class="w-7 h-7 text-[#EB2D2D]"></i>
+                    </div>`
+                }
+                <div class="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent flex flex-col justify-end p-4">
+                  <span class="text-[10px] font-semibold uppercase tracking-wider text-[#FF6B70]">สังกัด (Department)</span>
+                  <h3 class="font-bold text-xl text-white">${escapeHtml(item.name)}</h3>
+                </div>
+              </div>
+              <div class="p-4 flex-1 flex flex-col justify-between">
+                <p class="text-xs text-slate-500 line-clamp-2">
+                  Product: ${Array.from(item.products).join(', ')}
+                </p>
+                <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+                  <span class="font-medium text-slate-600">${item.products.size} Product • ${item.photoCount} รูป</span>
+                  <span class="text-[#EB2D2D] font-medium flex items-center gap-0.5">เลือก Product <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></span>
+                </div>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          container.className = 'bg-white rounded-2xl border border-slate-200 overflow-hidden divide-y divide-slate-100';
+          container.innerHTML = items.map(item => `
+            <div onclick="enterDept('${escapeHtml(item.name).replace(/'/g, "\'")}')"
+              class="p-4 hover:bg-red-50/40 flex items-center justify-between gap-4 transition cursor-pointer">
+              <div class="flex items-center gap-3.5 min-w-0">
+                <div class="w-11 h-11 rounded-xl bg-[#1B212C] text-white font-bold text-xs flex items-center justify-center shrink-0">
+                  ${escapeHtml(item.name)}
+                </div>
+                <div class="min-w-0">
+                  <h4 class="font-bold text-sm text-slate-900">สังกัด: ${escapeHtml(item.name)}</h4>
+                  <p class="text-xs text-slate-500 truncate">Product: ${Array.from(item.products).join(', ')}</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-4 shrink-0 text-xs">
+                <span class="font-semibold text-slate-700">${item.photoCount} รูป</span>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+              </div>
+            </div>
+          `).join('');
+        }
+        lucide.createIcons();
+        return;
+      }
+
+      if (!navPath.product) {
+        const deptAlbums = albums.filter(a => a.client === navPath.client && a.dept === navPath.dept);
+        const prodMap = new Map();
+        deptAlbums.forEach(a => {
+          const pName = a.product || 'ไม่ระบุ Product';
+          if (!prodMap.has(pName)) {
+            prodMap.set(pName, {
+              name: pName,
+              dateAlbums: [],
+              photoCount: 0,
+              cover: null
+            });
+          }
+          const entry = prodMap.get(pName);
+          entry.dateAlbums.push(a);
+          entry.photoCount += a.photos.length;
+          if (!entry.cover && a.photos.length > 0) entry.cover = a.photos[0].dataUrl;
+        });
+
+        let items = Array.from(prodMap.values());
+        if (query) {
+          items = items.filter(item =>
+            item.name.toLowerCase().includes(query) ||
+            item.dateAlbums.some(a => a.thaiDate.includes(query))
+          );
+        }
+
+        countText.textContent = `${items.length} Product`;
+        if (items.length === 0) {
+          renderEmptyState('ยังไม่มีโฟลเดอร์ Product ในสังกัดนี้', 'กดปุ่ม "+ เพิ่ม Product ใหม่" เพื่อสร้างโฟลเดอร์');
+          return;
+        }
+
+        if (viewMode === 'grid') {
+          container.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5';
+          container.innerHTML = items.map(item => `
+            <div onclick="enterProduct('${escapeHtml(item.name).replace(/'/g, "\'")}')"
+              class="group bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs hover:shadow-md hover:border-[#EB2D2D]/40 transition cursor-pointer flex flex-col">
+              <div class="h-40 bg-slate-100 relative overflow-hidden flex items-center justify-center">
+                ${item.cover
+                  ? `<img src="${item.cover}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />`
+                  : `<div class="text-center text-slate-400">
+                      <div class="w-12 h-12 rounded-2xl bg-slate-200/70 text-slate-600 flex items-center justify-center mx-auto mb-1.5">
+                        <i data-lucide="package" class="w-6 h-6"></i>
+                      </div>
+                      <span class="text-[11px]">โฟลเดอร์ Product</span>
+                    </div>`
+                }
+                <span class="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-[#EB2D2D] text-white text-[11px] font-semibold">
+                  Product
+                </span>
+                <span class="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-white/95 text-slate-700 text-[11px] font-medium shadow-2xs">
+                  ${item.dateAlbums.length} วัน
+                </span>
+              </div>
+              <div class="p-4 flex-1 flex flex-col justify-between">
+                <div>
+                  <h3 class="font-bold text-sm text-slate-900 group-hover:text-[#EB2D2D] transition line-clamp-2">${escapeHtml(item.name)}</h3>
+                  <p class="text-[11px] text-slate-400 mt-1">วันที่บันทึก: ${item.dateAlbums.map(d => d.thaiDate).join(', ')}</p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+                  <span class="font-medium text-slate-600">${item.photoCount} รูป</span>
+                  <span class="text-[#EB2D2D] font-medium flex items-center gap-0.5">เลือกวันที่ <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></span>
+                </div>
+              </div>
+            </div>
+          `).join('');
+        } else {
+          container.className = 'bg-white rounded-2xl border border-slate-200 overflow-hidden divide-y divide-slate-100';
+          container.innerHTML = items.map(item => `
+            <div onclick="enterProduct('${escapeHtml(item.name).replace(/'/g, "\'")}')"
+              class="p-4 hover:bg-red-50/40 flex items-center justify-between gap-4 transition cursor-pointer">
+              <div class="flex items-center gap-3.5 min-w-0">
+                <div class="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                  <i data-lucide="package" class="w-5 h-5"></i>
+                </div>
+                <div class="min-w-0">
+                  <h4 class="font-bold text-sm text-slate-900 truncate">${escapeHtml(item.name)}</h4>
+                  <p class="text-xs text-slate-500 truncate">${item.dateAlbums.length} อัลบั้มวันที่</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-4 shrink-0 text-xs">
+                <span class="font-semibold text-slate-700">${item.photoCount} รูป</span>
+                <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+              </div>
+            </div>
+          `).join('');
+        }
+        lucide.createIcons();
+        return;
+      }
+
+      let dateAlbums = albums.filter(a =>
+        a.client === navPath.client &&
+        a.dept === navPath.dept &&
+        a.product === navPath.product
+      );
+
+      if (query) {
+        dateAlbums = dateAlbums.filter(a =>
+          a.thaiDate.toLowerCase().includes(query) ||
+          (a.note && a.note.toLowerCase().includes(query))
+        );
+      }
+
+      countText.textContent = `${dateAlbums.length} อัลบั้มวันที่`;
+      if (dateAlbums.length === 0) {
+        renderEmptyState('ยังไม่มีโฟลเดอร์วัน/เดือน/ปีพ.ศ. ใน Product นี้', 'กดปุ่ม "+ เพิ่มวันที่เข้าหน้างาน" เพื่อสร้างโฟลเดอร์วันที่และอัปโหลดรูป');
+        return;
+      }
+
+      if (viewMode === 'grid') {
+        container.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5';
+        container.innerHTML = dateAlbums.map(album => {
+          const cover = album.photos.length > 0 ? album.photos[0].dataUrl : null;
+          return `
+            <div onclick="openAlbum('${album.id}')"
+              class="group bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs hover:shadow-md hover:border-[#EB2D2D]/40 transition cursor-pointer flex flex-col">
+              <div class="h-44 bg-slate-100 relative overflow-hidden flex items-center justify-center">
+                ${cover
+                  ? `<img src="${cover}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />`
+                  : `<div class="text-center text-slate-400">
+                      <div class="w-12 h-12 rounded-2xl bg-[#EB2D2D]/10 text-[#EB2D2D] flex items-center justify-center mx-auto mb-1.5">
+                        <i data-lucide="calendar-days" class="w-6 h-6"></i>
+                      </div>
+                      <span class="text-[11px]">กดเพื่อถ่ายรูป / อัปโหลด</span>
+                    </div>`
+                }
+                <span class="absolute top-3 left-3 px-3 py-1 rounded-lg bg-[#EB2D2D] text-white text-xs font-mono font-bold shadow-xs flex items-center gap-1.5">
+                  <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
+                  ${escapeHtml(album.thaiDate)}
+                </span>
+                <span class="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-[#1B212C]/90 text-white text-[11px] font-medium">
+                  ${escapeHtml(album.dept)}
+                </span>
+              </div>
+              <div class="p-4 flex-1 flex flex-col justify-between">
+                <div>
+                  <h3 class="font-bold text-slate-900 group-hover:text-[#EB2D2D] transition">วันที่ ${escapeHtml(album.thaiDate)}</h3>
+                  <p class="text-xs text-slate-500 mt-1 line-clamp-1">${escapeHtml(album.note || album.product)}</p>
+                </div>
+                <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
+                  <span class="flex items-center gap-1 font-medium text-slate-600">
+                    <i data-lucide="images" class="w-3.5 h-3.5 text-[#EB2D2D]"></i>
+                    ${album.photos.length} รูป
+                  </span>
+                  <span class="text-[#EB2D2D] font-medium flex items-center gap-0.5">เปิดดูรูปภาพ <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></span>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        container.className = 'bg-white rounded-2xl border border-slate-200 overflow-hidden divide-y divide-slate-100';
+        container.innerHTML = dateAlbums.map(album => `
+          <div onclick="openAlbum('${album.id}')"
+            class="p-4 hover:bg-red-50/40 flex items-center justify-between gap-4 transition cursor-pointer">
+            <div class="flex items-center gap-3.5 min-w-0">
+              <div class="w-11 h-11 rounded-xl bg-[#EB2D2D]/10 text-[#EB2D2D] flex items-center justify-center shrink-0">
+                <i data-lucide="calendar-days" class="w-5 h-5"></i>
+              </div>
+              <div class="min-w-0">
+                <h4 class="font-bold text-sm font-mono text-slate-900">วันที่ ${escapeHtml(album.thaiDate)}</h4>
+                <p class="text-xs text-slate-500 truncate">${escapeHtml(album.note || album.product)}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-4 shrink-0 text-xs">
+              <span class="font-semibold text-slate-700">${album.photos.length} รูป</span>
+              <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
+            </div>
+          </div>
+        `).join('');
+      }
+      lucide.createIcons();
+    }
+
+    function renderEmptyState(title, subtitle) {
+      const container = document.getElementById('albums-container');
+      container.className = '';
+      container.innerHTML = `
+        <div class="bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center">
+          <div class="w-14 h-14 bg-slate-100 rounded-2xl flex items-center justify-center mx-auto mb-3 text-slate-400">
+            <i data-lucide="folder-open" class="w-7 h-7"></i>
+          </div>
+          <h3 class="font-semibold text-slate-800">${title}</h3>
+          <p class="text-xs text-slate-400 mt-1 mb-4">${subtitle}</p>
+          <button onclick="openNewAlbumModal()" class="px-4 py-2 btn-cspm-primary text-xs font-medium rounded-xl cursor-pointer">+ สร้างโฟลเดอร์ใหม่</button>
+        </div>`;
+      lucide.createIcons();
+    }
+
+    // ==================== CREATE & OPEN ALBUM MODAL ====================
+    function openNewAlbumModal() {
+      renderDepartmentDropdowns(navPath.dept || (currentUser && currentUser.dept));
+
+      const uniqueClients = Array.from(new Set(albums.map(a => a.client).filter(Boolean)));
+      document.getElementById('customer-suggestions').innerHTML = uniqueClients
+        .map(c => `<option value="${escapeHtml(c)}"></option>`)
+        .join('');
+
+      const clientInp = document.getElementById('album-client');
+      const deptSel = document.getElementById('album-dept');
+      const prodInp = document.getElementById('album-product');
+      const datePicker = document.getElementById('album-date-picker');
+      const thaiDateInp = document.getElementById('album-thai-date');
+      const noteInp = document.getElementById('album-note');
+
+      clientInp.value = navPath.client || '';
+      if (navPath.dept) {
+        deptSel.value = navPath.dept;
+      }
+      prodInp.value = navPath.product || '';
+
+      const today = getTodayIsoAndThai();
+      datePicker.value = today.iso;
+      thaiDateInp.value = today.thai;
+      noteInp.value = '';
+
+      document.getElementById('new-album-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function syncThaiDateFromPicker() {
+      const iso = document.getElementById('album-date-picker').value;
+      if (iso) {
+        document.getElementById('album-thai-date').value = isoToThaiDate(iso);
+      }
+    }
+
+    function closeNewAlbumModal() {
+      document.getElementById('new-album-modal').classList.add('hidden');
+    }
+
+    function createAlbum(e) {
+      e.preventDefault();
+      const client = document.getElementById('album-client').value.trim();
+      const dept = document.getElementById('album-dept').value;
+      const product = document.getElementById('album-product').value.trim();
+      const thaiDate = document.getElementById('album-thai-date').value.trim();
+      const note = document.getElementById('album-note').value.trim();
+
+      if (!client || !dept || !product || !thaiDate) return;
+
+      navPath = { client, dept, product };
+
+      const existing = albums.find(a =>
+        a.client.toLowerCase() === client.toLowerCase() &&
+        a.dept === dept &&
+        a.product.toLowerCase() === product.toLowerCase() &&
+        a.thaiDate === thaiDate
+      );
+
+      if (existing) {
+        if (note && !existing.note) existing.note = note;
+        saveAlbums();
+        closeNewAlbumModal();
+        openAlbum(existing.id);
+        return;
+      }
+
+      const newAlb = {
+        id: 'alb-' + Date.now(),
+        client,
+        dept,
+        product,
+        thaiDate,
+        note,
+        photos: []
+      };
+      albums.unshift(newAlb);
+      saveAlbums();
+      closeNewAlbumModal();
+      openAlbum(newAlb.id);
+    }
+
+    function openAlbum(id) {
+      activeAlbumId = id;
+      const album = albums.find(a => a.id === id);
+      if (!album) return;
+
+      navPath = { client: album.client, dept: album.dept, product: album.product };
+
+      document.getElementById('dashboard-view').classList.add('hidden');
+      document.getElementById('album-detail-view').classList.remove('hidden');
+
+      document.getElementById('detail-breadcrumb').innerHTML = `
+        <button onclick="navigateToLevel('root')" class="inline-flex items-center gap-1 font-semibold text-[#EB2D2D] hover:underline cursor-pointer">
+          <i data-lucide="home" class="w-3.5 h-3.5"></i> ลูกค้าทั้งหมด
+        </button>
+        <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-400"></i>
+        <button onclick="navigateToLevel('client')" class="font-semibold text-[#EB2D2D] hover:underline cursor-pointer truncate max-w-[160px]">
+          ${escapeHtml(album.client)}
+        </button>
+        <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-400"></i>
+        <button onclick="navigateToLevel('dept')" class="font-semibold text-[#EB2D2D] hover:underline cursor-pointer">
+          ${escapeHtml(album.dept)}
+        </button>
+        <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-400"></i>
+        <button onclick="navigateToLevel('product')" class="font-semibold text-[#EB2D2D] hover:underline cursor-pointer truncate max-w-[180px]">
+          ${escapeHtml(album.product)}
+        </button>
+        <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-400"></i>
+        <span class="font-mono font-bold text-slate-900">${escapeHtml(album.thaiDate)}</span>
+      `;
+
+      document.getElementById('detail-date-badge').innerHTML = `<i data-lucide="calendar" class="w-3.5 h-3.5"></i><span>${escapeHtml(album.thaiDate)}</span>`;
+      document.getElementById('detail-title').textContent = album.client;
+      document.getElementById('detail-dept-badge').textContent = album.dept;
+      document.getElementById('detail-product-badge').textContent = album.product;
+      document.getElementById('detail-meta').innerHTML = `
+        <span><strong>รายละเอียด:</strong> ${escapeHtml(album.note || '-')}</span> •
+        <span><strong>จำนวนรูปภาพ:</strong> ${album.photos.length} รูป</span>
+      `;
+      renderPhotos();
+      sendPresenceHeartbeat();
+      lucide.createIcons();
+    }
+
+    function deleteCurrentAlbum() {
+      if (!confirm('ยืนยันการลบอัลบั้มวันที่นี้และรูปภาพทั้งหมดภายใน?')) return;
+      albums = albums.filter(a => a.id !== activeAlbumId);
+      saveAlbums();
+      navigateToLevel('product');
+    }
+
+    // ==================== PHOTO COMPRESSION & WATERMARK ====================
+    async function handleFilesSelected(event) {
+      const files = Array.from(event.target.files);
+      if (!files.length) return;
+
+      const album = albums.find(a => a.id === activeAlbumId);
+      const addWatermark = document.getElementById('watermark-toggle').checked;
+
+      pendingUploadItems = [];
+      document.getElementById('upload-modal').classList.remove('hidden');
+      document.getElementById('upload-preview-list').innerHTML = '<p class="text-sm text-center py-6 text-slate-500">กำลังบีบอัดรูปภาพ...</p>';
+
+      for (const file of files) {
+        const compressed = await compressAndWatermarkImage(file, album, addWatermark);
+        pendingUploadItems.push({
+          id: 'ph-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+          dataUrl: compressed.dataUrl,
+          sizeBytes: compressed.sizeBytes,
+          caption: file.name.replace(/\.[^/.]+$/, ''),
+          takenBy: currentUser.name,
+          timestamp: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
+        });
+      }
+
+      renderUploadPreviewList();
+      event.target.value = '';
+    }
+
+    function compressAndWatermarkImage(file, album, addWatermark) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const MAX_WIDTH = 1280;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            if (addWatermark) {
+              const barHeight = Math.max(40, Math.round(height * 0.06));
+              ctx.fillStyle = 'rgba(20, 25, 32, 0.80)';
+              ctx.fillRect(0, height - barHeight, width, barHeight);
+
+              ctx.fillStyle = '#EB2D2D';
+              ctx.fillRect(0, height - barHeight, 6, barHeight);
+
+              const fontSize = Math.max(12, Math.round(barHeight * 0.38));
+              ctx.font = `600 ${fontSize}px Prompt, sans-serif`;
+              ctx.fillStyle = '#ffffff';
+              const timeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+              const stampText = `CSPM | ${album.client} | ${album.dept} | ${album.product} | ${album.thaiDate} (${timeStr}) | โดย: ${currentUser.name}`;
+              ctx.fillText(stampText, 16, height - Math.round(barHeight * 0.34));
+            }
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.75);
+            const sizeBytes = Math.round((dataUrl.length * 3) / 4);
+            resolve({ dataUrl, sizeBytes });
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function renderUploadPreviewList() {
+      const list = document.getElementById('upload-preview-list');
+      list.innerHTML = pendingUploadItems.map((item, idx) => `
+        <div class="flex items-center gap-3 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50">
+          <img src="${item.dataUrl}" class="w-16 h-16 rounded-lg object-cover shrink-0 border border-slate-200" />
+          <div class="flex-1 min-w-0">
+            <input type="text" value="${escapeHtml(item.caption)}" oninput="pendingUploadItems[${idx}].caption = this.value"
+              placeholder="ใส่คำอธิบายภาพหน้างาน..."
+              class="w-full px-3 py-1.5 text-xs bg-white rounded-lg border border-slate-200 focus:border-[#EB2D2D] outline-none" />
+            <p class="text-[11px] text-slate-400 mt-1">ขนาดหลังบีบอัด: <strong class="text-emerald-600">${formatBytes(item.sizeBytes)}</strong></p>
+          </div>
+        </div>
+      `).join('');
+
+      const totalSize = pendingUploadItems.reduce((sum, i) => sum + i.sizeBytes, 0);
+      document.getElementById('upload-summary-text').textContent = `จำนวน ${pendingUploadItems.length} รูป (รวม ${formatBytes(totalSize)})`;
+    }
+
+    function closeUploadModal() {
+      document.getElementById('upload-modal').classList.add('hidden');
+      pendingUploadItems = [];
+    }
+
+    async function confirmSavePhotos() {
+      const album = albums.find(a => a.id === activeAlbumId);
+      if (!album || pendingUploadItems.length === 0) return;
+
+      const btn = document.getElementById('confirm-upload-btn');
+      const prevBtnText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = isCloudConnected ? 'กำลังอัปโหลดขึ้น Cloud...' : 'กำลังบันทึก...';
+
+      const processedPhotos = [];
+      for (const item of pendingUploadItems) {
+        const uploaded = await uploadPhotoBlobToStorage(album.id, item);
+        processedPhotos.push(uploaded);
+      }
+
+      album.photos.unshift(...processedPhotos);
+      saveAlbums();
+
+      btn.disabled = false;
+      btn.textContent = prevBtnText;
+      closeUploadModal();
+      openAlbum(album.id);
+    }
+
+    // ==================== RENDER PHOTOS & LIGHTBOX ====================
+    function renderPhotos() {
+      const album = albums.find(a => a.id === activeAlbumId);
+      const grid = document.getElementById('photos-grid');
+
+      if (!album || album.photos.length === 0) {
+        grid.className = 'bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center';
+        grid.innerHTML = `
+          <div class="w-14 h-14 bg-[#EB2D2D]/10 text-[#EB2D2D] rounded-2xl flex items-center justify-center mx-auto mb-3">
+            <i data-lucide="camera" class="w-7 h-7"></i>
+          </div>
+          <h3 class="font-semibold text-slate-800">ยังไม่มีภาพถ่ายในวันที่ ${escapeHtml(album ? album.thaiDate : '')}</h3>
+          <p class="text-xs text-slate-400 mt-1 mb-4">กดปุ่ม "ถ่ายรูปทันที" จากกล้องมือถือ หรือ "อัปโหลดรูปจากเครื่อง"</p>
+          <button onclick="document.getElementById('gallery-input').click()" class="px-4 py-2 btn-cspm-primary text-xs font-medium rounded-xl cursor-pointer">
+            อัปโหลดรูปภาพแรก
+          </button>`;
+        lucide.createIcons();
+        return;
+      }
+
+      grid.className = 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4';
+      grid.innerHTML = album.photos.map(photo => `
+        <div onclick="openLightbox('${photo.id}')" class="group bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs hover:shadow-md transition cursor-pointer flex flex-col">
+          <div class="aspect-square bg-slate-100 relative overflow-hidden">
+            <img src="${photo.dataUrl}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+            <span class="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/65 text-white text-[10px]">
+              ${formatBytes(photo.sizeBytes)}
+            </span>
+          </div>
+          <div class="p-3">
+            <p class="text-xs font-semibold text-slate-800 truncate">${escapeHtml(photo.caption || 'ไม่มีคำอธิบาย')}</p>
+            <p class="text-[11px] text-slate-400 mt-0.5 truncate">${escapeHtml(photo.takenBy)} • ${escapeHtml(photo.timestamp)}</p>
+          </div>
+        </div>
+      `).join('');
+      lucide.createIcons();
+    }
+
+    function openLightbox(photoId) {
+      const album = albums.find(a => a.id === activeAlbumId);
+      const photo = album.photos.find(p => p.id === photoId);
+      if (!photo) return;
+
+      activePhotoId = photoId;
+      document.getElementById('lb-image').src = photo.dataUrl;
+      document.getElementById('lb-title').textContent = photo.caption || 'ภาพถ่ายหน้างาน';
+      document.getElementById('lb-meta').textContent = `${album.client} • ${album.dept} • ${album.product} • วันที่ ${album.thaiDate} • ถ่ายโดย: ${photo.takenBy} (${formatBytes(photo.sizeBytes)})`;
+      document.getElementById('lightbox-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeLightbox() {
+      document.getElementById('lightbox-modal').classList.add('hidden');
+      activePhotoId = null;
+    }
+
+    function editLightboxCaption() {
+      const album = albums.find(a => a.id === activeAlbumId);
+      const photo = album.photos.find(p => p.id === activePhotoId);
+      const nextCaption = prompt('แก้ไขคำอธิบายภาพ:', photo.caption);
+      if (nextCaption !== null) {
+        photo.caption = nextCaption.trim();
+        saveAlbums();
+        document.getElementById('lb-title').textContent = photo.caption;
+        renderPhotos();
+      }
+    }
+
+    async function downloadCurrentPhoto() {
+      const album = albums.find(a => a.id === activeAlbumId);
+      const photo = album.photos.find(p => p.id === activePhotoId);
+      const safeDate = album.thaiDate.replace(/\//g, '-');
+      const fileName = `${album.client}_${album.dept}_${safeDate}_${photo.caption || 'photo'}.jpg`;
+
+      try {
+        const res = await fetch(photo.dataUrl);
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch (e) {
+        const a = document.createElement('a');
+        a.href = photo.dataUrl;
+        a.download = fileName;
+        a.click();
+      }
+    }
+
+    async function deleteCurrentPhoto() {
+      if (!confirm('ต้องการลบรูปภาพนี้ใช่หรือไม่?')) return;
+      const album = albums.find(a => a.id === activeAlbumId);
+      const targetPhoto = album.photos.find(p => p.id === activePhotoId);
+      if (isCloudConnected && supabaseClient && targetPhoto && targetPhoto.storagePath) {
+        try {
+          await supabaseClient.storage.from(PHOTO_BUCKET).remove([targetPhoto.storagePath]);
+        } catch (e) {}
+      }
+      album.photos = album.photos.filter(p => p.id !== activePhotoId);
+      saveAlbums();
+      closeLightbox();
+      openAlbum(album.id);
+    }
+
+    // ==================== EXPORT ALBUM AS ZIP ====================
+    async function downloadAlbumZip() {
+      const album = albums.find(a => a.id === activeAlbumId);
+      if (!album || album.photos.length === 0) {
+        alert('ยังไม่มีรูปภาพในอัลบั้มสำหรับดาวน์โหลด');
+        return;
+      }
+      const zip = new JSZip();
+      const safeDate = album.thaiDate.replace(/\//g, '-');
+      const folderName = `${album.client}_${album.dept}_${safeDate}`.replace(/[^a-zA-Z0-9ก-๙._-]/g, '_');
+      const folder = zip.folder(folderName);
+
+      for (let idx = 0; idx < album.photos.length; idx++) {
+        const photo = album.photos[idx];
+        const safeName = (photo.caption || `photo_${idx + 1}`).replace(/[^a-zA-Z0-9ก-๙_-]/g, '_');
+        if (photo.dataUrl.startsWith('data:')) {
+          const base64Data = photo.dataUrl.split(',')[1];
+          folder.file(`${idx + 1}_${safeName}.jpg`, base64Data, { base64: true });
+        } else {
+          try {
+            const resp = await fetch(photo.dataUrl);
+            const arrBuf = await resp.arrayBuffer();
+            folder.file(`${idx + 1}_${safeName}.jpg`, arrBuf);
+          } catch (e) {}
+        }
+      }
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `${folderName}.zip`;
+      link.click();
+    }
+
+    // ==================== DIRECT SAVE TO COMPANY NAS (FILE SYSTEM ACCESS API) ====================
+    let nasExportMode = 'single'; // 'single' or 'all'
+
+    function sanitizeFolderName(name) {
+      const cleaned = String(name || 'ไม่ระบุ')
+        .replace(/[\\/:*?"<>|]/g, '-')
+        .replace(/\s+/g, ' ')
+        .trim();
+      return cleaned || 'ไม่ระบุ';
+    }
+
+    function openNasExportModal(mode) {
+      nasExportMode = mode || 'single';
+      const modal = document.getElementById('nas-export-modal');
+      const titleEl = document.getElementById('nas-modal-title');
+      const previewEl = document.getElementById('nas-folder-preview');
+      const countEl = document.getElementById('nas-summary-count');
+      const progBox = document.getElementById('nas-progress-box');
+      const statusMsg = document.getElementById('nas-status-msg');
+      const clearCb = document.getElementById('nas-clear-cloud-checkbox');
+      const startBtn = document.getElementById('nas-start-btn');
+
+      progBox.classList.add('hidden');
+      statusMsg.classList.add('hidden');
+      clearCb.checked = false;
+      startBtn.disabled = false;
+      startBtn.innerHTML = '<i data-lucide="folder-check" class="w-4 h-4"></i> เลือกโฟลเดอร์ NAS และบันทึก';
+
+      if (nasExportMode === 'single') {
+        const album = albums.find(a => a.id === activeAlbumId);
+        if (!album || album.photos.length === 0) {
+          alert('ยังไม่มีรูปภาพในอัลบั้มนี้สำหรับบันทึกลง NAS');
+          return;
+        }
+        const safeDate = sanitizeFolderName(album.thaiDate);
+        titleEl.textContent = 'บันทึกลง NAS บริษัทโดยตรง (เฉพาะอัลบั้มนี้)';
+        previewEl.textContent = `[ไดรฟ์ NAS] / ${sanitizeFolderName(album.client)} / ${sanitizeFolderName(album.dept)} / ${sanitizeFolderName(album.product)} / ${safeDate} /`;
+        countEl.textContent = `จำนวน ${album.photos.length} รูปภาพ (พร้อมไฟล์สรุปรายละเอียดงาน .txt)`;
+      } else {
+        const albumsWithPhotos = albums.filter(a => a.photos && a.photos.length > 0);
+        const totalPics = albumsWithPhotos.reduce((sum, a) => sum + a.photos.length, 0);
+        if (totalPics === 0) {
+          alert('ยังไม่มีรูปภาพในระบบสำหรับบันทึกลง NAS');
+          return;
+        }
+        titleEl.textContent = 'สำรองอัลบั้มทั้งหมดลง NAS บริษัท';
+        previewEl.textContent = `[ไดรฟ์ NAS] / ชื่อลูกค้า / สังกัด / Product / วัน-เดือน-ปีพ.ศ. / (แยกโฟลเดอร์ให้อัตโนมัติ)`;
+        countEl.textContent = `ทั้งหมด ${albumsWithPhotos.length} อัลบั้มวันที่ รวม ${totalPics} รูปภาพ`;
+      }
+
+      modal.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeNasExportModal() {
+      document.getElementById('nas-export-modal').classList.add('hidden');
+    }
+
+    function showNasStatus(isError, text) {
+      const box = document.getElementById('nas-status-msg');
+      box.classList.remove('hidden', 'bg-red-50', 'text-red-700', 'border-red-200', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-200', 'border');
+      box.classList.add('border');
+      if (isError) {
+        box.classList.add('bg-red-50', 'text-red-700', 'border-red-200');
+      } else {
+        box.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
+      }
+      box.textContent = text;
+    }
+
+    async function fetchPhotoAsBlob(dataUrl) {
+      if (dataUrl.startsWith('data:')) {
+        return dataUrlToBlob(dataUrl);
+      }
+      const resp = await fetch(dataUrl);
+      if (!resp.ok) throw new Error('ไม่สามารถดึงไฟล์รูปภาพได้');
+      return await resp.blob();
+    }
+
+    async function executeDirectNasSave() {
+      const targetAlbums = nasExportMode === 'single'
+        ? albums.filter(a => a.id === activeAlbumId && a.photos && a.photos.length > 0)
+        : albums.filter(a => a.photos && a.photos.length > 0);
+
+      if (targetAlbums.length === 0) {
+        showNasStatus(true, 'ไม่พบรูปภาพสำหรับบันทึก');
+        return;
+      }
+
+      // Check browser support for File System Access API (Chrome / Edge Desktop)
+      if (typeof window.showDirectoryPicker !== 'function') {
+        showNasStatus(true, 'เบราว์เซอร์บนอุปกรณ์นี้ (เช่น มือถือ) ไม่รองรับการเขียนลงไดรฟ์ NAS โดยตรง กำลังดาวน์โหลดเป็นไฟล์ ZIP แทน...');
+        if (nasExportMode === 'single') {
+          await downloadAlbumZip();
+        }
+        return;
+      }
+
+      const startBtn = document.getElementById('nas-start-btn');
+      const progBox = document.getElementById('nas-progress-box');
+      const progLabel = document.getElementById('nas-progress-label');
+      const progPct = document.getElementById('nas-progress-pct');
+      const progBar = document.getElementById('nas-progress-bar');
+      const shouldClearCloud = document.getElementById('nas-clear-cloud-checkbox').checked;
+
+      try {
+        // Ask user to select the NAS folder (e.g. Z:\CSPM_WorkDrive)
+        const rootDirHandle = await window.showDirectoryPicker({ mode: 'readwrite' });
+
+        startBtn.disabled = true;
+        progBox.classList.remove('hidden');
+        document.getElementById('nas-status-msg').classList.add('hidden');
+
+        const totalPhotos = targetAlbums.reduce((sum, a) => sum + a.photos.length, 0);
+        let savedCount = 0;
+
+        for (const alb of targetAlbums) {
+          // Create 4-level directory hierarchy on NAS: ชื่อลูกค้า / สังกัด / Product / วัน-เดือน-ปีพ.ศ.
+          const clientDir = await rootDirHandle.getDirectoryHandle(sanitizeFolderName(alb.client), { create: true });
+          const deptDir = await clientDir.getDirectoryHandle(sanitizeFolderName(alb.dept), { create: true });
+          const prodDir = await deptDir.getDirectoryHandle(sanitizeFolderName(alb.product), { create: true });
+          const dateDir = await prodDir.getDirectoryHandle(sanitizeFolderName(alb.thaiDate), { create: true });
+
+          // Write summary metadata text file inside the date folder
+          try {
+            const infoHandle = await dateDir.getFileHandle('รายละเอียดงาน.txt', { create: true });
+            const infoWritable = await infoHandle.createWritable();
+            const infoText = [
+              `บริษัท ซีเอสพีเอ็ม (ประเทศไทย) จำกัด - CSPM WorkDrive`,
+              `ชื่อลูกค้า: ${alb.client}`,
+              `สังกัด: ${alb.dept}`,
+              `Product: ${alb.product}`,
+              `วันที่เข้าหน้างาน (พ.ศ.): ${alb.thaiDate}`,
+              `รายละเอียดเพิ่มเติม: ${alb.note || '-'}`,
+              `จำนวนรูปภาพทั้งหมด: ${alb.photos.length} รูป`,
+              `วันที่สำรองลง NAS: ${new Date().toLocaleString('th-TH')}`
+            ].join('\r\n');
+            await infoWritable.write(infoText);
+            await infoWritable.close();
+          } catch (metaErr) {}
+
+          // Write each photo file
+          for (let i = 0; i < alb.photos.length; i++) {
+            const photo = alb.photos[i];
+            const safeCaption = sanitizeFolderName(photo.caption || `photo_${i + 1}`);
+            const fileName = `${String(i + 1).padStart(2, '0')}_${safeCaption}.jpg`;
+
+            progLabel.textContent = `กำลังบันทึก: ${alb.client} (${alb.thaiDate}) — ${fileName}`;
+            const blob = await fetchPhotoAsBlob(photo.dataUrl);
+            const fileHandle = await dateDir.getFileHandle(fileName, { create: true });
+            const writable = await fileHandle.createWritable();
+            await writable.write(blob);
+            await writable.close();
+
+            savedCount++;
+            const pct = Math.round((savedCount / totalPhotos) * 100);
+            progPct.textContent = `${pct}%`;
+            progBar.style.width = `${pct}%`;
+          }
+        }
+
+        progLabel.textContent = `บันทึกลง NAS สำเร็จครบทั้ง ${savedCount} รูป!`;
+
+        // Optionally remove archived albums from Cloud to free up space
+        if (shouldClearCloud) {
+          const archivedIds = new Set(targetAlbums.map(a => a.id));
+          if (isCloudConnected && supabaseClient) {
+            for (const alb of targetAlbums) {
+              const paths = alb.photos.map(p => p.storagePath).filter(Boolean);
+              if (paths.length > 0) {
+                try {
+                  await supabaseClient.storage.from(PHOTO_BUCKET).remove(paths);
+                } catch (e) {}
+              }
+            }
+          }
+          albums = albums.filter(a => !archivedIds.has(a.id));
+          saveAlbums();
+          showNasStatus(false, `บันทึกลง NAS สำเร็จครบ ${savedCount} รูป และลบข้อมูลชุดนี้ออกจาก Cloud เพื่อคืนพื้นที่เรียบร้อยแล้ว!`);
+
+          setTimeout(() => {
+            closeNasExportModal();
+            if (nasExportMode === 'single') {
+              navigateToLevel('product');
+            } else {
+              goHome();
+            }
+          }, 1400);
+        } else {
+          showNasStatus(false, `บันทึกลงโฟลเดอร์ NAS "${rootDirHandle.name}" เรียบร้อยแล้ว (${savedCount} รูป) โดยจัดเรียงตาม ชื่อลูกค้า / สังกัด / Product / วันที่ พ.ศ. อัตโนมัติ`);
+        }
+      } catch (err) {
+        if (err && err.name === 'AbortError') {
+          // User cancelled folder picker
+          return;
+        }
+        console.error('NAS Direct Save Error:', err);
+        showNasStatus(true, `เกิดข้อผิดพลาดในการเขียนไฟล์ลง NAS: ${err.message || err}`);
+      } finally {
+        startBtn.disabled = false;
+        lucide.createIcons();
+      }
+    }
+
+    // ==================== BULK REGISTER FROM EXCEL / CSV ====================
+    let parsedBulkAccounts = [];
+
+    function openBulkExcelModal() {
+      parsedBulkAccounts = [];
+      document.getElementById('bulk-excel-input').value = '';
+      document.getElementById('bulk-preview-section').classList.add('hidden');
+      document.getElementById('bulk-excel-msg').classList.add('hidden');
+      document.getElementById('bulk-confirm-btn').disabled = true;
+      document.getElementById('bulk-excel-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeBulkExcelModal() {
+      document.getElementById('bulk-excel-modal').classList.add('hidden');
+    }
+
+    function showBulkMsg(isError, text) {
+      const box = document.getElementById('bulk-excel-msg');
+      box.classList.remove('hidden', 'bg-red-50', 'text-red-700', 'border-red-200', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-200', 'border');
+      box.classList.add('border');
+      if (isError) {
+        box.classList.add('bg-red-50', 'text-red-700', 'border-red-200');
+      } else {
+        box.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
+      }
+      box.textContent = text;
+    }
+
+    function downloadExcelTemplate() {
+      if (typeof XLSX === 'undefined') {
+        alert('ไม่สามารถสร้างไฟล์ Excel ตัวอย่างได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
+        return;
+      }
+      const sampleRows = [
+        { email: 'sarunchana.h@cspm.co.th', password: 'cspm1234', dept: 'F&S' },
+        { email: 'somchai.k@cspm.co.th', password: 'cspm1234', dept: 'UPS' },
+        { email: 'suda.p@cspm.co.th', password: 'cspm1234', dept: 'AIR' }
+      ];
+      const ws = XLSX.utils.json_to_sheet(sampleRows);
+      ws['!cols'] = [{ wch: 28 }, { wch: 16 }, { wch: 18 }];
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Users');
+      XLSX.writeFile(wb, 'CSPM_WorkDrive_Template_Users.xlsx');
+    }
+
+    function pickColumnValue(rowObj, candidateKeys) {
+      const entries = Object.entries(rowObj);
+      for (const [k, v] of entries) {
+        const normKey = String(k || '').trim().toLowerCase();
+        if (candidateKeys.includes(normKey)) {
+          return String(v ?? '').trim();
+        }
+      }
+      return '';
+    }
+
+    async function handleBulkExcelFile(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (typeof XLSX === 'undefined') {
+        showBulkMsg(true, 'ไม่พบไลบรารีอ่าน Excel กรุณาเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่');
+        return;
+      }
+
+      if (isCloudConnected) {
+        await syncFromCloud(false, false);
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
+
+          const defaultPass = document.getElementById('bulk-default-pass').value.trim() || 'cspm1234';
+          const defaultDept = getDepartments()[0] || 'F&S';
+          const existingAccounts = getRegisteredAccounts();
+
+          parsedBulkAccounts = [];
+          rows.forEach((r) => {
+            let email = pickColumnValue(r, ['email', 'e-mail', 'mail', 'อีเมล', 'อีเมลองค์กร', 'อีเมลบริษัท', 'user', 'username', 'ชื่อผู้ใช้']).toLowerCase();
+            if (!email) {
+              // Fallback: check first column value if it looks like an email or username
+              const vals = Object.values(r).map(v => String(v ?? '').trim()).filter(Boolean);
+              if (vals.length > 0) email = vals[0].toLowerCase();
+            }
+            if (!email) return;
+
+            const username = extractUsernameFromEmail(email);
+            if (!username) return;
+            const finalEmail = email.includes('@') ? email : `${username}@cspm.co.th`;
+
+            const rawPass = pickColumnValue(r, ['password', 'pass', 'pwd', 'รหัสผ่าน', 'รหัส']);
+            const rawDept = pickColumnValue(r, ['dept', 'department', 'team', 'สังกัด', 'แผนก', 'ฝ่าย']);
+
+            const exists = existingAccounts.some(acc => acc.username === username || acc.email === finalEmail);
+            parsedBulkAccounts.push({
+              username,
+              email: finalEmail,
+              password: rawPass || defaultPass,
+              hasCustomPass: Boolean(rawPass),
+              dept: rawDept || defaultDept,
+              isUpdate: exists
+            });
+          });
+
+          if (parsedBulkAccounts.length === 0) {
+            document.getElementById('bulk-preview-section').classList.add('hidden');
+            document.getElementById('bulk-confirm-btn').disabled = true;
+            showBulkMsg(true, 'ไม่พบข้อมูลอีเมลหรือชื่อผู้ใช้งานในไฟล์ Excel กรุณาตรวจสอบหัวตาราง (email, password, dept)');
+            return;
+          }
+
+          document.getElementById('bulk-excel-msg').classList.add('hidden');
+          renderBulkPreviewTable();
+        } catch (err) {
+          showBulkMsg(true, 'อ่านไฟล์ Excel ไม่สำเร็จ: ' + (err.message || err));
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    function reapplyBulkDefaultPass() {
+      const defPass = document.getElementById('bulk-default-pass').value.trim() || 'cspm1234';
+      parsedBulkAccounts.forEach(item => {
+        if (!item.hasCustomPass) {
+          item.password = defPass;
+        }
+      });
+      if (parsedBulkAccounts.length > 0) {
+        renderBulkPreviewTable();
+      }
+    }
+
+    function renderBulkPreviewTable() {
+      const sec = document.getElementById('bulk-preview-section');
+      const countEl = document.getElementById('bulk-preview-count');
+      const tbody = document.getElementById('bulk-preview-tbody');
+      const btn = document.getElementById('bulk-confirm-btn');
+
+      sec.classList.remove('hidden');
+      countEl.textContent = `พร้อมลงทะเบียนทั้งหมด ${parsedBulkAccounts.length} บัญชี`;
+      btn.disabled = false;
+
+      tbody.innerHTML = parsedBulkAccounts.map((item, idx) => `
+        <tr class="hover:bg-slate-50">
+          <td class="py-2 px-3 text-slate-400">${idx + 1}</td>
+          <td class="py-2 px-3 font-mono font-bold text-[#EB2D2D]">${escapeHtml(item.username)}</td>
+          <td class="py-2 px-3 text-slate-700">${escapeHtml(item.email)}</td>
+          <td class="py-2 px-3 font-mono text-slate-600">${escapeHtml(item.password)}</td>
+          <td class="py-2 px-3 font-medium text-slate-800">${escapeHtml(item.dept)}</td>
+          <td class="py-2 px-3">
+            ${item.isUpdate
+              ? '<span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-semibold">อัปเดตข้อมูล</span>'
+              : '<span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">บัญชีใหม่</span>'
+            }
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function confirmBulkImportAccounts() {
+      if (parsedBulkAccounts.length === 0) return;
+
+      const btn = document.getElementById('bulk-confirm-btn');
+      btn.disabled = true;
+
+      // Auto-register any new departments found in Excel
+      const depts = getDepartments();
+      let deptChanged = false;
+      parsedBulkAccounts.forEach(item => {
+        if (item.dept && !depts.some(d => d.toLowerCase() === item.dept.toLowerCase())) {
+          depts.push(item.dept);
+          deptChanged = true;
+        }
+      });
+      if (deptChanged) {
+        localStorage.setItem(DEPTS_KEY, JSON.stringify(depts));
+        renderDepartmentDropdowns();
+      }
+
+      // Merge accounts into registered accounts list
+      const accounts = getRegisteredAccounts();
+      parsedBulkAccounts.forEach(item => {
+        const idx = accounts.findIndex(acc => acc.username === item.username || acc.email === item.email);
+        const record = {
+          username: item.username,
+          email: item.email,
+          password: item.password,
+          dept: item.dept
+        };
+        if (idx !== -1) {
+          accounts[idx] = record;
+        } else {
+          accounts.push(record);
+        }
+      });
+
+      saveRegisteredAccounts(accounts);
+
+      const importedCount = parsedBulkAccounts.length;
+      showBulkMsg(false, `ลงทะเบียนสำเร็จทั้งหมด ${importedCount} บัญชีเรียบร้อยแล้ว! ${isCloudConnected ? '(ซิงก์ขึ้น Supabase Cloud ทั้งทีมแล้ว)' : ''}`);
+
+      if (!currentUser) {
+        switchAuthTab('login');
+        showAuthMessage('success', `นำเข้าและลงทะเบียนผู้ใช้งานจาก Excel สำเร็จจำนวน ${importedCount} บัญชี สามารถเข้าสู่ระบบได้ทันที`);
+      }
+
+      setTimeout(() => {
+        closeBulkExcelModal();
+      }, 1300);
+    }
+
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+
+  <!-- ==================== MODAL: DIRECT SAVE TO COMPANY NAS ==================== -->
+  <div id="nas-export-modal" class="hidden fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100">
+      <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
+        <h3 class="font-semibold text-sm flex items-center gap-2">
+          <i data-lucide="server" class="w-5 h-5 text-blue-400"></i>
+          <span id="nas-modal-title">บันทึกลง NAS บริษัทโดยตรง</span>
+        </h3>
+        <button type="button" onclick="closeNasExportModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 text-xs">
+        <div class="p-3.5 rounded-xl bg-blue-50/80 border border-blue-200/80 text-slate-700 space-y-1.5">
+          <p class="font-bold text-blue-800 flex items-center gap-1.5">
+            <i data-lucide="folder-tree" class="w-4 h-4"></i> โครงสร้างโฟลเดอร์ที่จะสร้างบน NAS อัตโนมัติ:
+          </p>
+          <p id="nas-folder-preview" class="font-mono text-[11px] bg-white px-2.5 py-1.5 rounded-lg border border-blue-100 text-slate-800 break-all">
+            [โฟลเดอร์ NAS ที่เลือก] / ชื่อลูกค้า / สังกัด / Product / วัน-เดือน-ปีพ.ศ. /
+          </p>
+          <p class="text-[11px] text-slate-500 pt-0.5" id="nas-summary-count">
+            เตรียมบันทึก 0 รูปภาพ
+          </p>
+        </div>
+
+        <!-- Option to clean Cloud space after NAS save -->
+        <div class="p-3 rounded-xl bg-amber-50/80 border border-amber-200/80">
+          <label class="inline-flex items-start gap-2.5 cursor-pointer select-none">
+            <input id="nas-clear-cloud-checkbox" type="checkbox" class="w-4 h-4 mt-0.5 rounded accent-[#EB2D2D] cursor-pointer" />
+            <div>
+              <span class="font-semibold text-slate-800 block">ลบอัลบั้มออกจาก Cloud หลังบันทึกลง NAS สำเร็จ</span>
+              <span class="text-[11px] text-slate-500">ช่วยคืนพื้นที่ฟรี 1 GB บน Supabase ให้ทีมใช้งานต่อได้ไม่จำกัด (ระบบจะลบเฉพาะเมื่อเขียนไฟล์ลง NAS ครบ 100% แล้วเท่านั้น)</span>
+            </div>
+          </label>
+        </div>
+
+        <!-- Progress Bar -->
+        <div id="nas-progress-box" class="hidden space-y-1.5">
+          <div class="flex items-center justify-between text-[11px] font-medium">
+            <span id="nas-progress-label" class="text-blue-700">กำลังเชื่อมต่อโฟลเดอร์ NAS...</span>
+            <span id="nas-progress-pct" class="font-mono font-bold text-slate-700">0%</span>
+          </div>
+          <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div id="nas-progress-bar" class="h-full bg-blue-600 transition-all duration-200" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <div id="nas-status-msg" class="hidden p-3 rounded-xl text-xs font-medium"></div>
+
+        <div class="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100">
+          <span class="text-[11px] text-slate-400">รองรับ Chrome / Edge บน PC ออฟฟิศ</span>
+          <div class="flex gap-2">
+            <button type="button" onclick="closeNasExportModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 cursor-pointer">ปิด</button>
+            <button id="nas-start-btn" type="button" onclick="executeDirectNasSave()" class="px-5 py-2 rounded-xl font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer flex items-center gap-1.5">
+              <i data-lucide="folder-check" class="w-4 h-4"></i> เลือกโฟลเดอร์ NAS และบันทึก
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ==================== MODAL: BULK REGISTER FROM EXCEL ==================== -->
+  <div id="bulk-excel-modal" class="hidden fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-100">
+      <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
+        <h3 class="font-semibold text-sm flex items-center gap-2">
+          <i data-lucide="file-spreadsheet" class="w-5 h-5 text-emerald-400"></i>
+          ลงทะเบียนผู้ใช้งานหลายคนจาก Excel (.xlsx / .xls / .csv)
+        </h3>
+        <button type="button" onclick="closeBulkExcelModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 max-h-[82vh] overflow-y-auto text-xs">
+        <div class="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-slate-700 flex flex-wrap items-center justify-between gap-3">
+          <div class="space-y-1">
+            <p class="font-bold text-emerald-800">รูปแบบคอลัมน์ในไฟล์ Excel:</p>
+            <p>รองรับหัวตาราง <code class="bg-white px-1.5 py-0.5 rounded border border-emerald-200 font-mono">email</code> (อีเมล), <code class="bg-white px-1.5 py-0.5 rounded border border-emerald-200 font-mono">password</code> (รหัสผ่าน), <code class="bg-white px-1.5 py-0.5 rounded border border-emerald-200 font-mono">dept</code> (สังกัด)</p>
+            <p class="text-[11px] text-slate-500">* หากใน Excel ไม่มีคอลัมน์รหัสผ่าน ระบบจะใช้รหัสผ่านเริ่มต้นด้านล่างให้โดยอัตโนมัติ</p>
+          </div>
+          <button type="button" onclick="downloadExcelTemplate()"
+            class="px-3.5 py-2 rounded-xl bg-white hover:bg-emerald-100/70 text-emerald-800 font-semibold border border-emerald-300 shadow-2xs transition cursor-pointer flex items-center gap-1.5 shrink-0">
+            <i data-lucide="download" class="w-3.5 h-3.5"></i> โหลดไฟล์ตัวอย่าง Excel
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">1. เลือกไฟล์ Excel / CSV *</label>
+            <input id="bulk-excel-input" type="file" accept=".xlsx,.xls,.csv" onchange="handleBulkExcelFile(event)"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-[#F8FAFC] text-xs file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#1B212C] file:text-white hover:file:bg-slate-800 cursor-pointer" />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">รหัสผ่านเริ่มต้น (กรณีในไฟล์ไม่ได้ระบุ)</label>
+            <input id="bulk-default-pass" type="text" value="cspm1234" oninput="reapplyBulkDefaultPass()"
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] outline-none text-xs font-mono" />
+          </div>
+        </div>
+
+        <!-- Preview Table -->
+        <div id="bulk-preview-section" class="hidden space-y-2">
+          <div class="flex items-center justify-between">
+            <span id="bulk-preview-count" class="font-bold text-slate-800">พบข้อมูล 0 รายการ</span>
+            <span class="text-[11px] text-slate-400">ระบบดึงชื่อหน้า @ เป็น Username ให้อัตโนมัติ</span>
+          </div>
+          <div class="border border-slate-200 rounded-xl overflow-hidden max-h-60 overflow-y-auto">
+            <table class="w-full text-left border-collapse text-xs">
+              <thead class="bg-slate-100 text-slate-600 sticky top-0">
+                <tr>
+                  <th class="py-2 px-3 font-semibold">#</th>
+                  <th class="py-2 px-3 font-semibold">Username</th>
+                  <th class="py-2 px-3 font-semibold">อีเมลองค์กร</th>
+                  <th class="py-2 px-3 font-semibold">รหัสผ่าน</th>
+                  <th class="py-2 px-3 font-semibold">สังกัด</th>
+                  <th class="py-2 px-3 font-semibold">สถานะ</th>
+                </tr>
+              </thead>
+              <tbody id="bulk-preview-tbody" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="bulk-excel-msg" class="hidden p-3 rounded-xl text-xs font-medium"></div>
+
+        <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
+          <button type="button" onclick="closeBulkExcelModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 cursor-pointer">ปิด</button>
+          <button id="bulk-confirm-btn" type="button" disabled onclick="confirmBulkImportAccounts()"
+            class="px-5 py-2 rounded-xl font-medium btn-cspm-primary disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="user-check" class="w-4 h-4"></i> ยืนยันลงทะเบียนทั้งหมด
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
+  <!-- ==================== MODAL: SUPABASE CLOUD CONFIG ==================== -->
+  <div id="cloud-config-modal" class="hidden fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden border border-slate-100">
+      <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
+        <h3 class="font-semibold text-sm flex items-center gap-2">
+          <i data-lucide="cloud" class="w-5 h-5 text-[#EB2D2D]"></i>
+          เชื่อมต่อ Supabase เพื่อแชร์ข้อมูลและรูปภาพข้ามเครื่องทั้งทีม
+        </h3>
+        <button type="button" onclick="closeCloudConfigModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 max-h-[82vh] overflow-y-auto text-xs">
+        <div class="p-3.5 rounded-xl bg-red-50/70 border border-red-200/80 text-slate-700 space-y-1.5">
+          <p class="font-bold text-[#EB2D2D]">วิธีตั้งค่าฟรีครั้งเดียว (ใช้ได้ทั้งทีม):</p>
+          <p>1. สร้างโปรเจกต์ฟรีที่ <strong>supabase.com</strong> แล้วไปที่ <strong>Settings → API</strong> เพื่อนำ <strong>Project URL</strong> และ <strong>anon public key</strong> มากรอกด้านล่าง</p>
+          <p>2. ไปที่ <strong>SQL Editor</strong> ใน Supabase แล้วกดรันสคริปต์สร้างตารางและ Bucket รูปภาพ (กดปุ่มคัดลอก SQL ด้านล่างได้เลย)</p>
+        </div>
+
+        <div class="flex items-center justify-between gap-2 bg-slate-50 p-3 rounded-xl border border-slate-200">
+          <span class="font-semibold text-slate-700">สคริปต์ SQL สำหรับสร้างตาราง & Storage Bucket:</span>
+          <button type="button" onclick="copySupabaseSql()" class="px-3 py-1.5 rounded-lg bg-[#1B212C] hover:bg-slate-800 text-white font-medium cursor-pointer flex items-center gap-1">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i> คัดลอก SQL
+          </button>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-600 mb-1">Supabase Project URL *</label>
+          <input id="sb-url-input" type="url" placeholder="https://xxxxxxxxxxxx.supabase.co"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] outline-none text-sm" />
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-600 mb-1">Supabase anon public Key *</label>
+          <input id="sb-key-input" type="text" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] outline-none text-sm font-mono" />
+        </div>
+
+        <div id="cloud-config-msg" class="hidden p-2.5 rounded-xl text-xs font-medium"></div>
+
+        <div class="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100">
+          <button type="button" onclick="disconnectCloudConfig()" class="px-3.5 py-2 rounded-xl text-slate-500 hover:text-red-600 hover:bg-red-50 cursor-pointer">
+            ยกเลิกการเชื่อมต่อ Cloud (ใช้ Local)
+          </button>
+          <div class="flex gap-2">
+            <button type="button" onclick="closeCloudConfigModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 cursor-pointer">ปิด</button>
+            <button type="button" onclick="saveAndConnectCloud()" class="px-5 py-2 rounded-xl font-medium btn-cspm-primary cursor-pointer">
+              บันทึกและเชื่อมต่อทีม
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>
