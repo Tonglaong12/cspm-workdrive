@@ -599,9 +599,10 @@
                 <span class="hidden sm:inline">โหลด ZIP</span>
               </button>
 
-              <button onclick="deleteCurrentAlbum()"
-                class="p-2.5 text-slate-400 hover:text-[#EB2D2D] hover:bg-red-50 rounded-xl border border-slate-200 transition cursor-pointer" title="ลบอัลบั้มวันที่นี้">
+              <button onclick="openDeleteConfirmModal('album', activeAlbumId)"
+                class="px-3.5 py-2.5 bg-red-50 hover:bg-red-100 text-[#EB2D2D] border border-red-200 text-sm font-medium rounded-xl flex items-center gap-1.5 transition cursor-pointer" title="ลบอัลบั้มวันที่นี้">
                 <i data-lucide="trash-2" class="w-4 h-4"></i>
+                <span>ลบอัลบั้ม</span>
               </button>
             </div>
           </div>
@@ -613,6 +614,31 @@
               <span>ประทับชื่อลูกค้า สังกัด Product วัน/เดือน/ปีพ.ศ. และชื่อผู้ถ่ายลงบนภาพอัตโนมัติ</span>
             </label>
             <span class="text-slate-400">ระบบย่อขนาดและบีบอัดอัตโนมัติ (~150–250 KB/รูป) เพื่อประหยัดพื้นที่องค์กร</span>
+          </div>
+        </div>
+
+        <!-- Photo Selection Toolbar -->
+        <div id="photo-selection-bar" class="hidden mb-4 bg-white rounded-2xl border border-slate-200 px-4 py-3 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <label class="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-semibold text-slate-700">
+              <input id="select-all-photos-cb" type="checkbox" onchange="toggleSelectAllPhotos(this.checked)" class="w-4 h-4 rounded accent-[#EB2D2D] cursor-pointer" />
+              <span>เลือกทั้งหมด</span>
+            </label>
+            <span id="selected-photos-count-badge" class="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-semibold">
+              เลือกแล้ว 0 รูป
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button id="btn-clear-photo-selection" type="button" onclick="clearPhotoSelection()"
+              class="hidden px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium transition cursor-pointer">
+              ยกเลิกการเลือก
+            </button>
+            <button id="btn-delete-selected-photos" type="button" onclick="openDeleteConfirmModal('selected-photos')" disabled
+              class="px-3.5 py-1.5 rounded-xl bg-red-50 text-red-300 border border-red-100 text-xs font-semibold flex items-center gap-1.5 transition cursor-not-allowed">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              <span id="btn-delete-selected-label">ลบรูปที่เลือก</span>
+            </button>
           </div>
         </div>
 
@@ -795,8 +821,8 @@
 
     // ใส่ค่า Supabase URL และ anon key ของทีมไว้ที่นี่เพื่อให้เพื่อนทุกคนแชร์ข้อมูลได้ทันทีโดยไม่ต้องกรอกซ้ำ
     const EMBEDDED_SUPABASE_CONFIG = {
-      url: 'https://ivomnnsbbwgmsngnahdz.supabase.co',
-      anonKey: 'sb_publishable_6k2OuQpS-c1rfNtM0ukCLg_jKVnSVUA'
+      url: '',
+      anonKey: ''
     };
 
     const TAB_SESSION_ID = 'tab-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
@@ -1487,14 +1513,19 @@ create policy "Public Access workdrive-photos" on storage.objects
       if (!currentUser) return;
       const now = Date.now();
       const activityStr = getCurrentActivityLabel();
+      const myKey = (currentUser.name || '').trim().toLowerCase();
 
       let presenceMap = {};
       try {
         presenceMap = JSON.parse(localStorage.getItem(PRESENCE_KEY) || '{}');
       } catch (e) {}
 
+      // Remove expired sessions and older duplicate sessions of the same user on this browser
       Object.keys(presenceMap).forEach(sid => {
-        if (now - (presenceMap[sid].lastSeen || 0) > 20000) {
+        const rec = presenceMap[sid];
+        const isExpired = now - (rec.lastSeen || 0) > 20000;
+        const isSameUserOldTab = sid !== TAB_SESSION_ID && (rec.name || '').trim().toLowerCase() === myKey;
+        if (isExpired || isSameUserOldTab) {
           delete presenceMap[sid];
         }
       });
@@ -1511,6 +1542,13 @@ create policy "Public Access workdrive-photos" on storage.objects
 
       if (isCloudConnected && supabaseClient) {
         try {
+          // Remove any stale duplicate rows for the same username before upserting current session
+          await supabaseClient
+            .from('workdrive_presence')
+            .delete()
+            .eq('username', currentUser.name)
+            .neq('session_id', TAB_SESSION_ID);
+
           await supabaseClient.from('workdrive_presence').upsert({
             session_id: TAB_SESSION_ID,
             username: currentUser.name,
@@ -1529,6 +1567,8 @@ create policy "Public Access workdrive-photos" on storage.objects
           if (Array.isArray(cloudRows)) {
             const merged = { ...presenceMap };
             cloudRows.forEach(r => {
+              const rUserKey = (r.username || '').trim().toLowerCase();
+              if (rUserKey === myKey && r.session_id !== TAB_SESSION_ID) return;
               merged[r.session_id] = {
                 sessionId: r.session_id,
                 name: r.username,
@@ -1586,26 +1626,47 @@ create policy "Public Access workdrive-photos" on storage.objects
         presenceMap = JSON.parse(localStorage.getItem(PRESENCE_KEY) || '{}');
       } catch (e) {}
 
-      const activeSessions = Object.values(presenceMap).filter(s => now - (s.lastSeen || 0) <= 20000);
-      activeSessions.sort((a, b) => {
-        if (a.sessionId === TAB_SESSION_ID) return -1;
-        if (b.sessionId === TAB_SESSION_ID) return 1;
+      const validSessions = Object.values(presenceMap).filter(s => now - (s.lastSeen || 0) <= 20000);
+
+      // Deduplicate by username so the same person never appears twice
+      const dedupByUser = new Map();
+      validSessions.forEach(s => {
+        const uKey = (s.name || '').trim().toLowerCase();
+        if (!uKey) return;
+        const existing = dedupByUser.get(uKey);
+        if (!existing) {
+          dedupByUser.set(uKey, s);
+        } else if (s.sessionId === TAB_SESSION_ID) {
+          dedupByUser.set(uKey, s);
+        } else if (existing.sessionId !== TAB_SESSION_ID && (s.lastSeen || 0) > (existing.lastSeen || 0)) {
+          dedupByUser.set(uKey, s);
+        }
+      });
+
+      const uniqueOnlineUsers = Array.from(dedupByUser.values());
+      const myKey = currentUser ? (currentUser.name || '').trim().toLowerCase() : '';
+
+      uniqueOnlineUsers.sort((a, b) => {
+        const aIsMe = (a.name || '').trim().toLowerCase() === myKey;
+        const bIsMe = (b.name || '').trim().toLowerCase() === myKey;
+        if (aIsMe && !bIsMe) return -1;
+        if (!aIsMe && bIsMe) return 1;
         return a.name.localeCompare(b.name);
       });
 
-      const onlineUsernames = new Set(activeSessions.map(s => s.name.toLowerCase()));
-      const registeredOffline = getRegisteredAccounts().filter(acc => !onlineUsernames.has(acc.username.toLowerCase()));
+      const onlineUsernames = new Set(uniqueOnlineUsers.map(s => (s.name || '').trim().toLowerCase()));
+      const registeredOffline = getRegisteredAccounts().filter(acc => !onlineUsernames.has((acc.username || '').trim().toLowerCase()));
 
       const badge = document.getElementById('online-count-badge');
       const totalLabel = document.getElementById('online-popover-total');
       const listEl = document.getElementById('online-users-list');
 
-      if (badge) badge.textContent = activeSessions.length;
-      if (totalLabel) totalLabel.textContent = `${activeSessions.length} คนออนไลน์`;
+      if (badge) badge.textContent = uniqueOnlineUsers.length;
+      if (totalLabel) totalLabel.textContent = `${uniqueOnlineUsers.length} คนออนไลน์`;
       if (!listEl) return;
 
-      let rowsHtml = activeSessions.map(s => {
-        const isMe = s.sessionId === TAB_SESSION_ID;
+      let rowsHtml = uniqueOnlineUsers.map(s => {
+        const isMe = (s.name || '').trim().toLowerCase() === myKey;
         const initial = (s.name || 'U').charAt(0).toUpperCase();
         return `
           <div class="p-3 hover:bg-slate-50 flex items-start justify-between gap-2.5 rounded-xl transition">
@@ -1925,13 +1986,17 @@ create policy "Public Access workdrive-photos" on storage.objects
                 <span class="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-[#1B212C]/90 text-white text-[11px] font-semibold flex items-center gap-1">
                   <i data-lucide="building-2" class="w-3 h-3 text-[#EB2D2D]"></i> ลูกค้า
                 </span>
-                <div class="absolute top-3 right-3 flex items-center gap-1.5">
+                <div class="absolute top-3 right-3 flex items-center gap-1">
                   <span class="px-2.5 py-1 rounded-full bg-white/95 text-slate-700 text-[11px] font-medium shadow-2xs">
                     ${item.depts.size} สังกัด
                   </span>
                   <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('client', '${safeJsName}')"
                     class="p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-600 hover:text-amber-700 shadow-2xs transition cursor-pointer" title="แก้ไขชื่อลูกค้า">
                     <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                  </button>
+                  <button type="button" onclick="event.stopPropagation(); openDeleteConfirmModal('client', '${safeJsName}')"
+                    class="p-1.5 rounded-full bg-white/95 hover:bg-red-50 text-slate-600 hover:text-[#EB2D2D] shadow-2xs transition cursor-pointer" title="ลบโฟลเดอร์ลูกค้านี้">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                   </button>
                 </div>
               </div>
@@ -1968,11 +2033,15 @@ create policy "Public Access workdrive-photos" on storage.objects
                   <p class="text-xs text-slate-500 truncate">สังกัด: ${Array.from(item.depts).join(', ')} • ${item.products.size} Product</p>
                 </div>
               </div>
-              <div class="flex items-center gap-3 shrink-0 text-xs">
-                <span class="font-semibold text-slate-700">${item.photoCount} รูป</span>
+              <div class="flex items-center gap-2 shrink-0 text-xs">
+                <span class="font-semibold text-slate-700 mr-1">${item.photoCount} รูป</span>
                 <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('client', '${safeJsName}')"
                   class="p-1.5 rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-700 transition cursor-pointer" title="แก้ไขชื่อลูกค้า">
                   <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" onclick="event.stopPropagation(); openDeleteConfirmModal('client', '${safeJsName}')"
+                  class="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-[#EB2D2D] transition cursor-pointer" title="ลบโฟลเดอร์ลูกค้านี้">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 </button>
                 <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
               </div>
@@ -2032,10 +2101,16 @@ create policy "Public Access workdrive-photos" on storage.objects
                       <i data-lucide="layers" class="w-7 h-7 text-[#EB2D2D]"></i>
                     </div>`
                 }
-                <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('dept', '${safeJsName}')"
-                  class="absolute top-3 right-3 p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-700 hover:text-amber-700 shadow-2xs transition cursor-pointer z-10" title="แก้ไขชื่อสังกัด">
-                  <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
-                </button>
+                <div class="absolute top-3 right-3 flex items-center gap-1 z-10">
+                  <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('dept', '${safeJsName}')"
+                    class="p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-700 hover:text-amber-700 shadow-2xs transition cursor-pointer" title="แก้ไขชื่อสังกัด">
+                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                  </button>
+                  <button type="button" onclick="event.stopPropagation(); openDeleteConfirmModal('dept', '${safeJsName}')"
+                    class="p-1.5 rounded-full bg-white/95 hover:bg-red-50 text-slate-700 hover:text-[#EB2D2D] shadow-2xs transition cursor-pointer" title="ลบโฟลเดอร์สังกัดนี้">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
                 <div class="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent flex flex-col justify-end p-4">
                   <span class="text-[10px] font-semibold uppercase tracking-wider text-[#FF6B70]">สังกัด (Department)</span>
                   <h3 class="font-bold text-xl text-white">${escapeHtml(item.name)}</h3>
@@ -2068,11 +2143,15 @@ create policy "Public Access workdrive-photos" on storage.objects
                   <p class="text-xs text-slate-500 truncate">Product: ${Array.from(item.products).join(', ')}</p>
                 </div>
               </div>
-              <div class="flex items-center gap-3 shrink-0 text-xs">
-                <span class="font-semibold text-slate-700">${item.photoCount} รูป</span>
+              <div class="flex items-center gap-2 shrink-0 text-xs">
+                <span class="font-semibold text-slate-700 mr-1">${item.photoCount} รูป</span>
                 <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('dept', '${safeJsName}')"
                   class="p-1.5 rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-700 transition cursor-pointer" title="แก้ไขชื่อสังกัด">
                   <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" onclick="event.stopPropagation(); openDeleteConfirmModal('dept', '${safeJsName}')"
+                  class="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-[#EB2D2D] transition cursor-pointer" title="ลบโฟลเดอร์สังกัดนี้">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 </button>
                 <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
               </div>
@@ -2136,13 +2215,17 @@ create policy "Public Access workdrive-photos" on storage.objects
                 <span class="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-[#EB2D2D] text-white text-[11px] font-semibold">
                   Product
                 </span>
-                <div class="absolute top-3 right-3 flex items-center gap-1.5">
+                <div class="absolute top-3 right-3 flex items-center gap-1">
                   <span class="px-2.5 py-1 rounded-full bg-white/95 text-slate-700 text-[11px] font-medium shadow-2xs">
                     ${item.dateAlbums.length} วัน
                   </span>
                   <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('product', '${safeJsName}')"
                     class="p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-600 hover:text-amber-700 shadow-2xs transition cursor-pointer" title="แก้ไขชื่อ Product">
                     <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                  </button>
+                  <button type="button" onclick="event.stopPropagation(); openDeleteConfirmModal('product', '${safeJsName}')"
+                    class="p-1.5 rounded-full bg-white/95 hover:bg-red-50 text-slate-600 hover:text-[#EB2D2D] shadow-2xs transition cursor-pointer" title="ลบโฟลเดอร์ Product นี้">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                   </button>
                 </div>
               </div>
@@ -2174,11 +2257,15 @@ create policy "Public Access workdrive-photos" on storage.objects
                   <p class="text-xs text-slate-500 truncate">${item.dateAlbums.length} อัลบั้มวันที่</p>
                 </div>
               </div>
-              <div class="flex items-center gap-3 shrink-0 text-xs">
-                <span class="font-semibold text-slate-700">${item.photoCount} รูป</span>
+              <div class="flex items-center gap-2 shrink-0 text-xs">
+                <span class="font-semibold text-slate-700 mr-1">${item.photoCount} รูป</span>
                 <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('product', '${safeJsName}')"
                   class="p-1.5 rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-700 transition cursor-pointer" title="แก้ไขชื่อ Product">
                   <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
+                <button type="button" onclick="event.stopPropagation(); openDeleteConfirmModal('product', '${safeJsName}')"
+                  class="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-[#EB2D2D] transition cursor-pointer" title="ลบโฟลเดอร์ Product นี้">
+                  <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                 </button>
                 <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
               </div>
@@ -2229,13 +2316,17 @@ create policy "Public Access workdrive-photos" on storage.objects
                   <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
                   ${escapeHtml(album.thaiDate)}
                 </span>
-                <div class="absolute top-3 right-3 flex items-center gap-1.5">
+                <div class="absolute top-3 right-3 flex items-center gap-1">
                   <span class="px-2.5 py-1 rounded-full bg-[#1B212C]/90 text-white text-[11px] font-medium">
                     ${escapeHtml(album.dept)}
                   </span>
                   <button type="button" onclick="event.stopPropagation(); openEditAlbumModal('${album.id}')"
                     class="p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-700 hover:text-amber-700 shadow-2xs transition cursor-pointer" title="แก้ไขวันที่ / ชื่อ / รายละเอียด">
                     <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                  </button>
+                  <button type="button" onclick="event.stopPropagation(); openDeleteConfirmModal('album', '${album.id}')"
+                    class="p-1.5 rounded-full bg-white/95 hover:bg-red-50 text-slate-700 hover:text-[#EB2D2D] shadow-2xs transition cursor-pointer" title="ลบอัลบั้มวันที่นี้">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                   </button>
                 </div>
               </div>
@@ -2269,11 +2360,15 @@ create policy "Public Access workdrive-photos" on storage.objects
                 <p class="text-xs text-slate-500 truncate">${escapeHtml(album.note || album.product)}</p>
               </div>
             </div>
-            <div class="flex items-center gap-3 shrink-0 text-xs">
-              <span class="font-semibold text-slate-700">${album.photos.length} รูป</span>
+            <div class="flex items-center gap-2 shrink-0 text-xs">
+              <span class="font-semibold text-slate-700 mr-1">${album.photos.length} รูป</span>
               <button type="button" onclick="event.stopPropagation(); openEditAlbumModal('${album.id}')"
                 class="p-1.5 rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-700 transition cursor-pointer" title="แก้ไขวันที่ / ชื่อ / รายละเอียด">
                 <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+              </button>
+              <button type="button" onclick="event.stopPropagation(); openDeleteConfirmModal('album', '${album.id}')"
+                class="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-[#EB2D2D] transition cursor-pointer" title="ลบอัลบั้มวันที่นี้">
+                <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
               </button>
               <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
             </div>
@@ -2382,7 +2477,12 @@ create policy "Public Access workdrive-photos" on storage.objects
       openAlbum(newAlb.id);
     }
 
+    let selectedPhotoIds = new Set();
+
     function openAlbum(id) {
+      if (activeAlbumId !== id) {
+        selectedPhotoIds.clear();
+      }
       activeAlbumId = id;
       const album = albums.find(a => a.id === id);
       if (!album) return;
@@ -2554,12 +2654,84 @@ create policy "Public Access workdrive-photos" on storage.objects
       openAlbum(album.id);
     }
 
-    // ==================== RENDER PHOTOS & LIGHTBOX ====================
+    // ==================== RENDER PHOTOS, SELECTION & LIGHTBOX ====================
+    function updatePhotoSelectionUI() {
+      const album = albums.find(a => a.id === activeAlbumId);
+      const bar = document.getElementById('photo-selection-bar');
+      const selectAllCb = document.getElementById('select-all-photos-cb');
+      const countBadge = document.getElementById('selected-photos-count-badge');
+      const clearBtn = document.getElementById('btn-clear-photo-selection');
+      const delBtn = document.getElementById('btn-delete-selected-photos');
+      const delLabel = document.getElementById('btn-delete-selected-label');
+
+      if (!album || !album.photos || album.photos.length === 0) {
+        if (bar) bar.classList.add('hidden');
+        return;
+      }
+
+      if (bar) bar.classList.remove('hidden');
+
+      // Clean up any stale IDs
+      const validIds = new Set(album.photos.map(p => p.id));
+      selectedPhotoIds.forEach(id => {
+        if (!validIds.has(id)) selectedPhotoIds.delete(id);
+      });
+
+      const count = selectedPhotoIds.size;
+      if (selectAllCb) {
+        selectAllCb.checked = count > 0 && count === album.photos.length;
+        selectAllCb.indeterminate = count > 0 && count < album.photos.length;
+      }
+
+      if (count > 0) {
+        countBadge.textContent = `เลือกแล้ว ${count} รูป`;
+        countBadge.className = 'px-2.5 py-0.5 rounded-full bg-[#EB2D2D]/10 text-[#EB2D2D] text-xs font-bold';
+        clearBtn.classList.remove('hidden');
+        delBtn.disabled = false;
+        delBtn.className = 'px-3.5 py-1.5 rounded-xl bg-[#EB2D2D] hover:bg-[#C8141B] text-white shadow-xs text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer';
+        delLabel.textContent = `ลบรูปที่เลือก (${count})`;
+      } else {
+        countBadge.textContent = `ทั้งหมด ${album.photos.length} รูป (คลิกช่องมุมซ้ายบนเพื่อเลือกลบ)`;
+        countBadge.className = 'px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 text-xs font-medium';
+        clearBtn.classList.add('hidden');
+        delBtn.disabled = true;
+        delBtn.className = 'px-3.5 py-1.5 rounded-xl bg-red-50 text-red-300 border border-red-100 text-xs font-semibold flex items-center gap-1.5 transition cursor-not-allowed';
+        delLabel.textContent = 'ลบรูปที่เลือก';
+      }
+    }
+
+    function togglePhotoSelect(photoId, e) {
+      if (e) e.stopPropagation();
+      if (selectedPhotoIds.has(photoId)) {
+        selectedPhotoIds.delete(photoId);
+      } else {
+        selectedPhotoIds.add(photoId);
+      }
+      renderPhotos();
+    }
+
+    function toggleSelectAllPhotos(checked) {
+      const album = albums.find(a => a.id === activeAlbumId);
+      if (!album) return;
+      selectedPhotoIds.clear();
+      if (checked) {
+        album.photos.forEach(p => selectedPhotoIds.add(p.id));
+      }
+      renderPhotos();
+    }
+
+    function clearPhotoSelection() {
+      selectedPhotoIds.clear();
+      renderPhotos();
+    }
+
     function renderPhotos() {
       const album = albums.find(a => a.id === activeAlbumId);
       const grid = document.getElementById('photos-grid');
 
       if (!album || album.photos.length === 0) {
+        selectedPhotoIds.clear();
+        updatePhotoSelectionUI();
         grid.className = 'bg-white rounded-2xl border border-dashed border-slate-300 p-12 text-center';
         grid.innerHTML = `
           <div class="w-14 h-14 bg-[#EB2D2D]/10 text-[#EB2D2D] rounded-2xl flex items-center justify-center mx-auto mb-3">
@@ -2574,21 +2746,40 @@ create policy "Public Access workdrive-photos" on storage.objects
         return;
       }
 
+      updatePhotoSelectionUI();
       grid.className = 'grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4';
-      grid.innerHTML = album.photos.map(photo => `
-        <div onclick="openLightbox('${photo.id}')" class="group bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs hover:shadow-md transition cursor-pointer flex flex-col">
+      grid.innerHTML = album.photos.map(photo => {
+        const isSelected = selectedPhotoIds.has(photo.id);
+        return `
+        <div onclick="openLightbox('${photo.id}')"
+          class="group bg-white rounded-2xl border-2 ${isSelected ? 'border-[#EB2D2D] ring-2 ring-[#EB2D2D]/20' : 'border-slate-200'} overflow-hidden shadow-2xs hover:shadow-md transition cursor-pointer flex flex-col">
           <div class="aspect-square bg-slate-100 relative overflow-hidden">
-            <img src="${photo.dataUrl}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />
+            <img src="${photo.dataUrl}" class="w-full h-full object-cover ${isSelected ? 'scale-[0.97]' : 'group-hover:scale-105'} transition duration-300" />
+
+            <!-- Top-Left Selection Checkbox -->
+            <button type="button" onclick="togglePhotoSelect('${photo.id}', event)"
+              class="absolute top-2.5 left-2.5 w-7 h-7 rounded-lg ${isSelected ? 'bg-[#EB2D2D] text-white border-[#EB2D2D]' : 'bg-white/90 hover:bg-white text-slate-400 border-slate-300'} border shadow-sm flex items-center justify-center transition cursor-pointer z-10"
+              title="คลิกเพื่อเลือกรูปนี้">
+              ${isSelected ? '<i data-lucide="check" class="w-4 h-4 stroke-[3]"></i>' : '<span class="w-3.5 h-3.5 rounded-xs border border-slate-400 block"></span>'}
+            </button>
+
+            <!-- Top-Right Quick Single Photo Delete Button -->
+            <button type="button" onclick="event.stopPropagation(); openDeleteConfirmModal('single-photo', '${photo.id}')"
+              class="absolute top-2.5 right-2.5 w-7 h-7 rounded-lg bg-white/90 hover:bg-red-50 text-slate-600 hover:text-[#EB2D2D] border border-slate-200/80 shadow-sm flex items-center justify-center transition cursor-pointer z-10"
+              title="ลบรูปภาพนี้">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            </button>
+
             <span class="absolute bottom-2 right-2 px-2 py-0.5 rounded-md bg-black/65 text-white text-[10px]">
               ${formatBytes(photo.sizeBytes)}
             </span>
           </div>
-          <div class="p-3">
+          <div class="p-3 ${isSelected ? 'bg-red-50/40' : ''}">
             <p class="text-xs font-semibold text-slate-800 truncate">${escapeHtml(photo.caption || 'ไม่มีคำอธิบาย')}</p>
             <p class="text-[11px] text-slate-400 mt-0.5 truncate">${escapeHtml(photo.takenBy)} • ${escapeHtml(photo.timestamp)}</p>
           </div>
         </div>
-      `).join('');
+      `;}).join('');
       lucide.createIcons();
     }
 
@@ -2645,19 +2836,9 @@ create policy "Public Access workdrive-photos" on storage.objects
       }
     }
 
-    async function deleteCurrentPhoto() {
-      if (!confirm('ต้องการลบรูปภาพนี้ใช่หรือไม่?')) return;
-      const album = albums.find(a => a.id === activeAlbumId);
-      const targetPhoto = album.photos.find(p => p.id === activePhotoId);
-      if (isCloudConnected && supabaseClient && targetPhoto && targetPhoto.storagePath) {
-        try {
-          await supabaseClient.storage.from(PHOTO_BUCKET).remove([targetPhoto.storagePath]);
-        } catch (e) {}
-      }
-      album.photos = album.photos.filter(p => p.id !== activePhotoId);
-      saveAlbums();
-      closeLightbox();
-      openAlbum(album.id);
+    function deleteCurrentPhoto() {
+      if (!activePhotoId) return;
+      openDeleteConfirmModal('single-photo', activePhotoId);
     }
 
     // ==================== EXPORT ALBUM AS ZIP ====================
@@ -3160,6 +3341,153 @@ create policy "Public Access workdrive-photos" on storage.objects
       lucide.createIcons();
     }
 
+    // ==================== UNIFIED DELETE LOGIC (ALBUMS, FOLDERS & SELECTED PHOTOS) ====================
+    let pendingDeleteTask = { type: null, targetId: null };
+
+    function openDeleteConfirmModal(type, targetId = null) {
+      pendingDeleteTask = { type, targetId };
+      const titleEl = document.getElementById('delete-modal-title');
+      const headingEl = document.getElementById('delete-modal-heading');
+      const descEl = document.getElementById('delete-modal-desc');
+
+      if (type === 'album') {
+        const alb = albums.find(a => a.id === targetId);
+        if (!alb) return;
+        titleEl.textContent = 'ยืนยันการลบอัลบั้ม';
+        headingEl.textContent = `ลบอัลบั้มวันที่ ${alb.thaiDate} (${alb.client})?`;
+        descEl.textContent = `รูปภาพทั้งหมด ${alb.photos.length} รูปภายในอัลบั้มนี้จะถูกลบออกจากระบบและ Cloud อย่างถาวร`;
+      } else if (type === 'client') {
+        const matched = albums.filter(a => a.client === targetId);
+        const totalPics = matched.reduce((s, a) => s + a.photos.length, 0);
+        titleEl.textContent = 'ยืนยันการลบโฟลเดอร์ลูกค้า';
+        headingEl.textContent = `ลบโฟลเดอร์ลูกค้า "${targetId}"?`;
+        descEl.textContent = `ระบบจะลบอัลบั้มย่อยทั้งหมด ${matched.length} อัลบั้ม และรูปภาพรวม ${totalPics} รูป ภายใต้ลูกค้ารายนี้`;
+      } else if (type === 'dept') {
+        const matched = albums.filter(a => a.client === navPath.client && a.dept === targetId);
+        const totalPics = matched.reduce((s, a) => s + a.photos.length, 0);
+        titleEl.textContent = 'ยืนยันการลบโฟลเดอร์สังกัด';
+        headingEl.textContent = `ลบโฟลเดอร์สังกัด "${targetId}" ใน ${navPath.client}?`;
+        descEl.textContent = `ระบบจะลบอัลบั้มย่อยทั้งหมด ${matched.length} อัลบั้ม และรูปภาพรวม ${totalPics} รูป ภายใต้สังกัดนี้`;
+      } else if (type === 'product') {
+        const matched = albums.filter(a => a.client === navPath.client && a.dept === navPath.dept && a.product === targetId);
+        const totalPics = matched.reduce((s, a) => s + a.photos.length, 0);
+        titleEl.textContent = 'ยืนยันการลบโฟลเดอร์ Product';
+        headingEl.textContent = `ลบโฟลเดอร์ "${targetId}"?`;
+        descEl.textContent = `ระบบจะลบอัลบั้มวันที่ทั้งหมด ${matched.length} อัลบั้ม และรูปภาพรวม ${totalPics} รูป ภายใต้ Product นี้`;
+      } else if (type === 'selected-photos') {
+        const count = selectedPhotoIds.size;
+        if (count === 0) return;
+        titleEl.textContent = 'ยืนยันการลบรูปภาพที่เลือก';
+        headingEl.textContent = `ลบรูปภาพที่คลิกเลือกไว้จำนวน ${count} รูป?`;
+        descEl.textContent = 'รูปภาพที่เลือกจะถูกลบออกจากอัลบั้มและพื้นที่ Cloud อย่างถาวร';
+      } else if (type === 'single-photo') {
+        const album = albums.find(a => a.id === activeAlbumId);
+        const ph = album ? album.photos.find(p => p.id === targetId) : null;
+        if (!ph) return;
+        titleEl.textContent = 'ยืนยันการลบรูปภาพ';
+        headingEl.textContent = `ลบรูปภาพ "${ph.caption || 'ภาพถ่ายหน้างาน'}"?`;
+        descEl.textContent = 'รูปภาพนี้จะถูกลบออกจากอัลบั้มและพื้นที่ Cloud อย่างถาวร';
+      }
+
+      document.getElementById('delete-confirm-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeDeleteConfirmModal() {
+      document.getElementById('delete-confirm-modal').classList.add('hidden');
+      pendingDeleteTask = { type: null, targetId: null };
+    }
+
+    async function removeCloudPhotosForAlbums(targetAlbums) {
+      if (!isCloudConnected || !supabaseClient) return;
+      const paths = [];
+      targetAlbums.forEach(alb => {
+        (alb.photos || []).forEach(p => {
+          if (p.storagePath) paths.push(p.storagePath);
+        });
+      });
+      if (paths.length > 0) {
+        try {
+          await supabaseClient.storage.from(PHOTO_BUCKET).remove(paths);
+        } catch (e) {}
+      }
+    }
+
+    async function executeConfirmedDelete() {
+      const { type, targetId } = pendingDeleteTask;
+      if (!type) return;
+
+      const btn = document.getElementById('delete-modal-confirm-btn');
+      btn.disabled = true;
+
+      try {
+        if (type === 'album') {
+          const targetAlb = albums.find(a => a.id === targetId);
+          if (targetAlb) {
+            await removeCloudPhotosForAlbums([targetAlb]);
+            albums = albums.filter(a => a.id !== targetId);
+            saveAlbums();
+          }
+          closeDeleteConfirmModal();
+          if (activeAlbumId === targetId) {
+            navigateToLevel('product');
+          } else {
+            showFolderDashboard();
+          }
+        } else if (type === 'client') {
+          const toDelete = albums.filter(a => a.client === targetId);
+          await removeCloudPhotosForAlbums(toDelete);
+          albums = albums.filter(a => a.client !== targetId);
+          saveAlbums();
+          closeDeleteConfirmModal();
+          showFolderDashboard();
+        } else if (type === 'dept') {
+          const toDelete = albums.filter(a => a.client === navPath.client && a.dept === targetId);
+          await removeCloudPhotosForAlbums(toDelete);
+          albums = albums.filter(a => !(a.client === navPath.client && a.dept === targetId));
+          saveAlbums();
+          closeDeleteConfirmModal();
+          showFolderDashboard();
+        } else if (type === 'product') {
+          const toDelete = albums.filter(a => a.client === navPath.client && a.dept === navPath.dept && a.product === targetId);
+          await removeCloudPhotosForAlbums(toDelete);
+          albums = albums.filter(a => !(a.client === navPath.client && a.dept === navPath.dept && a.product === targetId));
+          saveAlbums();
+          closeDeleteConfirmModal();
+          showFolderDashboard();
+        } else if (type === 'selected-photos') {
+          const album = albums.find(a => a.id === activeAlbumId);
+          if (album) {
+            const toDeletePhotos = album.photos.filter(p => selectedPhotoIds.has(p.id));
+            await removeCloudPhotosForAlbums([{ photos: toDeletePhotos }]);
+            album.photos = album.photos.filter(p => !selectedPhotoIds.has(p.id));
+            selectedPhotoIds.clear();
+            saveAlbums();
+          }
+          closeDeleteConfirmModal();
+          if (album) openAlbum(album.id);
+        } else if (type === 'single-photo') {
+          const album = albums.find(a => a.id === activeAlbumId);
+          if (album) {
+            const targetPhoto = album.photos.find(p => p.id === targetId);
+            if (targetPhoto) {
+              await removeCloudPhotosForAlbums([{ photos: [targetPhoto] }]);
+            }
+            album.photos = album.photos.filter(p => p.id !== targetId);
+            selectedPhotoIds.delete(targetId);
+            saveAlbums();
+          }
+          closeDeleteConfirmModal();
+          if (activePhotoId === targetId) {
+            closeLightbox();
+          }
+          if (album) openAlbum(album.id);
+        }
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
     window.addEventListener('DOMContentLoaded', () => { setupIphoneFullScreenApp(); init(); });
   </script>
 
@@ -3439,6 +3767,47 @@ create policy "Public Access workdrive-photos" on storage.objects
         class="mt-4 w-full py-3 rounded-2xl bg-slate-100 hover:bg-slate-200/80 text-slate-800 font-bold text-sm transition cursor-pointer">
         ปิด
       </button>
+    </div>
+  </div>
+
+
+  <!-- ==================== MODAL: CONFIRM DELETE (ALBUM / FOLDER / SELECTED PHOTOS) ==================== -->
+  <div id="delete-confirm-modal" onclick="if(event.target === this) closeDeleteConfirmModal()"
+    class="hidden fixed inset-0 z-[60] bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-100">
+      <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
+        <h3 class="font-semibold text-sm flex items-center gap-2">
+          <i data-lucide="trash-2" class="w-4 h-4 text-[#EB2D2D]"></i>
+          <span id="delete-modal-title">ยืนยันการลบข้อมูล</span>
+        </h3>
+        <button type="button" onclick="closeDeleteConfirmModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4">
+        <div class="flex items-start gap-3.5">
+          <div class="w-11 h-11 rounded-2xl bg-red-50 text-[#EB2D2D] flex items-center justify-center shrink-0">
+            <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+          </div>
+          <div>
+            <p id="delete-modal-heading" class="font-bold text-sm text-slate-900">ต้องการลบรายการที่เลือกใช่หรือไม่?</p>
+            <p id="delete-modal-desc" class="text-xs text-slate-500 mt-1 leading-relaxed">
+              ข้อมูลและรูปภาพที่ถูกลบจะถูกนำออกจากระบบและพื้นที่ Cloud ทันที
+            </p>
+          </div>
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2 border-t border-slate-100">
+          <button type="button" onclick="closeDeleteConfirmModal()" class="px-4 py-2 rounded-xl text-sm text-slate-600 hover:bg-slate-100 cursor-pointer">
+            ยกเลิก
+          </button>
+          <button id="delete-modal-confirm-btn" type="button" onclick="executeConfirmedDelete()"
+            class="px-5 py-2 rounded-xl text-sm font-semibold btn-cspm-primary cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="trash-2" class="w-4 h-4"></i>
+            <span>ยืนยันการลบ</span>
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
