@@ -2,13 +2,19 @@
 <html lang="th">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="CSPM WorkDrive" />
+  <meta name="theme-color" content="#141920" />
+  <link id="apple-touch-icon-link" rel="apple-touch-icon" sizes="180x180" href="" />
+  <link id="web-manifest-link" rel="manifest" href="" />
   <title>CSPM WorkDrive - Critical Services Site Photo & Album Repository</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -18,10 +24,25 @@
       --cspm-navy: #1E2530;
       --cspm-surface: #F5F7FA;
     }
-    body {
+    html, body {
       font-family: 'Prompt', sans-serif;
       background-color: var(--cspm-surface);
       color: #1E2530;
+      overscroll-behavior-y: none;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+    }
+    /* iPhone Notch / Dynamic Island & Home Indicator Safe Areas */
+    .ios-safe-top {
+      padding-top: env(safe-area-inset-top, 0px);
+    }
+    .ios-safe-bottom {
+      padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
+    }
+    @media all and (display-mode: standalone) {
+      .ios-sticky-header {
+        top: env(safe-area-inset-top, 0px);
+      }
     }
     /* Corporate Data Center subtle technical grid background matching cspm.co.th */
     .cspm-hero-bg {
@@ -70,7 +91,7 @@
 <body class="antialiased selection:bg-[#EB2D2D] selection:text-white">
 
   <!-- ==================== LOGIN SCREEN (CSPM CORPORATE THEME) ==================== -->
-  <div id="login-screen" class="min-h-screen flex flex-col justify-between cspm-hero-bg relative overflow-hidden">
+  <div id="login-screen" class="min-h-screen flex flex-col justify-between cspm-hero-bg relative overflow-hidden ios-safe-top ios-safe-bottom">
     <!-- Top Corporate Accent Bar -->
     <div class="w-full h-1.5 bg-cspm-red"></div>
 
@@ -88,7 +109,25 @@
     </div>
 
     <!-- Center Corporate Card -->
-    <div class="flex-1 flex items-center justify-center p-4 my-4">
+    <div class="flex-1 flex flex-col items-center justify-center p-4 my-4 gap-3.5">
+      <!-- Install App Pill Banner on Login Screen -->
+      <div id="install-pill-login" class="w-full max-w-4xl flex justify-center">
+        <div onclick="openInstallAppModal()"
+          class="w-full max-w-md bg-white/95 hover:bg-white border border-white/30 rounded-full py-2 pl-4 pr-2.5 shadow-lg flex items-center justify-between gap-3 cursor-pointer transition group">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-7 h-7 rounded-lg bg-[#1B212C] text-white flex items-center justify-center shrink-0">
+              <i data-lucide="smartphone" class="w-4 h-4 text-[#EB2D2D]"></i>
+            </div>
+            <span class="text-xs sm:text-sm font-bold text-[#1B212C] truncate group-hover:text-[#EB2D2D] transition">
+              ติดตั้งเป็นแอป • เปิดเร็วกว่า
+            </span>
+          </div>
+          <button type="button" onclick="event.stopPropagation(); dismissInstallPill('install-pill-login')"
+            class="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center shrink-0 transition cursor-pointer" title="ปิด">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
       <div class="max-w-4xl w-full bg-white rounded-2xl shadow-2xl overflow-hidden grid grid-cols-1 md:grid-cols-12 border border-white/10">
 
         <!-- Left Corporate Branding Panel (Matches cspm.co.th visual identity) -->
@@ -221,16 +260,9 @@
 
           <!-- ==================== REGISTER FORM ==================== -->
           <form id="register-form-box" onsubmit="handleRegisterSubmit(event)" class="hidden space-y-4">
-            <div class="flex flex-wrap items-start justify-between gap-2 mb-2">
-              <div>
-                <h1 class="text-xl font-bold text-slate-900">ลงทะเบียนผู้ใช้งานใหม่</h1>
-                <p class="text-slate-500 text-xs mt-1">ลงทะเบียนทีละคน หรือนำเข้าหลายคนพร้อมกันจากไฟล์ Excel</p>
-              </div>
-              <button type="button" onclick="openBulkExcelModal()"
-                class="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer shrink-0">
-                <i data-lucide="file-spreadsheet" class="w-4 h-4"></i>
-                นำเข้าจาก Excel หลายคน
-              </button>
+            <div class="mb-2">
+              <h1 class="text-xl font-bold text-slate-900">ลงทะเบียนผู้ใช้งานใหม่</h1>
+              <p class="text-slate-500 text-xs mt-1">ใช้อีเมลองค์กร ระบบจะดึงชื่อหน้า @ มาเป็นชื่อผู้ใช้งานให้อัตโนมัติ</p>
             </div>
 
             <div>
@@ -302,12 +334,12 @@
   </div>
 
   <!-- ==================== MAIN APP ==================== -->
-  <div id="app-screen" class="hidden min-h-screen flex flex-col">
-    <!-- Corporate Top Red Line -->
-    <div class="w-full h-1 bg-cspm-red"></div>
+  <div id="app-screen" class="hidden min-h-screen flex flex-col ios-safe-bottom">
+    <!-- Corporate Top Red Line + iOS Notch Cover -->
+    <div class="w-full bg-[#141920] ios-safe-top sticky top-0 z-40"><div class="w-full h-1 bg-cspm-red"></div></div>
 
     <!-- Top Navbar -->
-    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-2xs">
+    <header class="bg-white border-b border-slate-200 sticky top-0 ios-sticky-header z-30 shadow-2xs">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         <div class="flex items-center gap-3 cursor-pointer" onclick="goHome()">
           <img src="data:image/png;base64,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" alt="CSPM Logo" class="h-11 sm:h-12 object-contain" />
@@ -407,6 +439,25 @@
 
     <!-- Main Workspace -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6">
+      <!-- Install App Pill Banner (Matches IMG_8885.PNG style) -->
+      <div id="install-pill-app" class="mb-5 flex justify-center">
+        <div onclick="openInstallAppModal()"
+          class="w-full max-w-xl bg-red-50/90 hover:bg-red-100/80 border border-[#EB2D2D]/25 rounded-full py-2 pl-4 pr-2.5 shadow-2xs flex items-center justify-between gap-3 cursor-pointer transition group">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <div class="w-7 h-7 rounded-lg bg-[#1B212C] text-white flex items-center justify-center shrink-0">
+              <i data-lucide="smartphone-charging" class="w-4 h-4 text-[#EB2D2D]"></i>
+            </div>
+            <span class="text-xs sm:text-sm font-bold text-[#1B212C] truncate group-hover:text-[#EB2D2D] transition">
+              ติดตั้งเป็นแอป • เปิดเร็วกว่า
+            </span>
+          </div>
+          <button type="button" onclick="event.stopPropagation(); dismissInstallPill('install-pill-app')"
+            class="w-7 h-7 rounded-full bg-slate-200/75 hover:bg-slate-300/80 text-slate-600 flex items-center justify-center shrink-0 transition cursor-pointer" title="ซ่อนแถบนี้">
+            <i data-lucide="x" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+
 
       <!-- ==================== VIEW 1: 4-LEVEL HIERARCHICAL FOLDER EXPLORER ==================== -->
       <div id="dashboard-view">
@@ -530,6 +581,12 @@
                 อัปโหลดรูปจากเครื่อง
               </button>
 
+              <button onclick="openEditAlbumModal(activeAlbumId)"
+                class="px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-sm font-medium rounded-xl flex items-center gap-1.5 transition cursor-pointer" title="แก้ไขชื่อลูกค้า สังกัด Product วันที่ พ.ศ. หรือรายละเอียดงาน">
+                <i data-lucide="pencil" class="w-4 h-4"></i>
+                <span>แก้ไขชื่อ / วันที่</span>
+              </button>
+
               <button onclick="openNasExportModal('single')"
                 class="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl shadow-xs flex items-center gap-1.5 transition cursor-pointer" title="เลือกโฟลเดอร์ NAS ของบริษัท ระบบจะสร้างโฟลเดอร์ย่อย ชื่อลูกค้า / สังกัด / Product / วันที่ พ.ศ. ให้อัตโนมัติ">
                 <i data-lucide="server" class="w-4 h-4"></i>
@@ -574,9 +631,6 @@
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <button type="button" onclick="openBulkExcelModal()" class="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold border border-emerald-200 transition cursor-pointer flex items-center gap-1.5" title="นำเข้ารายชื่อพนักงานจากไฟล์ Excel เพื่อลงทะเบียนหลายคนพร้อมกัน">
-            <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> ลงทะเบียนจาก Excel
-          </button>
           <button type="button" onclick="openNasExportModal('all')" class="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold border border-blue-200 transition cursor-pointer flex items-center gap-1.5" title="เมื่อเชื่อมต่อเน็ตออฟฟิศ สามารถย้ายอัลบั้มทั้งหมดลง NAS ได้ในคลิกเดียว">
             <i data-lucide="server" class="w-3.5 h-3.5"></i> บันทึกทั้งหมดลง NAS
           </button>
@@ -741,9 +795,9 @@
 
     // ใส่ค่า Supabase URL และ anon key ของทีมไว้ที่นี่เพื่อให้เพื่อนทุกคนแชร์ข้อมูลได้ทันทีโดยไม่ต้องกรอกซ้ำ
     const EMBEDDED_SUPABASE_CONFIG = {
-  url: 'https://ivomnnsbbwgmsngnahdz.supabase.co',
-  anonKey: 'sb_publishable_6k2OuQpS-c1rfNtM0ukCLg_jKVnSVUA'
-};
+      url: '',
+      anonKey: ''
+    };
 
     const TAB_SESSION_ID = 'tab-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
     const PHOTO_BUCKET = 'workdrive-photos';
@@ -1853,8 +1907,10 @@ create policy "Public Access workdrive-photos" on storage.objects
 
         if (viewMode === 'grid') {
           container.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5';
-          container.innerHTML = items.map(item => `
-            <div onclick="enterCustomer('${escapeHtml(item.name).replace(/'/g, "\'")}')"
+          container.innerHTML = items.map(item => {
+            const safeJsName = escapeHtml(item.name).replace(/'/g, "\\'");
+            return `
+            <div onclick="enterCustomer('${safeJsName}')"
               class="group bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs hover:shadow-md hover:border-[#EB2D2D]/40 transition cursor-pointer flex flex-col">
               <div class="h-40 bg-slate-100 relative overflow-hidden flex items-center justify-center">
                 ${item.cover
@@ -1869,9 +1925,15 @@ create policy "Public Access workdrive-photos" on storage.objects
                 <span class="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-[#1B212C]/90 text-white text-[11px] font-semibold flex items-center gap-1">
                   <i data-lucide="building-2" class="w-3 h-3 text-[#EB2D2D]"></i> ลูกค้า
                 </span>
-                <span class="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-white/95 text-slate-700 text-[11px] font-medium shadow-2xs">
-                  ${item.depts.size} สังกัด
-                </span>
+                <div class="absolute top-3 right-3 flex items-center gap-1.5">
+                  <span class="px-2.5 py-1 rounded-full bg-white/95 text-slate-700 text-[11px] font-medium shadow-2xs">
+                    ${item.depts.size} สังกัด
+                  </span>
+                  <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('client', '${safeJsName}')"
+                    class="p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-600 hover:text-amber-700 shadow-2xs transition cursor-pointer" title="แก้ไขชื่อลูกค้า">
+                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
               </div>
               <div class="p-4 flex-1 flex flex-col justify-between">
                 <div>
@@ -1889,11 +1951,13 @@ create policy "Public Access workdrive-photos" on storage.objects
                 </div>
               </div>
             </div>
-          `).join('');
+          `;}).join('');
         } else {
           container.className = 'bg-white rounded-2xl border border-slate-200 overflow-hidden divide-y divide-slate-100';
-          container.innerHTML = items.map(item => `
-            <div onclick="enterCustomer('${escapeHtml(item.name).replace(/'/g, "\'")}')"
+          container.innerHTML = items.map(item => {
+            const safeJsName = escapeHtml(item.name).replace(/'/g, "\\'");
+            return `
+            <div onclick="enterCustomer('${safeJsName}')"
               class="p-4 hover:bg-red-50/40 flex items-center justify-between gap-4 transition cursor-pointer">
               <div class="flex items-center gap-3.5 min-w-0">
                 <div class="w-11 h-11 rounded-xl bg-[#EB2D2D]/10 text-[#EB2D2D] flex items-center justify-center shrink-0">
@@ -1904,12 +1968,16 @@ create policy "Public Access workdrive-photos" on storage.objects
                   <p class="text-xs text-slate-500 truncate">สังกัด: ${Array.from(item.depts).join(', ')} • ${item.products.size} Product</p>
                 </div>
               </div>
-              <div class="flex items-center gap-4 shrink-0 text-xs">
+              <div class="flex items-center gap-3 shrink-0 text-xs">
                 <span class="font-semibold text-slate-700">${item.photoCount} รูป</span>
+                <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('client', '${safeJsName}')"
+                  class="p-1.5 rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-700 transition cursor-pointer" title="แก้ไขชื่อลูกค้า">
+                  <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
                 <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
               </div>
             </div>
-          `).join('');
+          `;}).join('');
         }
         lucide.createIcons();
         return;
@@ -1952,8 +2020,10 @@ create policy "Public Access workdrive-photos" on storage.objects
 
         if (viewMode === 'grid') {
           container.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5';
-          container.innerHTML = items.map(item => `
-            <div onclick="enterDept('${escapeHtml(item.name).replace(/'/g, "\'")}')"
+          container.innerHTML = items.map(item => {
+            const safeJsName = escapeHtml(item.name).replace(/'/g, "\\'");
+            return `
+            <div onclick="enterDept('${safeJsName}')"
               class="group bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs hover:shadow-md hover:border-[#EB2D2D]/40 transition cursor-pointer flex flex-col">
               <div class="h-36 bg-[#1B212C] relative overflow-hidden flex items-center justify-center">
                 ${item.cover
@@ -1962,6 +2032,10 @@ create policy "Public Access workdrive-photos" on storage.objects
                       <i data-lucide="layers" class="w-7 h-7 text-[#EB2D2D]"></i>
                     </div>`
                 }
+                <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('dept', '${safeJsName}')"
+                  class="absolute top-3 right-3 p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-700 hover:text-amber-700 shadow-2xs transition cursor-pointer z-10" title="แก้ไขชื่อสังกัด">
+                  <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
                 <div class="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent flex flex-col justify-end p-4">
                   <span class="text-[10px] font-semibold uppercase tracking-wider text-[#FF6B70]">สังกัด (Department)</span>
                   <h3 class="font-bold text-xl text-white">${escapeHtml(item.name)}</h3>
@@ -1977,11 +2051,13 @@ create policy "Public Access workdrive-photos" on storage.objects
                 </div>
               </div>
             </div>
-          `).join('');
+          `;}).join('');
         } else {
           container.className = 'bg-white rounded-2xl border border-slate-200 overflow-hidden divide-y divide-slate-100';
-          container.innerHTML = items.map(item => `
-            <div onclick="enterDept('${escapeHtml(item.name).replace(/'/g, "\'")}')"
+          container.innerHTML = items.map(item => {
+            const safeJsName = escapeHtml(item.name).replace(/'/g, "\\'");
+            return `
+            <div onclick="enterDept('${safeJsName}')"
               class="p-4 hover:bg-red-50/40 flex items-center justify-between gap-4 transition cursor-pointer">
               <div class="flex items-center gap-3.5 min-w-0">
                 <div class="w-11 h-11 rounded-xl bg-[#1B212C] text-white font-bold text-xs flex items-center justify-center shrink-0">
@@ -1992,12 +2068,16 @@ create policy "Public Access workdrive-photos" on storage.objects
                   <p class="text-xs text-slate-500 truncate">Product: ${Array.from(item.products).join(', ')}</p>
                 </div>
               </div>
-              <div class="flex items-center gap-4 shrink-0 text-xs">
+              <div class="flex items-center gap-3 shrink-0 text-xs">
                 <span class="font-semibold text-slate-700">${item.photoCount} รูป</span>
+                <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('dept', '${safeJsName}')"
+                  class="p-1.5 rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-700 transition cursor-pointer" title="แก้ไขชื่อสังกัด">
+                  <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
                 <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
               </div>
             </div>
-          `).join('');
+          `;}).join('');
         }
         lucide.createIcons();
         return;
@@ -2038,8 +2118,10 @@ create policy "Public Access workdrive-photos" on storage.objects
 
         if (viewMode === 'grid') {
           container.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5';
-          container.innerHTML = items.map(item => `
-            <div onclick="enterProduct('${escapeHtml(item.name).replace(/'/g, "\'")}')"
+          container.innerHTML = items.map(item => {
+            const safeJsName = escapeHtml(item.name).replace(/'/g, "\\'");
+            return `
+            <div onclick="enterProduct('${safeJsName}')"
               class="group bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs hover:shadow-md hover:border-[#EB2D2D]/40 transition cursor-pointer flex flex-col">
               <div class="h-40 bg-slate-100 relative overflow-hidden flex items-center justify-center">
                 ${item.cover
@@ -2054,9 +2136,15 @@ create policy "Public Access workdrive-photos" on storage.objects
                 <span class="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-[#EB2D2D] text-white text-[11px] font-semibold">
                   Product
                 </span>
-                <span class="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-white/95 text-slate-700 text-[11px] font-medium shadow-2xs">
-                  ${item.dateAlbums.length} วัน
-                </span>
+                <div class="absolute top-3 right-3 flex items-center gap-1.5">
+                  <span class="px-2.5 py-1 rounded-full bg-white/95 text-slate-700 text-[11px] font-medium shadow-2xs">
+                    ${item.dateAlbums.length} วัน
+                  </span>
+                  <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('product', '${safeJsName}')"
+                    class="p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-600 hover:text-amber-700 shadow-2xs transition cursor-pointer" title="แก้ไขชื่อ Product">
+                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
               </div>
               <div class="p-4 flex-1 flex flex-col justify-between">
                 <div>
@@ -2069,11 +2157,13 @@ create policy "Public Access workdrive-photos" on storage.objects
                 </div>
               </div>
             </div>
-          `).join('');
+          `;}).join('');
         } else {
           container.className = 'bg-white rounded-2xl border border-slate-200 overflow-hidden divide-y divide-slate-100';
-          container.innerHTML = items.map(item => `
-            <div onclick="enterProduct('${escapeHtml(item.name).replace(/'/g, "\'")}')"
+          container.innerHTML = items.map(item => {
+            const safeJsName = escapeHtml(item.name).replace(/'/g, "\\'");
+            return `
+            <div onclick="enterProduct('${safeJsName}')"
               class="p-4 hover:bg-red-50/40 flex items-center justify-between gap-4 transition cursor-pointer">
               <div class="flex items-center gap-3.5 min-w-0">
                 <div class="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
@@ -2084,12 +2174,16 @@ create policy "Public Access workdrive-photos" on storage.objects
                   <p class="text-xs text-slate-500 truncate">${item.dateAlbums.length} อัลบั้มวันที่</p>
                 </div>
               </div>
-              <div class="flex items-center gap-4 shrink-0 text-xs">
+              <div class="flex items-center gap-3 shrink-0 text-xs">
                 <span class="font-semibold text-slate-700">${item.photoCount} รูป</span>
+                <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('product', '${safeJsName}')"
+                  class="p-1.5 rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-700 transition cursor-pointer" title="แก้ไขชื่อ Product">
+                  <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </button>
                 <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
               </div>
             </div>
-          `).join('');
+          `;}).join('');
         }
         lucide.createIcons();
         return;
@@ -2135,9 +2229,15 @@ create policy "Public Access workdrive-photos" on storage.objects
                   <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
                   ${escapeHtml(album.thaiDate)}
                 </span>
-                <span class="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-[#1B212C]/90 text-white text-[11px] font-medium">
-                  ${escapeHtml(album.dept)}
-                </span>
+                <div class="absolute top-3 right-3 flex items-center gap-1.5">
+                  <span class="px-2.5 py-1 rounded-full bg-[#1B212C]/90 text-white text-[11px] font-medium">
+                    ${escapeHtml(album.dept)}
+                  </span>
+                  <button type="button" onclick="event.stopPropagation(); openEditAlbumModal('${album.id}')"
+                    class="p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-700 hover:text-amber-700 shadow-2xs transition cursor-pointer" title="แก้ไขวันที่ / ชื่อ / รายละเอียด">
+                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
               </div>
               <div class="p-4 flex-1 flex flex-col justify-between">
                 <div>
@@ -2169,8 +2269,12 @@ create policy "Public Access workdrive-photos" on storage.objects
                 <p class="text-xs text-slate-500 truncate">${escapeHtml(album.note || album.product)}</p>
               </div>
             </div>
-            <div class="flex items-center gap-4 shrink-0 text-xs">
+            <div class="flex items-center gap-3 shrink-0 text-xs">
               <span class="font-semibold text-slate-700">${album.photos.length} รูป</span>
+              <button type="button" onclick="event.stopPropagation(); openEditAlbumModal('${album.id}')"
+                class="p-1.5 rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-700 transition cursor-pointer" title="แก้ไขวันที่ / ชื่อ / รายละเอียด">
+                <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+              </button>
               <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
             </div>
           </div>
@@ -2794,224 +2898,269 @@ create policy "Public Access workdrive-photos" on storage.objects
       }
     }
 
-    // ==================== BULK REGISTER FROM EXCEL / CSV ====================
-    let parsedBulkAccounts = [];
+    // ==================== EDIT FOLDER NAMES & ALBUM DATE/DETAILS ====================
+    let renameFolderState = { level: null, oldValue: '' };
 
-    function openBulkExcelModal() {
-      parsedBulkAccounts = [];
-      document.getElementById('bulk-excel-input').value = '';
-      document.getElementById('bulk-preview-section').classList.add('hidden');
-      document.getElementById('bulk-excel-msg').classList.add('hidden');
-      document.getElementById('bulk-confirm-btn').disabled = true;
-      document.getElementById('bulk-excel-modal').classList.remove('hidden');
+    function thaiDateToIso(thaiStr) {
+      if (!thaiStr || !thaiStr.includes('/')) return '';
+      const parts = thaiStr.split('/');
+      if (parts.length !== 3) return '';
+      const d = parts[0].padStart(2, '0');
+      const m = parts[1].padStart(2, '0');
+      const beY = parseInt(parts[2], 10);
+      if (isNaN(beY)) return '';
+      const adY = beY > 2400 ? beY - 543 : beY;
+      return `${adY}-${m}-${d}`;
+    }
+
+    function openRenameFolderModal(level, oldValue) {
+      renameFolderState = { level, oldValue };
+      const titleEl = document.getElementById('rename-folder-title');
+      const labelEl = document.getElementById('rename-folder-label');
+      const inputEl = document.getElementById('rename-folder-input');
+
+      if (level === 'client') {
+        titleEl.textContent = 'แก้ไขชื่อลูกค้า (Customer)';
+        labelEl.textContent = 'ชื่อลูกค้าใหม่ *';
+      } else if (level === 'dept') {
+        titleEl.textContent = 'แก้ไขชื่อสังกัด';
+        labelEl.textContent = 'ชื่อสังกัดใหม่ *';
+      } else if (level === 'product') {
+        titleEl.textContent = 'แก้ไขชื่อ Product';
+        labelEl.textContent = 'ชื่อ Product ใหม่ *';
+      }
+
+      inputEl.value = oldValue;
+      document.getElementById('rename-folder-modal').classList.remove('hidden');
+      setTimeout(() => {
+        inputEl.focus();
+        inputEl.select();
+      }, 50);
       lucide.createIcons();
     }
 
-    function closeBulkExcelModal() {
-      document.getElementById('bulk-excel-modal').classList.add('hidden');
+    function closeRenameFolderModal() {
+      document.getElementById('rename-folder-modal').classList.add('hidden');
+      renameFolderState = { level: null, oldValue: '' };
     }
 
-    function showBulkMsg(isError, text) {
-      const box = document.getElementById('bulk-excel-msg');
-      box.classList.remove('hidden', 'bg-red-50', 'text-red-700', 'border-red-200', 'bg-emerald-50', 'text-emerald-700', 'border-emerald-200', 'border');
-      box.classList.add('border');
-      if (isError) {
-        box.classList.add('bg-red-50', 'text-red-700', 'border-red-200');
-      } else {
-        box.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
-      }
-      box.textContent = text;
-    }
+    function submitRenameFolder(e) {
+      e.preventDefault();
+      const newVal = document.getElementById('rename-folder-input').value.trim();
+      const { level, oldValue } = renameFolderState;
+      if (!newVal || !level) return;
 
-    function downloadExcelTemplate() {
-      if (typeof XLSX === 'undefined') {
-        alert('ไม่สามารถสร้างไฟล์ Excel ตัวอย่างได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ต');
-        return;
-      }
-      const sampleRows = [
-        { email: 'sarunchana.h@cspm.co.th', password: 'cspm1234', dept: 'F&S' },
-        { email: 'somchai.k@cspm.co.th', password: 'cspm1234', dept: 'UPS' },
-        { email: 'suda.p@cspm.co.th', password: 'cspm1234', dept: 'AIR' }
-      ];
-      const ws = XLSX.utils.json_to_sheet(sampleRows);
-      ws['!cols'] = [{ wch: 28 }, { wch: 16 }, { wch: 18 }];
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Users');
-      XLSX.writeFile(wb, 'CSPM_WorkDrive_Template_Users.xlsx');
-    }
-
-    function pickColumnValue(rowObj, candidateKeys) {
-      const entries = Object.entries(rowObj);
-      for (const [k, v] of entries) {
-        const normKey = String(k || '').trim().toLowerCase();
-        if (candidateKeys.includes(normKey)) {
-          return String(v ?? '').trim();
-        }
-      }
-      return '';
-    }
-
-    async function handleBulkExcelFile(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
-      if (typeof XLSX === 'undefined') {
-        showBulkMsg(true, 'ไม่พบไลบรารีอ่าน Excel กรุณาเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่');
-        return;
-      }
-
-      if (isCloudConnected) {
-        await syncFromCloud(false, false);
-      }
-
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: 'array' });
-          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-          const rows = XLSX.utils.sheet_to_json(firstSheet, { defval: '' });
-
-          const defaultPass = document.getElementById('bulk-default-pass').value.trim() || 'cspm1234';
-          const defaultDept = getDepartments()[0] || 'F&S';
-          const existingAccounts = getRegisteredAccounts();
-
-          parsedBulkAccounts = [];
-          rows.forEach((r) => {
-            let email = pickColumnValue(r, ['email', 'e-mail', 'mail', 'อีเมล', 'อีเมลองค์กร', 'อีเมลบริษัท', 'user', 'username', 'ชื่อผู้ใช้']).toLowerCase();
-            if (!email) {
-              // Fallback: check first column value if it looks like an email or username
-              const vals = Object.values(r).map(v => String(v ?? '').trim()).filter(Boolean);
-              if (vals.length > 0) email = vals[0].toLowerCase();
-            }
-            if (!email) return;
-
-            const username = extractUsernameFromEmail(email);
-            if (!username) return;
-            const finalEmail = email.includes('@') ? email : `${username}@cspm.co.th`;
-
-            const rawPass = pickColumnValue(r, ['password', 'pass', 'pwd', 'รหัสผ่าน', 'รหัส']);
-            const rawDept = pickColumnValue(r, ['dept', 'department', 'team', 'สังกัด', 'แผนก', 'ฝ่าย']);
-
-            const exists = existingAccounts.some(acc => acc.username === username || acc.email === finalEmail);
-            parsedBulkAccounts.push({
-              username,
-              email: finalEmail,
-              password: rawPass || defaultPass,
-              hasCustomPass: Boolean(rawPass),
-              dept: rawDept || defaultDept,
-              isUpdate: exists
-            });
+      if (newVal !== oldValue) {
+        if (level === 'client') {
+          albums.forEach(a => {
+            if (a.client === oldValue) a.client = newVal;
           });
-
-          if (parsedBulkAccounts.length === 0) {
-            document.getElementById('bulk-preview-section').classList.add('hidden');
-            document.getElementById('bulk-confirm-btn').disabled = true;
-            showBulkMsg(true, 'ไม่พบข้อมูลอีเมลหรือชื่อผู้ใช้งานในไฟล์ Excel กรุณาตรวจสอบหัวตาราง (email, password, dept)');
-            return;
-          }
-
-          document.getElementById('bulk-excel-msg').classList.add('hidden');
-          renderBulkPreviewTable();
-        } catch (err) {
-          showBulkMsg(true, 'อ่านไฟล์ Excel ไม่สำเร็จ: ' + (err.message || err));
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    }
-
-    function reapplyBulkDefaultPass() {
-      const defPass = document.getElementById('bulk-default-pass').value.trim() || 'cspm1234';
-      parsedBulkAccounts.forEach(item => {
-        if (!item.hasCustomPass) {
-          item.password = defPass;
-        }
-      });
-      if (parsedBulkAccounts.length > 0) {
-        renderBulkPreviewTable();
-      }
-    }
-
-    function renderBulkPreviewTable() {
-      const sec = document.getElementById('bulk-preview-section');
-      const countEl = document.getElementById('bulk-preview-count');
-      const tbody = document.getElementById('bulk-preview-tbody');
-      const btn = document.getElementById('bulk-confirm-btn');
-
-      sec.classList.remove('hidden');
-      countEl.textContent = `พร้อมลงทะเบียนทั้งหมด ${parsedBulkAccounts.length} บัญชี`;
-      btn.disabled = false;
-
-      tbody.innerHTML = parsedBulkAccounts.map((item, idx) => `
-        <tr class="hover:bg-slate-50">
-          <td class="py-2 px-3 text-slate-400">${idx + 1}</td>
-          <td class="py-2 px-3 font-mono font-bold text-[#EB2D2D]">${escapeHtml(item.username)}</td>
-          <td class="py-2 px-3 text-slate-700">${escapeHtml(item.email)}</td>
-          <td class="py-2 px-3 font-mono text-slate-600">${escapeHtml(item.password)}</td>
-          <td class="py-2 px-3 font-medium text-slate-800">${escapeHtml(item.dept)}</td>
-          <td class="py-2 px-3">
-            ${item.isUpdate
-              ? '<span class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-semibold">อัปเดตข้อมูล</span>'
-              : '<span class="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-semibold">บัญชีใหม่</span>'
+          if (navPath.client === oldValue) navPath.client = newVal;
+        } else if (level === 'dept') {
+          albums.forEach(a => {
+            if (a.client === navPath.client && a.dept === oldValue) {
+              a.dept = newVal;
             }
-          </td>
-        </tr>
-      `).join('');
+          });
+          const depts = getDepartments();
+          if (!depts.includes(newVal)) {
+            depts.push(newVal);
+            saveDepartments(depts);
+          }
+          if (navPath.dept === oldValue) navPath.dept = newVal;
+        } else if (level === 'product') {
+          albums.forEach(a => {
+            if (a.client === navPath.client && a.dept === navPath.dept && a.product === oldValue) {
+              a.product = newVal;
+            }
+          });
+          if (navPath.product === oldValue) navPath.product = newVal;
+        }
+        saveAlbums();
+      }
+
+      closeRenameFolderModal();
+      showFolderDashboard();
     }
 
-    async function confirmBulkImportAccounts() {
-      if (parsedBulkAccounts.length === 0) return;
+    function openEditAlbumModal(albumId) {
+      const album = albums.find(a => a.id === albumId);
+      if (!album) return;
 
-      const btn = document.getElementById('bulk-confirm-btn');
-      btn.disabled = true;
-
-      // Auto-register any new departments found in Excel
+      // Populate dept select
       const depts = getDepartments();
-      let deptChanged = false;
-      parsedBulkAccounts.forEach(item => {
-        if (item.dept && !depts.some(d => d.toLowerCase() === item.dept.toLowerCase())) {
-          depts.push(item.dept);
-          deptChanged = true;
-        }
-      });
-      if (deptChanged) {
-        localStorage.setItem(DEPTS_KEY, JSON.stringify(depts));
-        renderDepartmentDropdowns();
+      const deptSel = document.getElementById('edit-album-dept');
+      deptSel.innerHTML = depts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+      if (!depts.includes(album.dept)) {
+        deptSel.innerHTML += `<option value="${escapeHtml(album.dept)}">${escapeHtml(album.dept)}</option>`;
       }
 
-      // Merge accounts into registered accounts list
-      const accounts = getRegisteredAccounts();
-      parsedBulkAccounts.forEach(item => {
-        const idx = accounts.findIndex(acc => acc.username === item.username || acc.email === item.email);
-        const record = {
-          username: item.username,
-          email: item.email,
-          password: item.password,
-          dept: item.dept
-        };
-        if (idx !== -1) {
-          accounts[idx] = record;
-        } else {
-          accounts.push(record);
-        }
-      });
+      // Populate customer suggestions
+      const uniqueClients = Array.from(new Set(albums.map(a => a.client).filter(Boolean)));
+      document.getElementById('customer-suggestions').innerHTML = uniqueClients
+        .map(c => `<option value="${escapeHtml(c)}"></option>`)
+        .join('');
 
-      saveRegisteredAccounts(accounts);
+      document.getElementById('edit-album-id').value = album.id;
+      document.getElementById('edit-album-client').value = album.client;
+      deptSel.value = album.dept;
+      document.getElementById('edit-album-product').value = album.product;
+      document.getElementById('edit-album-thai-date').value = album.thaiDate;
+      document.getElementById('edit-album-date-picker').value = thaiDateToIso(album.thaiDate);
+      document.getElementById('edit-album-note').value = album.note || '';
 
-      const importedCount = parsedBulkAccounts.length;
-      showBulkMsg(false, `ลงทะเบียนสำเร็จทั้งหมด ${importedCount} บัญชีเรียบร้อยแล้ว! ${isCloudConnected ? '(ซิงก์ขึ้น Supabase Cloud ทั้งทีมแล้ว)' : ''}`);
-
-      if (!currentUser) {
-        switchAuthTab('login');
-        showAuthMessage('success', `นำเข้าและลงทะเบียนผู้ใช้งานจาก Excel สำเร็จจำนวน ${importedCount} บัญชี สามารถเข้าสู่ระบบได้ทันที`);
-      }
-
-      setTimeout(() => {
-        closeBulkExcelModal();
-      }, 1300);
+      document.getElementById('edit-album-modal').classList.remove('hidden');
+      lucide.createIcons();
     }
 
-    window.addEventListener('DOMContentLoaded', init);
+    function syncEditThaiDateFromPicker() {
+      const iso = document.getElementById('edit-album-date-picker').value;
+      if (iso) {
+        document.getElementById('edit-album-thai-date').value = isoToThaiDate(iso);
+      }
+    }
+
+    function closeEditAlbumModal() {
+      document.getElementById('edit-album-modal').classList.add('hidden');
+    }
+
+    function submitEditAlbum(e) {
+      e.preventDefault();
+      const id = document.getElementById('edit-album-id').value;
+      const album = albums.find(a => a.id === id);
+      if (!album) return;
+
+      const nextClient = document.getElementById('edit-album-client').value.trim();
+      const nextDept = document.getElementById('edit-album-dept').value;
+      const nextProduct = document.getElementById('edit-album-product').value.trim();
+      const nextThaiDate = document.getElementById('edit-album-thai-date').value.trim();
+      const nextNote = document.getElementById('edit-album-note').value.trim();
+
+      if (!nextClient || !nextDept || !nextProduct || !nextThaiDate) return;
+
+      album.client = nextClient;
+      album.dept = nextDept;
+      album.product = nextProduct;
+      album.thaiDate = nextThaiDate;
+      album.note = nextNote;
+
+      navPath = { client: album.client, dept: album.dept, product: album.product };
+      saveAlbums();
+      closeEditAlbumModal();
+
+      if (activeAlbumId === album.id) {
+        openAlbum(album.id);
+      } else {
+        showFolderDashboard();
+      }
+    }
+
+    // ==================== IPHONE FULL-SCREEN PWA SETUP (ICON & MANIFEST) ====================
+    function setupIphoneFullScreenApp() {
+      try {
+        // Generate 180x180 Apple Touch Icon for Home Screen
+        const canvas = document.createElement('canvas');
+        canvas.width = 180;
+        canvas.height = 180;
+        const ctx = canvas.getContext('2d');
+
+        // Dark corporate background
+        ctx.fillStyle = '#141920';
+        ctx.fillRect(0, 0, 180, 180);
+
+        // Top red corporate bar
+        ctx.fillStyle = '#EB2D2D';
+        ctx.fillRect(0, 0, 180, 14);
+
+        // Brand text
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = 'bold 34px Prompt, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('CSPM', 90, 92);
+
+        ctx.fillStyle = '#FF6B70';
+        ctx.font = '600 18px Prompt, sans-serif';
+        ctx.fillText('WorkDrive', 90, 124);
+
+        const iconDataUrl = canvas.toDataURL('image/png');
+        const appleIconLink = document.getElementById('apple-touch-icon-link');
+        if (appleIconLink) appleIconLink.href = iconDataUrl;
+
+        // Dynamic Web App Manifest
+        const manifest = {
+          name: 'CSPM WorkDrive',
+          short_name: 'WorkDrive',
+          description: 'ระบบจัดเก็บภาพถ่ายหน้างานและอัลบั้มโครงการ บริษัท CSPM',
+          start_url: '.',
+          display: 'standalone',
+          background_color: '#141920',
+          theme_color: '#141920',
+          icons: [
+            { src: iconDataUrl, sizes: '180x180', type: 'image/png' },
+            { src: iconDataUrl, sizes: '512x512', type: 'image/png' }
+          ]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+        const manifestLink = document.getElementById('web-manifest-link');
+        if (manifestLink) manifestLink.href = URL.createObjectURL(manifestBlob);
+      } catch (e) {}
+
+      // Hide install pill only if already running in full-screen standalone mode
+      const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+      if (isStandalone) {
+        const p1 = document.getElementById('install-pill-login');
+        const p2 = document.getElementById('install-pill-app');
+        if (p1) p1.classList.add('hidden');
+        if (p2) p2.classList.add('hidden');
+      }
+
+      // Auto-select Android tab if user is on Android device
+      const ua = window.navigator.userAgent || '';
+      if (/Android/i.test(ua)) {
+        switchInstallGuideTab('android');
+      }
+    }
+
+    function openInstallAppModal() {
+      const modal = document.getElementById('install-app-modal');
+      if (modal) modal.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeInstallAppModal() {
+      const modal = document.getElementById('install-app-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function dismissInstallPill(id) {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('hidden');
+    }
+
+    function switchInstallGuideTab(platform) {
+      const iosBox = document.getElementById('install-steps-ios');
+      const andBox = document.getElementById('install-steps-android');
+      const iosWarn = document.getElementById('install-warning-ios');
+      const tabIos = document.getElementById('guide-tab-ios');
+      const tabAnd = document.getElementById('guide-tab-android');
+
+      if (platform === 'android') {
+        iosBox.classList.add('hidden');
+        iosWarn.classList.add('hidden');
+        andBox.classList.remove('hidden');
+        tabAnd.className = 'px-3 py-1 rounded-full text-[11px] font-semibold bg-[#1B212C] text-white cursor-pointer transition';
+        tabIos.className = 'px-3 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer transition';
+      } else {
+        andBox.classList.add('hidden');
+        iosBox.classList.remove('hidden');
+        iosWarn.classList.remove('hidden');
+        tabIos.className = 'px-3 py-1 rounded-full text-[11px] font-semibold bg-[#1B212C] text-white cursor-pointer transition';
+        tabAnd.className = 'px-3 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer transition';
+      }
+      lucide.createIcons();
+    }
+
+    window.addEventListener('DOMContentLoaded', () => { setupIphoneFullScreenApp(); init(); });
   </script>
 
   <!-- ==================== MODAL: DIRECT SAVE TO COMPANY NAS ==================== -->
@@ -3078,78 +3227,218 @@ create policy "Public Access workdrive-photos" on storage.objects
   </div>
 
 
-  <!-- ==================== MODAL: BULK REGISTER FROM EXCEL ==================== -->
-  <div id="bulk-excel-modal" class="hidden fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-100">
+  <!-- ==================== MODAL: RENAME FOLDER (CUSTOMER / DEPT / PRODUCT) ==================== -->
+  <div id="rename-folder-modal" class="hidden fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-100">
       <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
         <h3 class="font-semibold text-sm flex items-center gap-2">
-          <i data-lucide="file-spreadsheet" class="w-5 h-5 text-emerald-400"></i>
-          ลงทะเบียนผู้ใช้งานหลายคนจาก Excel (.xlsx / .xls / .csv)
+          <i data-lucide="pencil" class="w-4 h-4 text-[#EB2D2D]"></i>
+          <span id="rename-folder-title">แก้ไขชื่อโฟลเดอร์</span>
         </h3>
-        <button type="button" onclick="closeBulkExcelModal()" class="text-slate-400 hover:text-white cursor-pointer">
+        <button type="button" onclick="closeRenameFolderModal()" class="text-slate-400 hover:text-white cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
+      <form onsubmit="submitRenameFolder(event)" class="p-6 space-y-4">
+        <div>
+          <label id="rename-folder-label" class="block text-xs font-semibold text-slate-600 mb-1.5">ชื่อใหม่ *</label>
+          <input id="rename-folder-input" type="text" required
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-[#EB2D2D] outline-none" />
+          <p id="rename-folder-hint" class="text-[11px] text-slate-400 mt-1.5">การเปลี่ยนชื่อจะอัปเดตทุกอัลบั้มที่อยู่ภายใต้โฟลเดอร์นี้โดยอัตโนมัติ</p>
+        </div>
+        <div class="pt-1 flex justify-end gap-2">
+          <button type="button" onclick="closeRenameFolderModal()" class="px-4 py-2 rounded-xl text-sm text-slate-600 hover:bg-slate-100 cursor-pointer">ยกเลิก</button>
+          <button type="submit" class="px-5 py-2 rounded-xl text-sm font-medium btn-cspm-primary cursor-pointer">บันทึกการแก้ไข</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-      <div class="p-6 space-y-4 max-h-[82vh] overflow-y-auto text-xs">
-        <div class="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 text-slate-700 flex flex-wrap items-center justify-between gap-3">
-          <div class="space-y-1">
-            <p class="font-bold text-emerald-800">รูปแบบคอลัมน์ในไฟล์ Excel:</p>
-            <p>รองรับหัวตาราง <code class="bg-white px-1.5 py-0.5 rounded border border-emerald-200 font-mono">email</code> (อีเมล), <code class="bg-white px-1.5 py-0.5 rounded border border-emerald-200 font-mono">password</code> (รหัสผ่าน), <code class="bg-white px-1.5 py-0.5 rounded border border-emerald-200 font-mono">dept</code> (สังกัด)</p>
-            <p class="text-[11px] text-slate-500">* หากใน Excel ไม่มีคอลัมน์รหัสผ่าน ระบบจะใช้รหัสผ่านเริ่มต้นด้านล่างให้โดยอัตโนมัติ</p>
-          </div>
-          <button type="button" onclick="downloadExcelTemplate()"
-            class="px-3.5 py-2 rounded-xl bg-white hover:bg-emerald-100/70 text-emerald-800 font-semibold border border-emerald-300 shadow-2xs transition cursor-pointer flex items-center gap-1.5 shrink-0">
-            <i data-lucide="download" class="w-3.5 h-3.5"></i> โหลดไฟล์ตัวอย่าง Excel
-          </button>
+  <!-- ==================== MODAL: EDIT ALBUM NAME, DEPT, PRODUCT & THAI DATE ==================== -->
+  <div id="edit-album-modal" class="hidden fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100">
+      <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
+        <h3 class="font-semibold text-sm flex items-center gap-2">
+          <i data-lucide="calendar-cog" class="w-5 h-5 text-[#EB2D2D]"></i>
+          <span>แก้ไขชื่อลูกค้า สังกัด Product หรือวันที่ พ.ศ.</span>
+        </h3>
+        <button type="button" onclick="closeEditAlbumModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form onsubmit="submitEditAlbum(event)" class="p-6 space-y-4">
+        <input id="edit-album-id" type="hidden" />
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">1. ชื่อลูกค้า (Customer Name) *</label>
+          <input id="edit-album-client" type="text" list="customer-suggestions" required
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-[#EB2D2D] outline-none" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">2. สังกัด *</label>
+          <select id="edit-album-dept" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] outline-none"></select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">3. Product *</label>
+          <input id="edit-album-product" type="text" list="product-suggestions" required
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-[#EB2D2D] outline-none" />
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label class="block font-semibold text-slate-600 mb-1">1. เลือกไฟล์ Excel / CSV *</label>
-            <input id="bulk-excel-input" type="file" accept=".xlsx,.xls,.csv" onchange="handleBulkExcelFile(event)"
-              class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-[#F8FAFC] text-xs file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#1B212C] file:text-white hover:file:bg-slate-800 cursor-pointer" />
+            <label class="block text-xs font-semibold text-slate-600 mb-1">4. เลือกวันที่ใหม่ (ปฏิทิน)</label>
+            <input id="edit-album-date-picker" type="date" onchange="syncEditThaiDateFromPicker()"
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-[#EB2D2D] outline-none" />
           </div>
           <div>
-            <label class="block font-semibold text-slate-600 mb-1">รหัสผ่านเริ่มต้น (กรณีในไฟล์ไม่ได้ระบุ)</label>
-            <input id="bulk-default-pass" type="text" value="cspm1234" oninput="reapplyBulkDefaultPass()"
-              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] outline-none text-xs font-mono" />
+            <label class="block text-xs font-semibold text-slate-600 mb-1">วัน/เดือน/ปีพ.ศ. *</label>
+            <input id="edit-album-thai-date" type="text" required placeholder="เช่น 20/11/2569"
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-red-50/40 font-mono font-semibold text-[#EB2D2D] text-sm focus:border-[#EB2D2D] outline-none" />
           </div>
         </div>
 
-        <!-- Preview Table -->
-        <div id="bulk-preview-section" class="hidden space-y-2">
-          <div class="flex items-center justify-between">
-            <span id="bulk-preview-count" class="font-bold text-slate-800">พบข้อมูล 0 รายการ</span>
-            <span class="text-[11px] text-slate-400">ระบบดึงชื่อหน้า @ เป็น Username ให้อัตโนมัติ</span>
-          </div>
-          <div class="border border-slate-200 rounded-xl overflow-hidden max-h-60 overflow-y-auto">
-            <table class="w-full text-left border-collapse text-xs">
-              <thead class="bg-slate-100 text-slate-600 sticky top-0">
-                <tr>
-                  <th class="py-2 px-3 font-semibold">#</th>
-                  <th class="py-2 px-3 font-semibold">Username</th>
-                  <th class="py-2 px-3 font-semibold">อีเมลองค์กร</th>
-                  <th class="py-2 px-3 font-semibold">รหัสผ่าน</th>
-                  <th class="py-2 px-3 font-semibold">สังกัด</th>
-                  <th class="py-2 px-3 font-semibold">สถานะ</th>
-                </tr>
-              </thead>
-              <tbody id="bulk-preview-tbody" class="divide-y divide-slate-100"></tbody>
-            </table>
-          </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">รายละเอียดงาน / รหัสงาน / สถานที่</label>
+          <input id="edit-album-note" type="text" placeholder="เช่น JOB-2026-101 • สำรวจหน้างาน"
+            class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:border-[#EB2D2D] outline-none" />
         </div>
 
-        <div id="bulk-excel-msg" class="hidden p-3 rounded-xl text-xs font-medium"></div>
+        <div class="pt-2 flex justify-end gap-2">
+          <button type="button" onclick="closeEditAlbumModal()" class="px-4 py-2 rounded-xl text-sm text-slate-600 hover:bg-slate-100 cursor-pointer">ยกเลิก</button>
+          <button type="submit" class="px-5 py-2 rounded-xl text-sm font-medium btn-cspm-primary cursor-pointer">บันทึกการเปลี่ยนแปลง</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
-        <div class="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
-          <button type="button" onclick="closeBulkExcelModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 cursor-pointer">ปิด</button>
-          <button id="bulk-confirm-btn" type="button" disabled onclick="confirmBulkImportAccounts()"
-            class="px-5 py-2 rounded-xl font-medium btn-cspm-primary disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center gap-1.5">
-            <i data-lucide="user-check" class="w-4 h-4"></i> ยืนยันลงทะเบียนทั้งหมด
-          </button>
+
+  <!-- ==================== MODAL / BOTTOM SHEET: ADD TO HOME SCREEN GUIDE (MATCHES IMG_8886) ==================== -->
+  <div id="install-app-modal" onclick="if(event.target === this) closeInstallAppModal()"
+    class="hidden fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden border border-slate-100 px-6 pt-3 pb-6 ios-safe-bottom relative animate-[fadeIn_0.2s_ease-out]">
+      <!-- Top Drag Handle Pill -->
+      <div class="w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3"></div>
+
+      <!-- Close Button (Top Right Circle) -->
+      <button type="button" onclick="closeInstallAppModal()"
+        class="absolute top-4 right-4 w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition cursor-pointer" title="ปิด">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+
+      <!-- Top Pill Badge -->
+      <div class="flex justify-center mt-1">
+        <span class="px-4 py-1 rounded-full bg-red-50 text-[#EB2D2D] border border-[#EB2D2D]/20 text-xs font-bold">
+          ติดตั้ง
+        </span>
+      </div>
+
+      <!-- Title -->
+      <h3 class="text-center text-xl font-bold text-slate-900 mt-3">
+        เพิ่ม CSPM WorkDrive ไว้บนหน้าจอ
+      </h3>
+
+      <!-- App Icon Preview -->
+      <div class="flex justify-center my-3.5">
+        <div class="w-16 h-16 rounded-2xl bg-[#141920] shadow-md border border-slate-200 overflow-hidden flex flex-col items-center justify-center relative">
+          <div class="w-full h-1.5 bg-[#EB2D2D] absolute top-0 left-0"></div>
+          <span class="text-white font-bold text-sm tracking-tight leading-none mt-1">CSPM</span>
+          <span class="text-[#FF6B70] font-semibold text-[10px] leading-tight mt-0.5">WorkDrive</span>
         </div>
       </div>
+
+      <!-- Subtitle Description -->
+      <p class="text-center text-xs text-slate-600 leading-relaxed px-2">
+        เพิ่มแล้วจะมีไอคอน <strong>CSPM WorkDrive</strong> บนหน้าจอเหมือนแอปทั่วไป<br />
+        กดเปิดถ่ายรูปหน้างานได้ทันที ไม่ต้องหาในเบราว์เซอร์
+      </p>
+
+      <!-- Device Tab Switcher (iPhone/iPad default, optional Android) -->
+      <div class="flex items-center justify-center gap-1.5 mt-4 mb-2">
+        <button type="button" id="guide-tab-ios" onclick="switchInstallGuideTab('ios')"
+          class="px-3 py-1 rounded-full text-[11px] font-semibold bg-[#1B212C] text-white cursor-pointer transition">
+          iPhone / iPad (Safari)
+        </button>
+        <button type="button" id="guide-tab-android" onclick="switchInstallGuideTab('android')"
+          class="px-3 py-1 rounded-full text-[11px] font-semibold bg-slate-100 text-slate-600 hover:bg-slate-200 cursor-pointer transition">
+          Android (Chrome)
+        </button>
+      </div>
+
+      <!-- Step-by-Step Box: iPhone / iPad -->
+      <div id="install-steps-ios" class="bg-[#F5F7FA] rounded-2xl p-4 space-y-3 text-xs border border-slate-200/70">
+        <p class="font-bold text-slate-900 text-sm">บน iPhone / iPad</p>
+
+        <div class="flex items-start gap-3">
+          <span class="w-6 h-6 rounded-full bg-[#EB2D2D] text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+          <p class="text-slate-700 leading-relaxed">
+            กดปุ่ม <strong>แชร์</strong> ที่แถบล่างของ Safari (ไอคอนสี่เหลี่ยมมีลูกศรชี้ขึ้น <i data-lucide="share" class="w-3.5 h-3.5 inline text-slate-600"></i>)
+          </p>
+        </div>
+
+        <div class="flex items-start gap-3">
+          <span class="w-6 h-6 rounded-full bg-[#EB2D2D] text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+          <p class="text-slate-700 leading-relaxed">
+            เลื่อนลงหา <strong>เพิ่มไปยังหน้าจอโฮม</strong> (Add to Home Screen)
+          </p>
+        </div>
+
+        <div class="flex items-start gap-3">
+          <span class="w-6 h-6 rounded-full bg-[#EB2D2D] text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+          <p class="text-slate-700 leading-relaxed">
+            กด <strong>เพิ่ม</strong> มุมขวาบน
+          </p>
+        </div>
+      </div>
+
+      <!-- Step-by-Step Box: Android -->
+      <div id="install-steps-android" class="hidden bg-[#F5F7FA] rounded-2xl p-4 space-y-3 text-xs border border-slate-200/70">
+        <p class="font-bold text-slate-900 text-sm">บน Android (Google Chrome)</p>
+
+        <div class="flex items-start gap-3">
+          <span class="w-6 h-6 rounded-full bg-[#EB2D2D] text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">1</span>
+          <p class="text-slate-700 leading-relaxed">
+            กดปุ่มเมนู <strong>จุด 3 จุด (⋮)</strong> ที่มุมขวาบนของ Chrome
+          </p>
+        </div>
+
+        <div class="flex items-start gap-3">
+          <span class="w-6 h-6 rounded-full bg-[#EB2D2D] text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">2</span>
+          <p class="text-slate-700 leading-relaxed">
+            เลือก <strong>เพิ่มลงในหน้าจอหลัก</strong> (Add to Home screen) หรือ <strong>ติดตั้งแอป</strong>
+          </p>
+        </div>
+
+        <div class="flex items-start gap-3">
+          <span class="w-6 h-6 rounded-full bg-[#EB2D2D] text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">3</span>
+          <p class="text-slate-700 leading-relaxed">
+            กด <strong>เพิ่ม / ติดตั้ง</strong> เพื่อสร้างไอคอนบนหน้าจอ
+          </p>
+        </div>
+      </div>
+
+      <!-- Yellow Warning Box (Matches IMG_8886) -->
+      <div id="install-warning-ios" class="mt-3 p-3 rounded-2xl bg-amber-50 border border-amber-200/90 flex items-start gap-2.5 text-xs text-amber-900">
+        <i data-lucide="alert-triangle" class="w-4 h-4 text-amber-500 shrink-0 mt-0.5"></i>
+        <p class="leading-relaxed">
+          <strong>ต้องเปิดด้วย Safari เท่านั้น</strong> — Chrome บน iPhone เพิ่มลงหน้าจอโฮมไม่ได้
+        </p>
+      </div>
+
+      <!-- Cloud & Offline Info Line -->
+      <div class="mt-3 px-1 flex items-start gap-2.5 text-[11px] text-slate-500">
+        <i data-lucide="cloud" class="w-4 h-4 text-[#EB2D2D] shrink-0 mt-0.5"></i>
+        <p class="leading-relaxed">
+          ซิงก์ข้อมูลและรูปภาพร่วมกับทีมผ่าน Cloud — เมื่อเชื่อมต่อเน็ตออฟฟิศสามารถย้ายไฟล์ลง NAS ได้ทันที
+        </p>
+      </div>
+
+      <!-- Bottom Full-Width Close Button -->
+      <button type="button" onclick="closeInstallAppModal()"
+        class="mt-4 w-full py-3 rounded-2xl bg-slate-100 hover:bg-slate-200/80 text-slate-800 font-bold text-sm transition cursor-pointer">
+        ปิด
+      </button>
     </div>
   </div>
 
