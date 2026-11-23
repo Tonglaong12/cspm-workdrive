@@ -385,7 +385,7 @@
         <!-- User Profile, Online Presence & Actions -->
         <div class="flex items-center gap-2.5 sm:gap-3">
           <!-- Online Users Indicator Pill + Popover -->
-          <div class="relative" id="online-presence-wrapper">
+          <div class="sm:relative" id="online-presence-wrapper">
             <button type="button" onclick="toggleOnlinePopover(event)"
               class="px-2.5 sm:px-3 py-1.5 rounded-xl bg-emerald-50/90 hover:bg-emerald-100/80 border border-emerald-200/90 flex items-center gap-2 transition cursor-pointer"
               title="ดูรายชื่อผู้ใช้งานที่ออนไลน์อยู่ขณะนี้">
@@ -400,7 +400,7 @@
             </button>
 
             <!-- Dropdown Popover -->
-            <div id="online-popover" class="hidden absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50">
+            <div id="online-popover" class="hidden absolute left-3 right-3 top-[4.25rem] sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96 bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden z-50">
               <div class="px-4 py-3 bg-[#1B212C] text-white flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
@@ -422,6 +422,15 @@
             </div>
           </div>
 
+          <!-- Admin Activity Status Button (Visible ONLY for sarunchana.h) -->
+          <button id="admin-logs-nav-btn" type="button" onclick="openAdminLogsModal()"
+            class="hidden px-3 py-2 rounded-xl bg-[#1B212C] hover:bg-slate-800 text-white border border-amber-400/50 text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer transition"
+            title="ดูประวัติการใช้งานทีม: ใครเพิ่มรูป ลบอัลบั้ม หรือดาวน์โหลดอัลบั้มไหนไป (เฉพาะ Admin)">
+            <i data-lucide="shield-check" class="w-4 h-4 text-amber-400"></i>
+            <span class="hidden sm:inline">ประวัติทีม</span>
+            <span class="px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 text-[10px] font-bold">ADMIN</span>
+          </button>
+
           <button onclick="openNewAlbumModal()"
             class="btn-cspm-primary text-sm font-medium px-3.5 py-2 rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer">
             <i data-lucide="folder-plus" class="w-4 h-4"></i>
@@ -438,6 +447,7 @@
             <div class="hidden lg:block text-left">
               <div class="flex items-center gap-1.5">
                 <p id="user-display-name" class="text-xs font-semibold text-slate-800 leading-tight">User</p>
+                <span id="user-admin-badge" class="hidden px-1.5 py-0.2 rounded bg-amber-100 text-amber-800 border border-amber-300 text-[9px] font-bold tracking-wide">ADMIN</span>
               </div>
               <p id="user-display-dept" class="text-[11px] text-slate-400">สังกัด</p>
             </div>
@@ -532,7 +542,13 @@
             <!-- Rendered dynamically -->
           </div>
 
-          <div class="flex items-center gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="manage-products-toolbar-btn" type="button" onclick="openManageProductsModal()"
+              class="px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200/80 text-slate-700 text-xs font-medium flex items-center gap-1.5 transition cursor-pointer" title="ดูและลบรายชื่อ Product">
+              <i data-lucide="package-x" class="w-4 h-4 text-[#EB2D2D]"></i>
+              <span>จัดการชื่อ Product</span>
+            </button>
+
             <button id="contextual-add-btn" onclick="openNewAlbumModal()"
               class="px-3.5 py-2 rounded-xl bg-[#1B212C] hover:bg-slate-800 text-white text-xs font-medium flex items-center gap-1.5 transition cursor-pointer">
               <i data-lucide="folder-plus" class="w-4 h-4 text-[#EB2D2D]"></i>
@@ -604,21 +620,21 @@
               </button>
 
               <button onclick="openEditAlbumModal(activeAlbumId)"
-                class="px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-sm font-medium rounded-xl flex items-center gap-1.5 transition cursor-pointer" title="แก้ไขชื่อลูกค้า สังกัด Product วันที่ พ.ศ. หรือรายละเอียดงาน">
+                class="px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-sm font-medium rounded-xl flex items-center gap-1.5 transition cursor-pointer" title="แก้ไขชื่อลูกค้า สังกัด Product วันที่ พ.ศ. หรือรูปหน้าปกอัลบั้ม">
                 <i data-lucide="pencil" class="w-4 h-4"></i>
-                <span>แก้ไขชื่อ / วันที่</span>
+                <span>แก้ไขชื่อ / วันที่ / หน้าปก</span>
               </button>
 
-              <button onclick="openNasExportModal('single')"
-                class="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl shadow-xs flex items-center gap-1.5 transition cursor-pointer" title="เลือกโฟลเดอร์ NAS ของบริษัท ระบบจะสร้างโฟลเดอร์ย่อย ชื่อลูกค้า / สังกัด / Product / วันที่ พ.ศ. ให้อัตโนมัติ">
+              <button onclick="openExportModal('nas', activeAlbumId)"
+                class="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl shadow-xs flex items-center gap-1.5 transition cursor-pointer" title="เลือกเดือนและอัลบั้มเพื่อบันทึกลง NAS ของบริษัทโดยตรง">
                 <i data-lucide="server" class="w-4 h-4"></i>
-                <span>บันทึกลง NAS โดยตรง</span>
+                <span>บันทึกลง NAS</span>
               </button>
 
-              <button onclick="downloadAlbumZip()"
-                class="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-sm font-medium rounded-xl flex items-center gap-1.5 transition cursor-pointer" title="ดาวน์โหลดทั้งอัลบั้มวันที่นี้เป็นไฟล์ ZIP">
+              <button onclick="openExportModal('zip', activeAlbumId)"
+                class="px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 text-sm font-medium rounded-xl flex items-center gap-1.5 transition cursor-pointer" title="เลือกเดือนและอัลบั้มเพื่อดาวน์โหลดเป็นไฟล์ ZIP">
                 <i data-lucide="archive" class="w-4 h-4"></i>
-                <span class="hidden sm:inline">โหลด ZIP</span>
+                <span>โหลด ZIP</span>
               </button>
 
               <button onclick="openDeleteConfirmModal('album', activeAlbumId)"
@@ -679,8 +695,11 @@
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-2">
-          <button type="button" onclick="openNasExportModal('all')" class="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold border border-blue-200 transition cursor-pointer flex items-center gap-1.5" title="เมื่อเชื่อมต่อเน็ตออฟฟิศ สามารถย้ายอัลบั้มทั้งหมดลง NAS ได้ในคลิกเดียว">
-            <i data-lucide="server" class="w-3.5 h-3.5"></i> บันทึกทั้งหมดลง NAS
+          <button type="button" onclick="openExportModal('nas', null)" class="px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold border border-blue-200 transition cursor-pointer flex items-center gap-1.5" title="เลือกเดือนและอัลบั้มเพื่อบันทึกลง NAS">
+            <i data-lucide="server" class="w-3.5 h-3.5"></i> บันทึกลง NAS
+          </button>
+          <button type="button" onclick="openExportModal('zip', null)" class="px-3 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold border border-emerald-200 transition cursor-pointer flex items-center gap-1.5" title="เลือกเดือนและอัลบั้มเพื่อดาวน์โหลดไฟล์ ZIP">
+            <i data-lucide="archive" class="w-3.5 h-3.5"></i> โหลด ZIP
           </button>
           <button type="button" onclick="syncFromCloud(true)" class="px-3 py-1.5 rounded-xl bg-[#F5F7FA] hover:bg-slate-200/70 text-slate-700 font-medium border border-slate-200 transition cursor-pointer flex items-center gap-1">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> รีเฟรชข้อมูลทีม
@@ -705,7 +724,7 @@
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
-      <form onsubmit="createAlbum(event)" class="p-6 space-y-4">
+      <form onsubmit="createAlbum(event)" class="p-6 space-y-4 max-h-[82vh] overflow-y-auto">
         <!-- Step 1: Customer Name -->
         <div>
           <label class="block text-xs font-semibold text-slate-600 mb-1">1. ชื่อลูกค้า (Customer Name) *</label>
@@ -733,19 +752,15 @@
 
         <!-- Step 3: Product -->
         <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">3. Product *</label>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold text-slate-600">3. Product *</label>
+            <button type="button" onclick="openManageProductsModal()" class="text-[11px] font-semibold text-[#EB2D2D] hover:underline flex items-center gap-1 cursor-pointer">
+              <i data-lucide="trash-2" class="w-3 h-3"></i> จัดการ / ลบชื่อ Product
+            </button>
+          </div>
           <input id="album-product" type="text" list="product-suggestions" required placeholder="พิมพ์หรือเลือก Product เช่น Clean Agent (IG-100 / Novec 1230)"
             class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-[#EB2D2D] outline-none" />
-          <datalist id="product-suggestions">
-            <option value="Fire Protection - Clean Agent (IG-100 / Novec 1230)"></option>
-            <option value="Fire Protection - VESDA Aspirating Smoke Detection"></option>
-            <option value="Power Quality - Uninterruptible Power Supply (UPS)"></option>
-            <option value="Power Quality - Generator & Battery Monitoring"></option>
-            <option value="Cooling System - Data Center Cooling (CRAC / AHU)"></option>
-            <option value="Liquid Leak Detection System (RAYCHEM)"></option>
-            <option value="Building Management & Security System (BMS / CCTV)"></option>
-            <option value="Micro Data Center & DCIM"></option>
-          </datalist>
+          <datalist id="product-suggestions"></datalist>
         </div>
 
         <!-- Step 4: วัน/เดือน/ปีพ.ศ. -->
@@ -759,6 +774,30 @@
             <label class="block text-xs font-semibold text-slate-600 mb-1">วัน/เดือน/ปีพ.ศ. ที่จะบันทึก *</label>
             <input id="album-thai-date" type="text" required placeholder="เช่น 20/11/2569"
               class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-red-50/40 font-mono font-semibold text-[#EB2D2D] text-sm focus:border-[#EB2D2D] outline-none" />
+          </div>
+        </div>
+
+        <!-- Optional Album Cover Photo -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">5. รูปหน้าปกอัลบั้ม (ไม่บังคับ — หากไม่ใส่จะแสดงเป็นชื่อที่พิมพ์แทน)</label>
+          <input id="new-album-cover-input" type="file" accept="image/*" class="hidden" onchange="handleAlbumCoverSelected(event, 'new')" />
+          <div class="flex items-center gap-3 p-2.5 rounded-xl border border-dashed border-slate-300 bg-[#F8FAFC]">
+            <div id="new-album-cover-preview" class="w-16 h-16 rounded-xl bg-[#1B212C] text-white flex items-center justify-center overflow-hidden shrink-0 text-[10px] text-center px-1 font-semibold">
+              แสดงชื่ออัลบั้ม
+            </div>
+            <div class="flex-1 min-w-0 space-y-1.5">
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="document.getElementById('new-album-cover-input').click()"
+                  class="px-3 py-1.5 rounded-lg bg-[#1B212C] hover:bg-slate-800 text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer">
+                  <i data-lucide="image-plus" class="w-3.5 h-3.5 text-[#EB2D2D]"></i> เลือกรูปหน้าปก
+                </button>
+                <button id="new-album-cover-clear-btn" type="button" onclick="clearAlbumCover('new')"
+                  class="hidden px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-[#EB2D2D] text-xs font-medium cursor-pointer">
+                  ลบรูปหน้าปก
+                </button>
+              </div>
+              <p class="text-[11px] text-slate-400">สามารถเว้นว่างได้ ระบบจะขึ้นเป็นชื่อลูกค้า / Product / วันที่ที่พิมพ์ไว้แทน</p>
+            </div>
           </div>
         </div>
 
@@ -812,6 +851,9 @@
         <p id="lb-meta" class="text-xs text-slate-400">ผู้ถ่าย • วันเวลา • ขนาดไฟล์</p>
       </div>
       <div class="flex items-center gap-2">
+        <button onclick="setCurrentPhotoAsAlbumCover()" class="px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/35 text-amber-200 text-xs flex items-center gap-1.5 cursor-pointer" title="ตั้งรูปนี้เป็นหน้าปกอัลบั้ม">
+          <i data-lucide="image" class="w-3.5 h-3.5"></i> <span class="hidden sm:inline">ตั้งเป็นหน้าปก</span>
+        </button>
         <button onclick="editLightboxCaption()" class="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs flex items-center gap-1.5 cursor-pointer">
           <i data-lucide="edit-3" class="w-3.5 h-3.5"></i> แก้ไขคำอธิบาย
         </button>
@@ -849,7 +891,18 @@
 
     const TAB_SESSION_ID = 'tab-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5);
     const PHOTO_BUCKET = 'workdrive-photos';
+    const PRODUCTS_KEY = 'cspm_workdrive_products_v1';
     const DEFAULT_DEPTS = ['F&S', 'RPS', 'UPS', 'AIR', 'BS', 'Facility Services'];
+    const DEFAULT_PRODUCTS = [
+      'Fire Protection - Clean Agent (IG-100 / Novec 1230)',
+      'Fire Protection - VESDA Aspirating Smoke Detection',
+      'Power Quality - Uninterruptible Power Supply (UPS)',
+      'Power Quality - Generator & Battery Monitoring',
+      'Cooling System - Data Center Cooling (CRAC / AHU)',
+      'Liquid Leak Detection System (RAYCHEM)',
+      'Building Management & Security System (BMS / CCTV)',
+      'Micro Data Center & DCIM'
+    ];
 
     let supabaseClient = null;
     let isCloudConnected = false;
@@ -1017,6 +1070,7 @@ create policy "Public Access workdrive-photos" on storage.objects
           closeCloudConfigModal();
           renderCurrentView();
           renderDepartmentDropdowns();
+      renderProductSuggestions();
         }, 900);
       } else {
         showCloudConfigMsg(true, 'เชื่อมต่อฐานข้อมูลไม่สำเร็จ กรุณาตรวจสอบว่าได้รัน SQL สร้างตารางและ Bucket ใน Supabase แล้วหรือยัง');
@@ -1084,122 +1138,434 @@ create policy "Public Access workdrive-photos" on storage.objects
       return new Blob([ab], { type: mime });
     }
 
+    // ==================== OFFLINE-FIRST STORAGE & TEAM SYNC ====================
+    const TEAM_ROW_ID = 'cspm-team-main';
+    const PENDING_KEY = 'cspm_workdrive_pending_v1';
+    const LASTSYNC_KEY = 'cspm_workdrive_lastsync_v1';
+    const DEFAULT_ALBUMS_JSON = JSON.stringify(defaultAlbums);
+    const IDB_NAME = 'cspm_workdrive_offline';
+    const IDB_STORE = 'kv';
+
+    let pendingSync = false;           // true = this device has changes the team has not received yet
+    try { pendingSync = localStorage.getItem(PENDING_KEY) === '1'; } catch (e) {}
+    let syncBase = null;               // last state known to be identical to the cloud copy
+    let syncAgain = false;             // a save happened while a sync was running
+    let editVersion = 0;               // counts local edits (so edits made during a sync are never lost)
+
+    function deepCopy(v) { return JSON.parse(JSON.stringify(v)); }
+
+    function withTimeout(promise, ms, label) {
+      let timer;
+      const timeout = new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error((label || 'request') + ' timeout')), ms);
+      });
+      return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+    }
+
+    // ---- IndexedDB: big offline copy (localStorage is only ~5 MB) ----
+    let idbPromise = null;
+    function idbOpen() {
+      if (!idbPromise) {
+        idbPromise = new Promise((resolve, reject) => {
+          if (!window.indexedDB) { reject(new Error('IndexedDB not supported')); return; }
+          const req = indexedDB.open(IDB_NAME, 1);
+          req.onupgradeneeded = () => { req.result.createObjectStore(IDB_STORE); };
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+        });
+      }
+      return idbPromise;
+    }
+    async function idbGet(key) {
+      const db = await idbOpen();
+      return new Promise((resolve, reject) => {
+        const req = db.transaction(IDB_STORE, 'readonly').objectStore(IDB_STORE).get(key);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    async function idbSet(key, value) {
+      const db = await idbOpen();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, 'readwrite');
+        tx.objectStore(IDB_STORE).put(value, key);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+      });
+    }
+
+    function setPending(flag) {
+      pendingSync = !!flag;
+      try {
+        if (flag) localStorage.setItem(PENDING_KEY, '1');
+        else localStorage.removeItem(PENDING_KEY);
+      } catch (e) {}
+    }
+
+    let quotaWarned = false;
+    function persistAlbumsLocal() {
+      let lsOk = true;
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(albums)); } catch (e) { lsOk = false; }
+      idbSet('albums', albums).catch(() => {
+        if (!lsOk && !quotaWarned) {
+          quotaWarned = true;
+          alert('พื้นที่จัดเก็บในเครื่องเต็ม กรุณาดาวน์โหลด ZIP สำรองและลบอัลบั้มเก่าออกบางส่วน');
+        }
+      });
+    }
+
+    // <merge-start>
+    // 3-way merge: what this device changed (offline) + what the team changed meanwhile, using the last synced copy as base
+    function mergeObjectFields(l, b, r) {
+      const out = { ...r };
+      const keys = new Set([...Object.keys(l), ...Object.keys(r)]);
+      keys.forEach(k => {
+        if (!b) { if (l[k] !== undefined) out[k] = l[k]; return; }
+        if (JSON.stringify(l[k]) !== JSON.stringify(b[k])) out[k] = l[k];
+      });
+      return out;
+    }
+
+    function mergeKeyedList(L, B, R, keyFn, mergeFn) {
+      const lm = new Map(L.map(x => [keyFn(x), x]));
+      const bm = new Map(B.map(x => [keyFn(x), x]));
+      const rm = new Map(R.map(x => [keyFn(x), x]));
+      const order = [];
+      const seen = new Set();
+      [...R, ...L].forEach(x => {
+        const k = keyFn(x);
+        if (!seen.has(k)) { seen.add(k); order.push(k); }
+      });
+      const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+      const out = [];
+      order.forEach(k => {
+        const l = lm.get(k), b = bm.get(k), r = rm.get(k);
+        if (l && r) out.push(mergeFn(l, b, r));
+        else if (l && !r) { if (!b || !same(l, b)) out.push(l); }   // added here, or edited here after the team deleted it
+        else if (!l && r) { if (!b || !same(r, b)) out.push(r); }   // added by the team, or edited by the team after we deleted it
+      });
+      return out;
+    }
+
+    function mergeAlbum(l, b, r) {
+      if ((l && l.id === '__cspm_activity_logs__') || (r && r.id === '__cspm_activity_logs__')) {
+        const logMap = new Map();
+        [...(r && r.logs ? r.logs : []), ...(l && l.logs ? l.logs : [])].forEach(entry => {
+          if (entry && entry.id && !logMap.has(entry.id)) {
+            logMap.set(entry.id, entry);
+          }
+        });
+        const mergedLogs = Array.from(logMap.values())
+          .sort((a, z) => (z.createdAtMs || 0) - (a.createdAtMs || 0))
+          .slice(0, 600);
+        return { id: '__cspm_activity_logs__', isSystemLogContainer: true, photos: [], logs: mergedLogs };
+      }
+      const out = mergeObjectFields({ ...l, photos: undefined }, b ? { ...b, photos: undefined } : null, { ...r, photos: undefined });
+      out.photos = mergeKeyedList(l.photos || [], b ? (b.photos || []) : [], r.photos || [], p => p.id, mergeObjectFields);
+      return out;
+    }
+
+    function mergeSet(L, B, R) {
+      const out = [...R];
+      L.forEach(x => { if (!B.includes(x) && !out.includes(x)) out.push(x); });
+      return out.filter(x => !(B.includes(x) && !L.includes(x)));
+    }
+
+    function accountKey(a) {
+      return String((a && (a.email || a.username)) || '').trim().toLowerCase();
+    }
+    // <merge-end>
+
+    function isInlinePhoto(p) {
+      return !!(p && typeof p.dataUrl === 'string' && p.dataUrl.startsWith('data:'));
+    }
+
+    function countPendingPhotos() {
+      let n = 0;
+      albums.forEach(a => (a.photos || []).forEach(p => { if (isInlinePhoto(p)) n++; }));
+      return n;
+    }
+
     async function uploadPhotoBlobToStorage(albumId, photoObj) {
-      if (!isCloudConnected || !supabaseClient) return photoObj;
       if (!photoObj.dataUrl || !photoObj.dataUrl.startsWith('data:')) return photoObj;
+      if (!isCloudConnected || !supabaseClient) return photoObj;
+      // Offline: keep the photo on this device, it is sent to the team when the internet is back
+      if (!navigator.onLine) return { ...photoObj, pendingUpload: true };
 
       try {
         const blob = dataUrlToBlob(photoObj.dataUrl);
         const filePath = `${albumId}/${photoObj.id}.jpg`;
-        const { error: upErr } = await supabaseClient.storage
-          .from(PHOTO_BUCKET)
-          .upload(filePath, blob, { contentType: 'image/jpeg', upsert: true });
+        const { error: upErr } = await withTimeout(
+          supabaseClient.storage.from(PHOTO_BUCKET).upload(filePath, blob, { contentType: 'image/jpeg', upsert: true }),
+          90000, 'upload'
+        );
         if (upErr) throw upErr;
 
         const { data: pubData } = supabaseClient.storage
           .from(PHOTO_BUCKET)
           .getPublicUrl(filePath);
 
+        const { pendingUpload, ...rest } = photoObj;
         return {
-          ...photoObj,
+          ...rest,
           dataUrl: pubData.publicUrl,
           storagePath: filePath
         };
       } catch (err) {
-        console.warn('Fallback to inline image due to storage error:', err);
-        return photoObj;
+        console.warn('Photo upload failed, will retry later:', err);
+        return { ...photoObj, pendingUpload: true };
       }
     }
 
-    async function pushTeamStateToCloud() {
-      if (!isCloudConnected || !supabaseClient || isSyncingCloud) return;
+    async function uploadCoverDataUrlToStorage(albumId, coverDataUrl) {
+      if (!coverDataUrl || !coverDataUrl.startsWith('data:')) return coverDataUrl;
+      if (!isCloudConnected || !supabaseClient || !navigator.onLine) return coverDataUrl;
       try {
-        const payload = {
-          id: 'cspm-team-main',
-          albums: albums,
-          depts: getDepartments(),
-          accounts: getRegisteredAccounts(),
-          updated_at: new Date().toISOString()
-        };
-        const { error } = await supabaseClient
-          .from('workdrive_state')
-          .upsert(payload, { onConflict: 'id' });
-        if (!error) {
-          updateCloudBannerUI(
-            'เชื่อมต่อ Cloud สำเร็จ (แชร์ทั้งทีมแบบเรียลไทม์)',
-            `ซิงก์ล่าสุดเมื่อ ${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} น.`,
-            'bg-emerald-500'
-          );
-        }
-      } catch (e) {
-        console.warn('Cloud push error:', e);
+        const blob = dataUrlToBlob(coverDataUrl);
+        const filePath = `covers/${albumId}_${Date.now()}.jpg`;
+        const { error: upErr } = await withTimeout(
+          supabaseClient.storage.from(PHOTO_BUCKET).upload(filePath, blob, { contentType: 'image/jpeg', upsert: true }),
+          60000, 'cover-upload'
+        );
+        if (upErr) throw upErr;
+        const { data: pubData } = supabaseClient.storage.from(PHOTO_BUCKET).getPublicUrl(filePath);
+        return pubData.publicUrl;
+      } catch (err) {
+        console.warn('Cover upload failed, will retry later:', err);
+        return coverDataUrl;
       }
     }
 
-    async function syncFromCloud(showAlertWhenDone = false, pushLocalIfEmpty = false) {
-      if (!isCloudConnected || !supabaseClient || isSyncingCloud) return false;
-      isSyncingCloud = true;
-      try {
-        const { data, error } = await supabaseClient
-          .from('workdrive_state')
-          .select('*')
-          .eq('id', 'cspm-team-main')
-          .maybeSingle();
-
-        if (error) throw error;
-
-        if (data) {
-          const cloudAlbums = Array.isArray(data.albums) ? data.albums : [];
-          const cloudDepts = Array.isArray(data.depts) && data.depts.length > 0 ? data.depts : null;
-          const cloudAccounts = Array.isArray(data.accounts) ? data.accounts : null;
-
-          if (cloudAlbums.length === 0 && albums.length > 0 && pushLocalIfEmpty) {
-            await pushTeamStateToCloud();
+    // Send photos & cover images that were taken offline (stored inside the app) to Supabase Storage
+    async function flushPendingPhotos() {
+      if (!navigator.onLine) return countPendingPhotos();
+      const total = countPendingPhotos();
+      let done = 0;
+      let remaining = 0;
+      for (const album of albums) {
+        if (album.coverUrl && album.coverUrl.startsWith('data:')) {
+          const uploadedCover = await uploadCoverDataUrlToStorage(album.id, album.coverUrl);
+          if (uploadedCover && !uploadedCover.startsWith('data:')) {
+            album.coverUrl = uploadedCover;
           } else {
-            albums = cloudAlbums;
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(albums));
+            remaining++;
           }
-
-          if (cloudDepts) {
-            localStorage.setItem(DEPTS_KEY, JSON.stringify(cloudDepts));
-            renderDepartmentDropdowns();
-          }
-          if (cloudAccounts) {
-            localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(cloudAccounts));
-          }
-
-          if (currentUser) {
-            updateStats();
-            if (activeAlbumId) {
-              const stillExists = albums.some(a => a.id === activeAlbumId);
-              if (stillExists) {
-                renderPhotos();
-              } else {
-                navigateToLevel('product');
-              }
-            } else {
-              renderBreadcrumbAndHeaders();
-              renderCurrentLevelFolders();
-            }
-          }
-        } else if (pushLocalIfEmpty) {
-          await pushTeamStateToCloud();
         }
+        for (const p of (album.photos || [])) {
+          if (!isInlinePhoto(p)) continue;
+          updateCloudBannerUI('กำลังส่งรูปที่ถ่ายตอนออฟไลน์ขึ้นทีม...', `รูปที่ ${done + remaining + 1} จาก ${total}`, 'bg-sky-500');
+          const up = await uploadPhotoBlobToStorage(album.id, p);
+          if (up && up.dataUrl && !up.dataUrl.startsWith('data:')) {
+            delete p.pendingUpload;
+            Object.assign(p, up);
+            done++;
+          } else {
+            remaining++;
+          }
+        }
+      }
+      return remaining;
+    }
 
-        if (showAlertWhenDone) {
-          alert('อัปเดตข้อมูลล่าสุดจากทีมเรียบร้อยแล้วครับ');
+    // State that goes to the cloud: photos/covers still waiting for upload stay on this device only
+    function cloudStateForPush() {
+      const albumsCopy = albums.map(a => ({
+        ...a,
+        coverUrl: (a.coverUrl && a.coverUrl.startsWith('data:')) ? '' : (a.coverUrl || ''),
+        photos: (a.photos || []).filter(p => !(p && p.pendingUpload === true && isInlinePhoto(p)))
+      }));
+      return { albums: albumsCopy, depts: getDepartments(), accounts: getRegisteredAccounts() };
+    }
+
+    function formatSyncTime(ts) {
+      if (!ts) return '';
+      return new Date(Number(ts)).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + ' น.';
+    }
+
+    function refreshSyncStatus() {
+      if (!isCloudConnected) return;
+      const pendingPhotos = countPendingPhotos();
+      let last = '';
+      try { last = formatSyncTime(localStorage.getItem(LASTSYNC_KEY)); } catch (e) {}
+      if (!navigator.onLine) {
+        updateCloudBannerUI(
+          'ออฟไลน์ — ใช้งานต่อได้ตามปกติ',
+          pendingSync
+            ? 'มีการเปลี่ยนแปลงรอส่งขึ้นทีม' + (pendingPhotos ? ` (รูปรอส่ง ${pendingPhotos} รูป)` : '') + ' จะซิงก์อัตโนมัติเมื่อมีอินเทอร์เน็ต'
+            : 'ข้อมูลทีมอัปเดตล่าสุด ' + (last || 'ยังไม่เคยซิงก์'),
+          'bg-slate-400'
+        );
+      } else if (isSyncingCloud) {
+        updateCloudBannerUI('กำลังซิงก์กับทีม...', 'กำลังรวมข้อมูลในเครื่องกับข้อมูลทีม', 'bg-sky-500');
+      } else if (pendingSync) {
+        updateCloudBannerUI(
+          'มีข้อมูลรอซิงก์กับทีม',
+          (pendingPhotos ? `รูปรอส่ง ${pendingPhotos} รูป • ` : '') + 'กด "รีเฟรชข้อมูลทีม" เพื่อซิงก์ทันที',
+          'bg-amber-400'
+        );
+      } else {
+        updateCloudBannerUI('เชื่อมต่อ Cloud สำเร็จ (แชร์ทั้งทีม)', 'ซิงก์ล่าสุดเมื่อ ' + (last || '-'), 'bg-emerald-500');
+      }
+    }
+
+    function refreshViewsAfterSync() {
+      if (!currentUser) return;
+      updateStats();
+      if (activeAlbumId) {
+        const stillExists = albums.some(a => a.id === activeAlbumId);
+        if (stillExists) {
+          renderPhotos();
+        } else {
+          navigateToLevel('product');
+        }
+      } else {
+        renderBreadcrumbAndHeaders();
+        renderCurrentLevelFolders();
+      }
+    }
+
+    function adoptRemote(remote) {
+      albums = remote.albums;
+      persistAlbumsLocal();
+      if (remote.depts) {
+        try { localStorage.setItem(DEPTS_KEY, JSON.stringify(remote.depts)); } catch (e) {}
+        renderDepartmentDropdowns();
+      }
+      if (remote.accounts) {
+        try { localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(remote.accounts)); } catch (e) {}
+      }
+      syncBase = deepCopy({
+        albums: remote.albums,
+        depts: remote.depts || getDepartments(),
+        accounts: remote.accounts || getRegisteredAccounts()
+      });
+      idbSet('base', syncBase).catch(() => {});
+      try { localStorage.setItem(LASTSYNC_KEY, String(Date.now())); } catch (e) {}
+    }
+
+    async function finishPush(v0) {
+      const remaining = await flushPendingPhotos();
+      persistAlbumsLocal();
+      const state = cloudStateForPush();
+      const { error } = await withTimeout(
+        supabaseClient.from('workdrive_state').upsert({
+          id: TEAM_ROW_ID,
+          albums: state.albums,
+          depts: state.depts,
+          accounts: state.accounts,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id' }),
+        20000, 'push'
+      );
+      if (error) throw error;
+      syncBase = deepCopy(state);
+      idbSet('base', syncBase).catch(() => {});
+      try { localStorage.setItem(LASTSYNC_KEY, String(Date.now())); } catch (e) {}
+      setPending(editVersion !== v0 || remaining > 0);
+    }
+
+    async function doCloudSync(pushLocalIfEmpty) {
+      const v0 = editVersion;
+      const { data, error } = await withTimeout(
+        supabaseClient.from('workdrive_state').select('*').eq('id', TEAM_ROW_ID).maybeSingle(),
+        8000, 'pull'
+      );
+      if (error) throw error;
+
+      if (!data) {
+        if (pushLocalIfEmpty || pendingSync) await finishPush(v0);
+        return true;
+      }
+
+      const remote = {
+        albums: Array.isArray(data.albums) ? data.albums : [],
+        depts: Array.isArray(data.depts) && data.depts.length > 0 ? data.depts : null,
+        accounts: Array.isArray(data.accounts) ? data.accounts : null
+      };
+      const mustMerge = pendingSync || (pushLocalIfEmpty && !syncBase);
+
+      if (!mustMerge) {
+        if (remote.albums.length === 0 && albums.length > 0 && pushLocalIfEmpty) {
+          await finishPush(v0);
+        } else {
+          adoptRemote(remote);
+          refreshViewsAfterSync();
         }
         return true;
+      }
+
+      // This device has changes the team has not seen: merge instead of overwriting
+      const base = syncBase || { albums: JSON.parse(DEFAULT_ALBUMS_JSON), depts: [...DEFAULT_DEPTS], accounts: [] };
+      const localDepts = getDepartments();
+      const localAccounts = getRegisteredAccounts();
+      const mergedAlbums = mergeKeyedList(albums, base.albums || [], remote.albums, a => a.id, mergeAlbum);
+      let mergedDepts = remote.depts ? mergeSet(localDepts, base.depts || [], remote.depts) : localDepts;
+      if (!mergedDepts.length) mergedDepts = [...DEFAULT_DEPTS];
+      const mergedAccounts = remote.accounts
+        ? mergeKeyedList(localAccounts, base.accounts || [], remote.accounts, accountKey, mergeObjectFields)
+        : localAccounts;
+
+      albums = mergedAlbums;
+      try { localStorage.setItem(DEPTS_KEY, JSON.stringify(mergedDepts)); } catch (e) {}
+      try { localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(mergedAccounts)); } catch (e) {}
+      persistAlbumsLocal();
+      renderDepartmentDropdowns();
+      refreshViewsAfterSync();
+      await finishPush(v0);
+      return true;
+    }
+
+    async function runCloudSync(opts = {}) {
+      const showAlert = !!opts.showAlert;
+      const pushLocalIfEmpty = !!opts.pushLocalIfEmpty;
+      if (!isCloudConnected || !supabaseClient) return false;
+      if (!navigator.onLine) {
+        refreshSyncStatus();
+        if (showAlert) alert('ตอนนี้ไม่มีอินเทอร์เน็ต ข้อมูลทั้งหมดยังอยู่ในเครื่องและใช้งานต่อได้ตามปกติ ระบบจะซิงก์กับทีมให้อัตโนมัติเมื่อกลับมาออนไลน์ครับ');
+        return false;
+      }
+      if (isSyncingCloud) { syncAgain = true; return false; }
+
+      isSyncingCloud = true;
+      refreshSyncStatus();
+      let ok = false;
+      try {
+        ok = await doCloudSync(pushLocalIfEmpty);
+        if (showAlert) alert('อัปเดตข้อมูลล่าสุดจากทีมเรียบร้อยแล้วครับ');
       } catch (e) {
         console.warn('Cloud sync error:', e);
-        if (showAlertWhenDone) {
-          alert('ไม่สามารถดึงข้อมูลจาก Cloud ได้ กรุณาตรวจสอบการตั้งค่า Supabase');
-        }
-        return false;
+        if (showAlert) alert('ไม่สามารถดึงข้อมูลจาก Cloud ได้ กรุณาตรวจสอบการตั้งค่า Supabase หรือสัญญาณอินเทอร์เน็ต');
       } finally {
         isSyncingCloud = false;
       }
+      refreshSyncStatus();
+      if (syncAgain) {
+        syncAgain = false;
+        setTimeout(() => runCloudSync({}), 300);
+      }
+      return ok;
     }
+
+    function pushTeamStateToCloud() {
+      return runCloudSync({});
+    }
+
+    function syncFromCloud(showAlertWhenDone = false, pushLocalIfEmpty = false) {
+      return runCloudSync({ showAlert: showAlertWhenDone, pushLocalIfEmpty });
+    }
+
+    window.addEventListener('online', () => {
+      refreshSyncStatus();
+      setTimeout(() => runCloudSync({}), 1500);
+    });
+    window.addEventListener('offline', () => refreshSyncStatus());
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && currentUser) {
+        refreshSyncStatus();
+        runCloudSync({});
+      }
+    });
 
     function getTodayIsoAndThai() {
       const now = new Date();
@@ -1231,6 +1597,8 @@ create policy "Public Access workdrive-photos" on storage.objects
 
     function saveDepartments(list) {
       localStorage.setItem(DEPTS_KEY, JSON.stringify(list));
+      editVersion++;
+      setPending(true);
       pushTeamStateToCloud();
     }
 
@@ -1299,6 +1667,125 @@ create policy "Public Access workdrive-photos" on storage.objects
       toggleModalNewDept();
     }
 
+    // ==================== PRODUCT LIST MANAGEMENT (ADD & DELETE ANY PRODUCT) ====================
+    function getProducts() {
+      const raw = localStorage.getItem(PRODUCTS_KEY);
+      if (!raw) {
+        localStorage.setItem(PRODUCTS_KEY, JSON.stringify(DEFAULT_PRODUCTS));
+        return [...DEFAULT_PRODUCTS];
+      }
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [...DEFAULT_PRODUCTS];
+      } catch (e) {
+        return [...DEFAULT_PRODUCTS];
+      }
+    }
+
+    function saveProducts(list) {
+      localStorage.setItem(PRODUCTS_KEY, JSON.stringify(list));
+      renderProductSuggestions();
+    }
+
+    function renderProductSuggestions() {
+      const savedList = getProducts();
+      const fromAlbums = albums.map(a => a.product).filter(Boolean);
+      const combined = Array.from(new Set([...savedList, ...fromAlbums]));
+      const dl = document.getElementById('product-suggestions');
+      if (dl) {
+        dl.innerHTML = combined.map(p => `<option value="${escapeHtml(p)}"></option>`).join('');
+      }
+    }
+
+    function openManageProductsModal() {
+      renderManageProductsList();
+      document.getElementById('manage-products-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeManageProductsModal() {
+      document.getElementById('manage-products-modal').classList.add('hidden');
+    }
+
+    function renderManageProductsList() {
+      const listEl = document.getElementById('manage-products-list');
+      if (!listEl) return;
+      const savedList = getProducts();
+      const fromAlbums = albums.map(a => a.product).filter(Boolean);
+      const allProducts = Array.from(new Set([...savedList, ...fromAlbums]));
+
+      if (allProducts.length === 0) {
+        listEl.innerHTML = `<p class="text-center text-xs text-slate-400 py-6">ยังไม่มีรายชื่อ Product ในระบบ สามารถพิมพ์เพิ่มใหม่ด้านบนได้ทันที</p>`;
+        return;
+      }
+
+      listEl.innerHTML = allProducts.map(prodName => {
+        const usedCount = albums.filter(a => a.product === prodName).length;
+        const safeJs = escapeHtml(prodName).replace(/'/g, "\'");
+        return `
+          <div class="p-3 hover:bg-slate-50 flex items-center justify-between gap-3 rounded-xl transition">
+            <div class="min-w-0">
+              <p class="text-xs font-semibold text-slate-800 truncate">${escapeHtml(prodName)}</p>
+              <p class="text-[11px] text-slate-400">${usedCount > 0 ? `ใช้งานอยู่ใน ${usedCount} อัลบั้ม` : 'ยังไม่มีอัลบั้มในชื่อนี้'}</p>
+            </div>
+            <button type="button" onclick="deleteProductNameFromList('${safeJs}')"
+              class="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-[#EB2D2D] border border-red-200/80 text-xs font-medium flex items-center gap-1 shrink-0 cursor-pointer transition"
+              title="ลบชื่อ Product นี้ออกจากระบบ">
+              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+              <span>ลบ</span>
+            </button>
+          </div>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    function addNewProductToList() {
+      const inp = document.getElementById('manage-new-product-input');
+      const val = (inp.value || '').trim();
+      if (!val) return;
+      const list = getProducts();
+      if (!list.some(p => p.toLowerCase() === val.toLowerCase())) {
+        list.unshift(val);
+        saveProducts(list);
+      }
+      inp.value = '';
+      renderManageProductsList();
+    }
+
+    async function deleteProductNameFromList(prodName) {
+      const relatedAlbums = albums.filter(a => a.product === prodName);
+      const msg = relatedAlbums.length > 0
+        ? `ต้องการลบชื่อ Product "${prodName}" รวมถึงอัลบั้มทั้งหมด ${relatedAlbums.length} อัลบั้มภายใต้ Product นี้ใช่หรือไม่?`
+        : `ต้องการลบชื่อ Product "${prodName}" ออกจากรายการตัวเลือกใช่หรือไม่?`;
+      if (!confirm(msg)) return;
+
+      // Remove from saved product suggestions
+      const nextProducts = getProducts().filter(p => p !== prodName);
+      saveProducts(nextProducts);
+
+      // Remove any albums using this product
+      if (relatedAlbums.length > 0) {
+        await removeCloudPhotosForAlbums(relatedAlbums);
+        albums = albums.filter(a => a.product !== prodName);
+        if (navPath.product === prodName) {
+          navPath.product = null;
+        }
+        saveAlbums();
+      }
+
+      // Clear input if it currently holds the deleted product
+      ['album-product', 'edit-album-product'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.value === prodName) el.value = '';
+      });
+
+      renderManageProductsList();
+      if (currentUser) {
+        renderCurrentView();
+      }
+    }
+
     function applyRememberedCredentials() {
       const rememberedRaw = localStorage.getItem(REMEMBER_KEY);
       if (rememberedRaw) {
@@ -1322,14 +1809,27 @@ create policy "Public Access workdrive-photos" on storage.objects
       applyRememberedCredentials();
       const savedUser = localStorage.getItem(USER_KEY) || sessionStorage.getItem(USER_KEY);
       const savedAlbums = localStorage.getItem(STORAGE_KEY);
-      albums = savedAlbums ? JSON.parse(savedAlbums) : defaultAlbums;
-      if (!savedAlbums) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(albums));
+
+      // IndexedDB keeps the full offline copy (much bigger than localStorage)
+      let idbAlbums = null;
+      try { idbAlbums = await idbGet('albums'); } catch (e) {}
+      try { syncBase = (await idbGet('base')) || null; } catch (e) {}
+
+      const hadLocalData = Array.isArray(idbAlbums) || !!savedAlbums;
+      if (Array.isArray(idbAlbums)) {
+        albums = idbAlbums;
+      } else if (savedAlbums) {
+        albums = JSON.parse(savedAlbums);
+      } else {
+        albums = JSON.parse(DEFAULT_ALBUMS_JSON);
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(albums)); } catch (e) {}
       }
 
       initSupabaseClient();
       if (isCloudConnected) {
-        await syncFromCloud(false, false);
+        // Open instantly from the saved copy; the team data is merged in the background
+        const syncPromise = syncFromCloud(false, false);
+        if (!hadLocalData) await syncPromise;
       }
 
       if (savedUser) {
@@ -1337,14 +1837,13 @@ create policy "Public Access workdrive-photos" on storage.objects
         showApp();
       }
       lucide.createIcons();
+      refreshSyncStatus();
     }
 
     function saveAlbums() {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(albums));
-      } catch (e) {
-        alert('พื้นที่จัดเก็บในเบราว์เซอร์เต็ม กรุณาดาวน์โหลด ZIP และลบอัลบั้มเก่าออกบางส่วน หรือเชื่อมต่อ Supabase/Cloud Storage');
-      }
+      editVersion++;
+      setPending(true);
+      persistAlbumsLocal();
       pushTeamStateToCloud();
     }
 
@@ -1356,6 +1855,8 @@ create policy "Public Access workdrive-photos" on storage.objects
 
     function saveRegisteredAccounts(list) {
       localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(list));
+      editVersion++;
+      setPending(true);
       pushTeamStateToCloud();
     }
 
@@ -1562,7 +2063,7 @@ create policy "Public Access workdrive-photos" on storage.objects
       presenceMap[TAB_SESSION_ID] = myRecord;
       localStorage.setItem(PRESENCE_KEY, JSON.stringify(presenceMap));
 
-      if (isCloudConnected && supabaseClient) {
+      if (isCloudConnected && supabaseClient && navigator.onLine) {
         try {
           // Remove any stale duplicate rows for the same username before upserting current session
           await supabaseClient
@@ -1613,7 +2114,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         delete presenceMap[TAB_SESSION_ID];
         localStorage.setItem(PRESENCE_KEY, JSON.stringify(presenceMap));
       } catch (e) {}
-      if (isCloudConnected && supabaseClient) {
+      if (isCloudConnected && supabaseClient && navigator.onLine) {
         supabaseClient.from('workdrive_presence').delete().eq('session_id', TAB_SESSION_ID).then(() => {});
       }
     }
@@ -1766,12 +2267,28 @@ create policy "Public Access workdrive-photos" on storage.objects
       }
     });
 
+    function isAdminUser() {
+      if (!currentUser || !currentUser.name) return false;
+      return currentUser.name.trim().toLowerCase() === 'sarunchana.h';
+    }
+
     function showApp() {
       document.getElementById('login-screen').classList.add('hidden');
       document.getElementById('app-screen').classList.remove('hidden');
       document.getElementById('user-display-name').textContent = currentUser.name;
       document.getElementById('user-display-dept').textContent = currentUser.dept;
       document.getElementById('user-avatar').textContent = currentUser.name.charAt(0).toUpperCase();
+
+      const adminBtn = document.getElementById('admin-logs-nav-btn');
+      const adminBadge = document.getElementById('user-admin-badge');
+      if (isAdminUser()) {
+        if (adminBtn) adminBtn.classList.remove('hidden');
+        if (adminBadge) adminBadge.classList.remove('hidden');
+      } else {
+        if (adminBtn) adminBtn.classList.add('hidden');
+        if (adminBadge) adminBadge.classList.add('hidden');
+      }
+
       goHome();
       startPresenceTracking();
     }
@@ -1852,11 +2369,12 @@ create policy "Public Access workdrive-photos" on storage.objects
     }
 
     function updateStats() {
-      const uniqueCustomers = new Set(albums.map(a => a.client).filter(Boolean));
-      const totalAlbums = albums.length;
+      const realAlbums = albums.filter(a => !a.isSystemLogContainer);
+      const uniqueCustomers = new Set(realAlbums.map(a => a.client).filter(Boolean));
+      const totalAlbums = realAlbums.length;
       let totalPhotos = 0;
       let totalBytes = 0;
-      albums.forEach(a => {
+      realAlbums.forEach(a => {
         totalPhotos += a.photos.length;
         a.photos.forEach(p => totalBytes += (p.sizeBytes || 0));
       });
@@ -1950,7 +2468,7 @@ create policy "Public Access workdrive-photos" on storage.objects
 
       if (!navPath.client) {
         const customerMap = new Map();
-        albums.forEach(a => {
+        albums.filter(a => !a.isSystemLogContainer).forEach(a => {
           const cName = a.client || 'ไม่ระบุชื่อลูกค้า';
           if (!customerMap.has(cName)) {
             customerMap.set(cName, {
@@ -1967,8 +2485,8 @@ create policy "Public Access workdrive-photos" on storage.objects
           entry.products.add(a.product);
           entry.dateAlbums.push(a);
           entry.photoCount += a.photos.length;
-          if (!entry.cover && a.photos.length > 0) {
-            entry.cover = a.photos[0].dataUrl;
+          if (!entry.cover && a.coverUrl) {
+            entry.cover = a.coverUrl;
           }
         });
 
@@ -1995,17 +2513,14 @@ create policy "Public Access workdrive-photos" on storage.objects
             return `
             <div onclick="enterCustomer('${safeJsName}')"
               class="group bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs hover:shadow-md hover:border-[#EB2D2D]/40 transition cursor-pointer flex flex-col">
-              <div class="h-40 bg-slate-100 relative overflow-hidden flex items-center justify-center">
+              <div class="h-40 bg-[#1B212C] relative overflow-hidden flex items-center justify-center">
                 ${item.cover
                   ? `<img src="${item.cover}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />`
-                  : `<div class="text-center text-slate-400">
-                      <div class="w-14 h-14 rounded-2xl bg-[#EB2D2D]/10 text-[#EB2D2D] flex items-center justify-center mx-auto mb-1.5">
-                        <i data-lucide="building-2" class="w-7 h-7"></i>
-                      </div>
-                      <span class="text-[11px]">โฟลเดอร์ลูกค้า</span>
+                  : `<div class="w-full h-full cspm-hero-bg px-5 pt-10 pb-4 flex flex-col items-center justify-center text-center">
+                      <span class="text-white font-bold text-base sm:text-lg leading-snug line-clamp-2 group-hover:text-[#FF6B70] transition">${escapeHtml(item.name)}</span>
                     </div>`
                 }
-                <span class="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-[#1B212C]/90 text-white text-[11px] font-semibold flex items-center gap-1">
+                <span class="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-[#1B212C]/90 text-white text-[11px] font-semibold flex items-center gap-1 border border-white/10">
                   <i data-lucide="building-2" class="w-3 h-3 text-[#EB2D2D]"></i> ลูกค้า
                 </span>
                 <div class="absolute top-3 right-3 flex items-center gap-1">
@@ -2047,8 +2562,8 @@ create policy "Public Access workdrive-photos" on storage.objects
             <div onclick="enterCustomer('${safeJsName}')"
               class="p-4 hover:bg-red-50/40 flex items-center justify-between gap-4 transition cursor-pointer">
               <div class="flex items-center gap-3.5 min-w-0">
-                <div class="w-11 h-11 rounded-xl bg-[#EB2D2D]/10 text-[#EB2D2D] flex items-center justify-center shrink-0">
-                  <i data-lucide="building-2" class="w-5 h-5"></i>
+                <div class="w-11 h-11 rounded-xl bg-[#EB2D2D]/10 text-[#EB2D2D] flex items-center justify-center shrink-0 overflow-hidden">
+                  ${item.cover ? `<img src="${item.cover}" class="w-full h-full object-cover" />` : `<i data-lucide="building-2" class="w-5 h-5"></i>`}
                 </div>
                 <div class="min-w-0">
                   <h4 class="font-bold text-sm text-slate-900 truncate">${escapeHtml(item.name)}</h4>
@@ -2092,7 +2607,7 @@ create policy "Public Access workdrive-photos" on storage.objects
           entry.products.add(a.product);
           entry.dateAlbums.push(a);
           entry.photoCount += a.photos.length;
-          if (!entry.cover && a.photos.length > 0) entry.cover = a.photos[0].dataUrl;
+          if (!entry.cover && a.coverUrl) entry.cover = a.coverUrl;
         });
 
         let items = Array.from(deptMap.values());
@@ -2119,9 +2634,7 @@ create policy "Public Access workdrive-photos" on storage.objects
               <div class="h-36 bg-[#1B212C] relative overflow-hidden flex items-center justify-center">
                 ${item.cover
                   ? `<img src="${item.cover}" class="w-full h-full object-cover opacity-55 group-hover:scale-105 transition duration-300" />`
-                  : `<div class="w-14 h-14 rounded-2xl bg-white/10 text-white flex items-center justify-center">
-                      <i data-lucide="layers" class="w-7 h-7 text-[#EB2D2D]"></i>
-                    </div>`
+                  : `<div class="w-full h-full cspm-hero-bg"></div>`
                 }
                 <div class="absolute top-3 right-3 flex items-center gap-1 z-10">
                   <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('dept', '${safeJsName}')"
@@ -2157,8 +2670,8 @@ create policy "Public Access workdrive-photos" on storage.objects
             <div onclick="enterDept('${safeJsName}')"
               class="p-4 hover:bg-red-50/40 flex items-center justify-between gap-4 transition cursor-pointer">
               <div class="flex items-center gap-3.5 min-w-0">
-                <div class="w-11 h-11 rounded-xl bg-[#1B212C] text-white font-bold text-xs flex items-center justify-center shrink-0">
-                  ${escapeHtml(item.name)}
+                <div class="w-11 h-11 rounded-xl bg-[#1B212C] text-white font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
+                  ${item.cover ? `<img src="${item.cover}" class="w-full h-full object-cover" />` : escapeHtml(item.name)}
                 </div>
                 <div class="min-w-0">
                   <h4 class="font-bold text-sm text-slate-900">สังกัด: ${escapeHtml(item.name)}</h4>
@@ -2200,7 +2713,7 @@ create policy "Public Access workdrive-photos" on storage.objects
           const entry = prodMap.get(pName);
           entry.dateAlbums.push(a);
           entry.photoCount += a.photos.length;
-          if (!entry.cover && a.photos.length > 0) entry.cover = a.photos[0].dataUrl;
+          if (!entry.cover && a.coverUrl) entry.cover = a.coverUrl;
         });
 
         let items = Array.from(prodMap.values());
@@ -2224,14 +2737,11 @@ create policy "Public Access workdrive-photos" on storage.objects
             return `
             <div onclick="enterProduct('${safeJsName}')"
               class="group bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs hover:shadow-md hover:border-[#EB2D2D]/40 transition cursor-pointer flex flex-col">
-              <div class="h-40 bg-slate-100 relative overflow-hidden flex items-center justify-center">
+              <div class="h-40 bg-[#1B212C] relative overflow-hidden flex items-center justify-center">
                 ${item.cover
                   ? `<img src="${item.cover}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />`
-                  : `<div class="text-center text-slate-400">
-                      <div class="w-12 h-12 rounded-2xl bg-slate-200/70 text-slate-600 flex items-center justify-center mx-auto mb-1.5">
-                        <i data-lucide="package" class="w-6 h-6"></i>
-                      </div>
-                      <span class="text-[11px]">โฟลเดอร์ Product</span>
+                  : `<div class="w-full h-full cspm-hero-bg px-5 pt-10 pb-4 flex flex-col items-center justify-center text-center">
+                      <span class="text-white font-bold text-sm sm:text-base leading-snug line-clamp-2 group-hover:text-[#FF6B70] transition">${escapeHtml(item.name)}</span>
                     </div>`
                 }
                 <span class="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-[#EB2D2D] text-white text-[11px] font-semibold">
@@ -2246,7 +2756,7 @@ create policy "Public Access workdrive-photos" on storage.objects
                     <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
                   </button>
                   <button type="button" onclick="event.stopPropagation(); openDeleteConfirmModal('product', '${safeJsName}')"
-                    class="p-1.5 rounded-full bg-white/95 hover:bg-red-50 text-slate-600 hover:text-[#EB2D2D] shadow-2xs transition cursor-pointer" title="ลบโฟลเดอร์ Product นี้">
+                    class="p-1.5 rounded-full bg-white/95 hover:bg-red-50 text-slate-600 hover:text-[#EB2D2D] shadow-2xs transition cursor-pointer" title="ลบ Product นี้">
                     <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
                   </button>
                 </div>
@@ -2258,7 +2768,13 @@ create policy "Public Access workdrive-photos" on storage.objects
                 </div>
                 <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
                   <span class="font-medium text-slate-600">${item.photoCount} รูป</span>
-                  <span class="text-[#EB2D2D] font-medium flex items-center gap-0.5">เลือกวันที่ <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></span>
+                  <div class="flex items-center gap-2">
+                    <button type="button" onclick="event.stopPropagation(); openDeleteConfirmModal('product', '${safeJsName}')"
+                      class="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-[#EB2D2D] font-medium flex items-center gap-1 cursor-pointer transition">
+                      <i data-lucide="trash-2" class="w-3 h-3"></i> ลบ Product
+                    </button>
+                    <span class="text-[#EB2D2D] font-medium flex items-center gap-0.5">เลือกวันที่ <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -2271,8 +2787,8 @@ create policy "Public Access workdrive-photos" on storage.objects
             <div onclick="enterProduct('${safeJsName}')"
               class="p-4 hover:bg-red-50/40 flex items-center justify-between gap-4 transition cursor-pointer">
               <div class="flex items-center gap-3.5 min-w-0">
-                <div class="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
-                  <i data-lucide="package" class="w-5 h-5"></i>
+                <div class="w-11 h-11 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 overflow-hidden">
+                  ${item.cover ? `<img src="${item.cover}" class="w-full h-full object-cover" />` : `<i data-lucide="package" class="w-5 h-5"></i>`}
                 </div>
                 <div class="min-w-0">
                   <h4 class="font-bold text-sm text-slate-900 truncate">${escapeHtml(item.name)}</h4>
@@ -2286,8 +2802,9 @@ create policy "Public Access workdrive-photos" on storage.objects
                   <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
                 </button>
                 <button type="button" onclick="event.stopPropagation(); openDeleteConfirmModal('product', '${safeJsName}')"
-                  class="p-1.5 rounded-lg hover:bg-red-50 text-slate-400 hover:text-[#EB2D2D] transition cursor-pointer" title="ลบโฟลเดอร์ Product นี้">
+                  class="px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-[#EB2D2D] font-medium flex items-center gap-1 transition cursor-pointer" title="ลบ Product นี้">
                   <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                  <span class="hidden sm:inline">ลบ</span>
                 </button>
                 <i data-lucide="chevron-right" class="w-4 h-4 text-slate-400"></i>
               </div>
@@ -2320,18 +2837,17 @@ create policy "Public Access workdrive-photos" on storage.objects
       if (viewMode === 'grid') {
         container.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5';
         container.innerHTML = dateAlbums.map(album => {
-          const cover = album.photos.length > 0 ? album.photos[0].dataUrl : null;
+          const cover = album.coverUrl || null;
           return `
             <div onclick="openAlbum('${album.id}')"
               class="group bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs hover:shadow-md hover:border-[#EB2D2D]/40 transition cursor-pointer flex flex-col">
-              <div class="h-44 bg-slate-100 relative overflow-hidden flex items-center justify-center">
+              <div class="h-44 bg-[#1B212C] relative overflow-hidden flex items-center justify-center">
                 ${cover
                   ? `<img src="${cover}" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />`
-                  : `<div class="text-center text-slate-400">
-                      <div class="w-12 h-12 rounded-2xl bg-[#EB2D2D]/10 text-[#EB2D2D] flex items-center justify-center mx-auto mb-1.5">
-                        <i data-lucide="calendar-days" class="w-6 h-6"></i>
-                      </div>
-                      <span class="text-[11px]">กดเพื่อถ่ายรูป / อัปโหลด</span>
+                  : `<div class="w-full h-full cspm-hero-bg px-5 pt-11 pb-4 flex flex-col items-center justify-center text-center">
+                      <span class="text-white font-bold text-base leading-snug line-clamp-1">${escapeHtml(album.client)}</span>
+                      <span class="text-[#FF6B70] font-semibold text-xs mt-1 line-clamp-1">${escapeHtml(album.product)}</span>
+                      <span class="text-slate-300 font-mono text-xs mt-1">วันที่ ${escapeHtml(album.thaiDate)}</span>
                     </div>`
                 }
                 <span class="absolute top-3 left-3 px-3 py-1 rounded-lg bg-[#EB2D2D] text-white text-xs font-mono font-bold shadow-xs flex items-center gap-1.5">
@@ -2339,11 +2855,11 @@ create policy "Public Access workdrive-photos" on storage.objects
                   ${escapeHtml(album.thaiDate)}
                 </span>
                 <div class="absolute top-3 right-3 flex items-center gap-1">
-                  <span class="px-2.5 py-1 rounded-full bg-[#1B212C]/90 text-white text-[11px] font-medium">
+                  <span class="px-2.5 py-1 rounded-full bg-[#1B212C]/90 text-white text-[11px] font-medium border border-white/10">
                     ${escapeHtml(album.dept)}
                   </span>
                   <button type="button" onclick="event.stopPropagation(); openEditAlbumModal('${album.id}')"
-                    class="p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-700 hover:text-amber-700 shadow-2xs transition cursor-pointer" title="แก้ไขวันที่ / ชื่อ / รายละเอียด">
+                    class="p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-700 hover:text-amber-700 shadow-2xs transition cursor-pointer" title="แก้ไขวันที่ / ชื่อ / รูปหน้าปก">
                     <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
                   </button>
                   <button type="button" onclick="event.stopPropagation(); openDeleteConfirmModal('album', '${album.id}')"
@@ -2374,8 +2890,8 @@ create policy "Public Access workdrive-photos" on storage.objects
           <div onclick="openAlbum('${album.id}')"
             class="p-4 hover:bg-red-50/40 flex items-center justify-between gap-4 transition cursor-pointer">
             <div class="flex items-center gap-3.5 min-w-0">
-              <div class="w-11 h-11 rounded-xl bg-[#EB2D2D]/10 text-[#EB2D2D] flex items-center justify-center shrink-0">
-                <i data-lucide="calendar-days" class="w-5 h-5"></i>
+              <div class="w-11 h-11 rounded-xl bg-[#EB2D2D]/10 text-[#EB2D2D] flex items-center justify-center shrink-0 overflow-hidden">
+                ${album.coverUrl ? `<img src="${album.coverUrl}" class="w-full h-full object-cover" />` : `<i data-lucide="calendar-days" class="w-5 h-5"></i>`}
               </div>
               <div class="min-w-0">
                 <h4 class="font-bold text-sm font-mono text-slate-900">วันที่ ${escapeHtml(album.thaiDate)}</h4>
@@ -2385,7 +2901,7 @@ create policy "Public Access workdrive-photos" on storage.objects
             <div class="flex items-center gap-2 shrink-0 text-xs">
               <span class="font-semibold text-slate-700 mr-1">${album.photos.length} รูป</span>
               <button type="button" onclick="event.stopPropagation(); openEditAlbumModal('${album.id}')"
-                class="p-1.5 rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-700 transition cursor-pointer" title="แก้ไขวันที่ / ชื่อ / รายละเอียด">
+                class="p-1.5 rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-700 transition cursor-pointer" title="แก้ไขวันที่ / ชื่อ / รูปหน้าปก">
                 <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
               </button>
               <button type="button" onclick="event.stopPropagation(); openDeleteConfirmModal('album', '${album.id}')"
@@ -2415,9 +2931,74 @@ create policy "Public Access workdrive-photos" on storage.objects
       lucide.createIcons();
     }
 
-    // ==================== CREATE & OPEN ALBUM MODAL ====================
+    // ==================== CREATE & OPEN ALBUM MODAL (WITH OPTIONAL COVER) ====================
+    let pendingNewAlbumCover = '';
+    let pendingEditAlbumCover = '';
+
+    function compressCoverImageFile(file) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            const MAX_W = 800;
+            let w = img.width;
+            let h = img.height;
+            if (w > MAX_W) {
+              h = Math.round((h * MAX_W) / w);
+              w = MAX_W;
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, w, h);
+            resolve(canvas.toDataURL('image/jpeg', 0.78));
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function updateAlbumCoverPreviewUI(mode, coverDataUrl) {
+      const previewEl = document.getElementById(`${mode}-album-cover-preview`);
+      const clearBtn = document.getElementById(`${mode}-album-cover-clear-btn`);
+      if (!previewEl) return;
+      if (coverDataUrl) {
+        previewEl.innerHTML = `<img src="${coverDataUrl}" class="w-full h-full object-cover" />`;
+        if (clearBtn) clearBtn.classList.remove('hidden');
+      } else {
+        previewEl.innerHTML = `<span class="leading-tight">แสดงชื่อ<br/>อัลบั้ม</span>`;
+        if (clearBtn) clearBtn.classList.add('hidden');
+      }
+    }
+
+    async function handleAlbumCoverSelected(event, mode) {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const compressed = await compressCoverImageFile(file);
+      if (mode === 'new') {
+        pendingNewAlbumCover = compressed;
+      } else {
+        pendingEditAlbumCover = compressed;
+      }
+      updateAlbumCoverPreviewUI(mode, compressed);
+      event.target.value = '';
+    }
+
+    function clearAlbumCover(mode) {
+      if (mode === 'new') {
+        pendingNewAlbumCover = '';
+      } else {
+        pendingEditAlbumCover = '';
+      }
+      updateAlbumCoverPreviewUI(mode, '');
+    }
+
     function openNewAlbumModal() {
       renderDepartmentDropdowns(navPath.dept || (currentUser && currentUser.dept));
+      renderProductSuggestions();
 
       const uniqueClients = Array.from(new Set(albums.map(a => a.client).filter(Boolean)));
       document.getElementById('customer-suggestions').innerHTML = uniqueClients
@@ -2442,6 +3023,9 @@ create policy "Public Access workdrive-photos" on storage.objects
       thaiDateInp.value = today.thai;
       noteInp.value = '';
 
+      pendingNewAlbumCover = '';
+      updateAlbumCoverPreviewUI('new', '');
+
       document.getElementById('new-album-modal').classList.remove('hidden');
       lucide.createIcons();
     }
@@ -2455,9 +3039,10 @@ create policy "Public Access workdrive-photos" on storage.objects
 
     function closeNewAlbumModal() {
       document.getElementById('new-album-modal').classList.add('hidden');
+      pendingNewAlbumCover = '';
     }
 
-    function createAlbum(e) {
+    async function createAlbum(e) {
       e.preventDefault();
       const client = document.getElementById('album-client').value.trim();
       const dept = document.getElementById('album-dept').value;
@@ -2466,6 +3051,13 @@ create policy "Public Access workdrive-photos" on storage.objects
       const note = document.getElementById('album-note').value.trim();
 
       if (!client || !dept || !product || !thaiDate) return;
+
+      // Save Product name to suggestions list if not already present
+      const prodList = getProducts();
+      if (!prodList.some(p => p.toLowerCase() === product.toLowerCase())) {
+        prodList.unshift(product);
+        saveProducts(prodList);
+      }
 
       navPath = { client, dept, product };
 
@@ -2478,22 +3070,37 @@ create policy "Public Access workdrive-photos" on storage.objects
 
       if (existing) {
         if (note && !existing.note) existing.note = note;
+        if (pendingNewAlbumCover) {
+          existing.coverUrl = await uploadCoverDataUrlToStorage(existing.id, pendingNewAlbumCover);
+        }
         saveAlbums();
         closeNewAlbumModal();
         openAlbum(existing.id);
         return;
       }
 
+      const newId = 'alb-' + Date.now();
+      let finalCover = '';
+      if (pendingNewAlbumCover) {
+        finalCover = await uploadCoverDataUrlToStorage(newId, pendingNewAlbumCover);
+      }
+
       const newAlb = {
-        id: 'alb-' + Date.now(),
+        id: newId,
         client,
         dept,
         product,
         thaiDate,
         note,
+        coverUrl: finalCover,
         photos: []
       };
       albums.unshift(newAlb);
+      recordActivityLog('create_album', {
+        albumTitle: `${client} • ${dept} • ${product} (${thaiDate})`,
+        client, dept, product, thaiDate,
+        detail: `สร้างอัลบั้มงานใหม่${note ? ' (' + note + ')' : ''}`
+      });
       saveAlbums();
       closeNewAlbumModal();
       openAlbum(newAlb.id);
@@ -2659,7 +3266,7 @@ create policy "Public Access workdrive-photos" on storage.objects
       const btn = document.getElementById('confirm-upload-btn');
       const prevBtnText = btn.textContent;
       btn.disabled = true;
-      btn.textContent = isCloudConnected ? 'กำลังอัปโหลดขึ้น Cloud...' : 'กำลังบันทึก...';
+      btn.textContent = (isCloudConnected && navigator.onLine) ? 'กำลังอัปโหลดขึ้น Cloud...' : 'กำลังบันทึก...';
 
       const processedPhotos = [];
       for (const item of pendingUploadItems) {
@@ -2668,6 +3275,16 @@ create policy "Public Access workdrive-photos" on storage.objects
       }
 
       album.photos.unshift(...processedPhotos);
+      const sampleNames = processedPhotos.slice(0, 3).map(p => p.caption || 'ภาพถ่าย').join(', ');
+      recordActivityLog('add_photos', {
+        albumTitle: `${album.client} • ${album.dept} • ${album.product} (${album.thaiDate})`,
+        client: album.client,
+        dept: album.dept,
+        product: album.product,
+        thaiDate: album.thaiDate,
+        photoCount: processedPhotos.length,
+        detail: `เพิ่มรูปภาพจำนวน ${processedPhotos.length} รูป (${sampleNames}${processedPhotos.length > 3 ? ' ...' : ''})`
+      });
       saveAlbums();
 
       btn.disabled = false;
@@ -2856,6 +3473,16 @@ create policy "Public Access workdrive-photos" on storage.objects
         a.download = fileName;
         a.click();
       }
+      recordActivityLog('download_photo', {
+        albumTitle: `${album.client} • ${album.dept} • ${album.product} (${album.thaiDate})`,
+        client: album.client,
+        dept: album.dept,
+        product: album.product,
+        thaiDate: album.thaiDate,
+        photoCount: 1,
+        detail: `ดาวน์โหลดรูปภาพเดี่ยว "${photo.caption || 'ภาพถ่ายหน้างาน'}"`
+      });
+      saveAlbums();
     }
 
     function deleteCurrentPhoto() {
@@ -2863,42 +3490,40 @@ create policy "Public Access workdrive-photos" on storage.objects
       openDeleteConfirmModal('single-photo', activePhotoId);
     }
 
-    // ==================== EXPORT ALBUM AS ZIP ====================
-    async function downloadAlbumZip() {
+    function setCurrentPhotoAsAlbumCover() {
       const album = albums.find(a => a.id === activeAlbumId);
-      if (!album || album.photos.length === 0) {
-        alert('ยังไม่มีรูปภาพในอัลบั้มสำหรับดาวน์โหลด');
-        return;
-      }
-      const zip = new JSZip();
-      const safeDate = album.thaiDate.replace(/\//g, '-');
-      const folderName = `${album.client}_${album.dept}_${safeDate}`.replace(/[^a-zA-Z0-9ก-๙._-]/g, '_');
-      const folder = zip.folder(folderName);
-
-      for (let idx = 0; idx < album.photos.length; idx++) {
-        const photo = album.photos[idx];
-        const safeName = (photo.caption || `photo_${idx + 1}`).replace(/[^a-zA-Z0-9ก-๙_-]/g, '_');
-        if (photo.dataUrl.startsWith('data:')) {
-          const base64Data = photo.dataUrl.split(',')[1];
-          folder.file(`${idx + 1}_${safeName}.jpg`, base64Data, { base64: true });
-        } else {
-          try {
-            const resp = await fetch(photo.dataUrl);
-            const arrBuf = await resp.arrayBuffer();
-            folder.file(`${idx + 1}_${safeName}.jpg`, arrBuf);
-          } catch (e) {}
-        }
-      }
-
-      const blob = await zip.generateAsync({ type: 'blob' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = `${folderName}.zip`;
-      link.click();
+      const photo = album ? album.photos.find(p => p.id === activePhotoId) : null;
+      if (!album || !photo) return;
+      album.coverUrl = photo.dataUrl;
+      saveAlbums();
+      alert('ตั้งค่ารูปภาพนี้เป็นหน้าปกอัลบั้มเรียบร้อยแล้วครับ');
     }
 
-    // ==================== DIRECT SAVE TO COMPANY NAS (FILE SYSTEM ACCESS API) ====================
-    let nasExportMode = 'single'; // 'single' or 'all'
+    // ==================== UNIFIED EXPORT ENGINE: SELECT MONTH & ALBUMS (NAS & ZIP) ====================
+    let exportTargetMode = 'nas'; // 'nas' or 'zip'
+    let exportSelectedAlbumIds = new Set();
+
+    const THAI_MONTH_NAMES = [
+      '', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+      'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+    ];
+
+    function getMonthYearKeyFromThaiDate(thaiDate) {
+      // Expected DD/MM/YYYY (e.g. 20/11/2569) -> returns "11/2569"
+      const parts = String(thaiDate || '').trim().split('/');
+      if (parts.length === 3 && parts[1] && parts[2]) {
+        return `${parts[1].padStart(2, '0')}/${parts[2]}`;
+      }
+      return 'ไม่ระบุเดือน';
+    }
+
+    function formatThaiMonthYearLabel(mmYyyy) {
+      if (!mmYyyy || !mmYyyy.includes('/')) return mmYyyy || 'ไม่ระบุเดือน';
+      const [mmStr, yyyyStr] = mmYyyy.split('/');
+      const mIdx = parseInt(mmStr, 10);
+      const mName = (mIdx >= 1 && mIdx <= 12) ? THAI_MONTH_NAMES[mIdx] : mmStr;
+      return `${mmYyyy} (${mName} ${yyyyStr})`;
+    }
 
     function sanitizeFolderName(name) {
       const cleaned = String(name || 'ไม่ระบุ')
@@ -2908,51 +3533,188 @@ create policy "Public Access workdrive-photos" on storage.objects
       return cleaned || 'ไม่ระบุ';
     }
 
-    function openNasExportModal(mode) {
-      nasExportMode = mode || 'single';
+    function switchExportModalMode(mode) {
+      exportTargetMode = mode === 'zip' ? 'zip' : 'nas';
+      const tabNas = document.getElementById('export-tab-nas');
+      const tabZip = document.getElementById('export-tab-zip');
+      const nasOptions = document.getElementById('export-nas-options');
+      const nasHint = document.getElementById('export-platform-hint');
+      const startBtn = document.getElementById('export-start-btn');
+
+      if (exportTargetMode === 'nas') {
+        tabNas.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold bg-blue-600 text-white shadow-2xs transition cursor-pointer flex items-center justify-center gap-1.5';
+        tabZip.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center justify-center gap-1.5';
+        nasOptions.classList.remove('hidden');
+        nasHint.textContent = 'รองรับ Chrome / Edge บน PC ออฟฟิศ';
+        startBtn.className = 'px-5 py-2.5 rounded-xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer flex items-center gap-1.5 text-xs';
+        startBtn.innerHTML = '<i data-lucide="folder-check" class="w-4 h-4"></i> เลือกโฟลเดอร์ NAS และบันทึก';
+      } else {
+        tabZip.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold bg-emerald-600 text-white shadow-2xs transition cursor-pointer flex items-center justify-center gap-1.5';
+        tabNas.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center justify-center gap-1.5';
+        nasOptions.classList.add('hidden');
+        nasHint.textContent = 'รองรับทั้งคอมพิวเตอร์ และมือถือ iPhone / Android';
+        startBtn.className = 'px-5 py-2.5 rounded-xl font-semibold bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs cursor-pointer flex items-center gap-1.5 text-xs';
+        startBtn.innerHTML = '<i data-lucide="archive" class="w-4 h-4"></i> ดาวน์โหลดไฟล์ ZIP';
+      }
+      lucide.createIcons();
+    }
+
+    function openExportModal(mode, preselectAlbumId = null) {
+      const albumsWithPhotos = albums.filter(a => a.photos && a.photos.length > 0);
+      if (albumsWithPhotos.length === 0) {
+        alert('ยังไม่มีรูปภาพในอัลบั้มใดๆ สำหรับส่งออก');
+        return;
+      }
+
       const modal = document.getElementById('nas-export-modal');
-      const titleEl = document.getElementById('nas-modal-title');
-      const previewEl = document.getElementById('nas-folder-preview');
-      const countEl = document.getElementById('nas-summary-count');
       const progBox = document.getElementById('nas-progress-box');
       const statusMsg = document.getElementById('nas-status-msg');
       const clearCb = document.getElementById('nas-clear-cloud-checkbox');
-      const startBtn = document.getElementById('nas-start-btn');
+      const monthSel = document.getElementById('export-month-filter');
+      const clientSel = document.getElementById('export-client-filter');
 
       progBox.classList.add('hidden');
       statusMsg.classList.add('hidden');
       clearCb.checked = false;
-      startBtn.disabled = false;
-      startBtn.innerHTML = '<i data-lucide="folder-check" class="w-4 h-4"></i> เลือกโฟลเดอร์ NAS และบันทึก';
 
-      if (nasExportMode === 'single') {
-        const album = albums.find(a => a.id === activeAlbumId);
-        if (!album || album.photos.length === 0) {
-          alert('ยังไม่มีรูปภาพในอัลบั้มนี้สำหรับบันทึกลง NAS');
-          return;
+      // Populate Month/Year dropdown sorted newest first
+      const monthSet = new Set();
+      albumsWithPhotos.forEach(a => monthSet.add(getMonthYearKeyFromThaiDate(a.thaiDate)));
+      const sortedMonths = Array.from(monthSet).sort((a, b) => {
+        const [ma, ya] = a.split('/').map(Number);
+        const [mb, yb] = b.split('/').map(Number);
+        if (!isNaN(ya) && !isNaN(yb) && ya !== yb) return yb - ya;
+        if (!isNaN(ma) && !isNaN(mb)) return mb - ma;
+        return b.localeCompare(a);
+      });
+
+      monthSel.innerHTML = `<option value="ALL">ทุกเดือน (${albumsWithPhotos.length} อัลบั้ม)</option>` +
+        sortedMonths.map(m => {
+          const cnt = albumsWithPhotos.filter(a => getMonthYearKeyFromThaiDate(a.thaiDate) === m).length;
+          return `<option value="${escapeHtml(m)}">${escapeHtml(formatThaiMonthYearLabel(m))} • ${cnt} อัลบั้ม</option>`;
+        }).join('');
+
+      // Populate Client dropdown
+      const clients = Array.from(new Set(albumsWithPhotos.map(a => a.client).filter(Boolean)));
+      clientSel.innerHTML = `<option value="ALL">ทุกลูกค้า</option>` +
+        clients.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+
+      // Default selection
+      exportSelectedAlbumIds.clear();
+      if (preselectAlbumId) {
+        const targetAlb = albumsWithPhotos.find(a => a.id === preselectAlbumId);
+        if (targetAlb) {
+          monthSel.value = getMonthYearKeyFromThaiDate(targetAlb.thaiDate);
+          exportSelectedAlbumIds.add(targetAlb.id);
+        } else {
+          monthSel.value = 'ALL';
+          albumsWithPhotos.forEach(a => exportSelectedAlbumIds.add(a.id));
         }
-        const safeDate = sanitizeFolderName(album.thaiDate);
-        titleEl.textContent = 'บันทึกลง NAS บริษัทโดยตรง (เฉพาะอัลบั้มนี้)';
-        previewEl.textContent = `[ไดรฟ์ NAS] / ${sanitizeFolderName(album.client)} / ${sanitizeFolderName(album.dept)} / ${sanitizeFolderName(album.product)} / ${safeDate} /`;
-        countEl.textContent = `จำนวน ${album.photos.length} รูปภาพ (พร้อมไฟล์สรุปรายละเอียดงาน .txt)`;
       } else {
-        const albumsWithPhotos = albums.filter(a => a.photos && a.photos.length > 0);
-        const totalPics = albumsWithPhotos.reduce((sum, a) => sum + a.photos.length, 0);
-        if (totalPics === 0) {
-          alert('ยังไม่มีรูปภาพในระบบสำหรับบันทึกลง NAS');
-          return;
-        }
-        titleEl.textContent = 'สำรองอัลบั้มทั้งหมดลง NAS บริษัท';
-        previewEl.textContent = `[ไดรฟ์ NAS] / ชื่อลูกค้า / สังกัด / Product / วัน-เดือน-ปีพ.ศ. / (แยกโฟลเดอร์ให้อัตโนมัติ)`;
-        countEl.textContent = `ทั้งหมด ${albumsWithPhotos.length} อัลบั้มวันที่ รวม ${totalPics} รูปภาพ`;
+        monthSel.value = 'ALL';
+        albumsWithPhotos.forEach(a => exportSelectedAlbumIds.add(a.id));
       }
 
+      switchExportModalMode(mode || 'nas');
+      renderExportAlbumChecklist(false);
       modal.classList.remove('hidden');
       lucide.createIcons();
     }
 
+    function openNasExportModal(mode) {
+      openExportModal('nas', mode === 'single' ? activeAlbumId : null);
+    }
+
+    function downloadAlbumZip() {
+      openExportModal('zip', activeAlbumId);
+    }
+
     function closeNasExportModal() {
       document.getElementById('nas-export-modal').classList.add('hidden');
+    }
+
+    function getFilteredExportableAlbums() {
+      const mVal = document.getElementById('export-month-filter').value;
+      const cVal = document.getElementById('export-client-filter').value;
+      return albums.filter(a => {
+        if (!a.photos || a.photos.length === 0) return false;
+        if (mVal !== 'ALL' && getMonthYearKeyFromThaiDate(a.thaiDate) !== mVal) return false;
+        if (cVal !== 'ALL' && a.client !== cVal) return false;
+        return true;
+      });
+    }
+
+    function onExportFilterChanged() {
+      // Automatically select all albums matching the newly chosen month/client filter
+      const filtered = getFilteredExportableAlbums();
+      exportSelectedAlbumIds.clear();
+      filtered.forEach(a => exportSelectedAlbumIds.add(a.id));
+      renderExportAlbumChecklist(false);
+    }
+
+    function toggleExportAlbumCheckbox(albumId, checked) {
+      if (checked) {
+        exportSelectedAlbumIds.add(albumId);
+      } else {
+        exportSelectedAlbumIds.delete(albumId);
+      }
+      renderExportAlbumChecklist(false);
+    }
+
+    function toggleExportSelectAll(checked) {
+      const filtered = getFilteredExportableAlbums();
+      if (checked) {
+        filtered.forEach(a => exportSelectedAlbumIds.add(a.id));
+      } else {
+        filtered.forEach(a => exportSelectedAlbumIds.delete(a.id));
+      }
+      renderExportAlbumChecklist(false);
+    }
+
+    function renderExportAlbumChecklist() {
+      const listEl = document.getElementById('export-album-checklist');
+      const selectAllCb = document.getElementById('export-select-all-cb');
+      const countEl = document.getElementById('nas-summary-count');
+      const filtered = getFilteredExportableAlbums();
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `<p class="text-center text-slate-400 py-6 text-xs">ไม่พบอัลบั้มที่มีรูปภาพตามตัวกรองที่เลือก</p>`;
+        if (selectAllCb) {
+          selectAllCb.checked = false;
+          selectAllCb.indeterminate = false;
+        }
+        countEl.textContent = 'เลือกแล้ว 0 อัลบั้ม (0 รูปภาพ)';
+        return;
+      }
+
+      const selectedInFilter = filtered.filter(a => exportSelectedAlbumIds.has(a.id));
+      if (selectAllCb) {
+        selectAllCb.checked = selectedInFilter.length === filtered.length;
+        selectAllCb.indeterminate = selectedInFilter.length > 0 && selectedInFilter.length < filtered.length;
+      }
+
+      listEl.innerHTML = filtered.map(alb => {
+        const checked = exportSelectedAlbumIds.has(alb.id);
+        return `
+          <label class="flex items-start gap-2.5 p-2.5 rounded-xl border ${checked ? 'bg-blue-50/40 border-blue-200' : 'bg-white border-slate-200/80'} hover:bg-slate-50 cursor-pointer transition select-none">
+            <input type="checkbox" ${checked ? 'checked' : ''} onchange="toggleExportAlbumCheckbox('${alb.id}', this.checked)"
+              class="w-4 h-4 mt-0.5 rounded accent-[#EB2D2D] cursor-pointer shrink-0" />
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-bold text-slate-900 truncate">${escapeHtml(alb.client)}</span>
+                <span class="px-2 py-0.5 rounded bg-red-50 text-[#EB2D2D] font-mono font-bold text-[11px] shrink-0">${escapeHtml(alb.thaiDate)}</span>
+              </div>
+              <p class="text-[11px] text-slate-500 truncate mt-0.5">
+                <span class="font-semibold text-slate-700">${escapeHtml(alb.dept)}</span> • ${escapeHtml(alb.product)} • <strong>${alb.photos.length} รูป</strong>
+              </p>
+            </div>
+          </label>
+        `;
+      }).join('');
+
+      const activeSelectedAlbums = filtered.filter(a => exportSelectedAlbumIds.has(a.id));
+      const totalPics = activeSelectedAlbums.reduce((s, a) => s + a.photos.length, 0);
+      countEl.textContent = `เลือกแล้ว ${activeSelectedAlbums.length} อัลบั้ม • รวมทั้งหมด ${totalPics} รูปภาพ`;
     }
 
     function showNasStatus(isError, text) {
@@ -2976,26 +3738,126 @@ create policy "Public Access workdrive-photos" on storage.objects
       return await resp.blob();
     }
 
-    async function executeDirectNasSave() {
-      const targetAlbums = nasExportMode === 'single'
-        ? albums.filter(a => a.id === activeAlbumId && a.photos && a.photos.length > 0)
-        : albums.filter(a => a.photos && a.photos.length > 0);
+    function executeExportAction() {
+      if (exportTargetMode === 'zip') {
+        executeSelectedZipDownload();
+      } else {
+        executeDirectNasSave();
+      }
+    }
+
+    async function executeSelectedZipDownload() {
+      const filtered = getFilteredExportableAlbums();
+      const targetAlbums = filtered.filter(a => exportSelectedAlbumIds.has(a.id));
 
       if (targetAlbums.length === 0) {
-        showNasStatus(true, 'ไม่พบรูปภาพสำหรับบันทึก');
+        showNasStatus(true, 'กรุณาติ๊กเลือกอย่างน้อย 1 อัลบั้มที่ต้องการดาวน์โหลด ZIP');
+        return;
+      }
+
+      const startBtn = document.getElementById('export-start-btn');
+      const progBox = document.getElementById('nas-progress-box');
+      const progLabel = document.getElementById('nas-progress-label');
+      const progPct = document.getElementById('nas-progress-pct');
+      const progBar = document.getElementById('nas-progress-bar');
+
+      startBtn.disabled = true;
+      progBox.classList.remove('hidden');
+      document.getElementById('nas-status-msg').classList.add('hidden');
+
+      try {
+        const zip = new JSZip();
+        const totalPhotos = targetAlbums.reduce((sum, a) => sum + a.photos.length, 0);
+        let doneCount = 0;
+
+        for (const alb of targetAlbums) {
+          const folderPath = `${sanitizeFolderName(alb.client)}/${sanitizeFolderName(alb.dept)}/${sanitizeFolderName(alb.product)}/${sanitizeFolderName(alb.thaiDate)}`;
+          const folder = zip.folder(folderPath);
+
+          const infoText = [
+            `บริษัท ซีเอสพีเอ็ม (ประเทศไทย) จำกัด - CSPM WorkDrive`,
+            `ชื่อลูกค้า: ${alb.client}`,
+            `สังกัด: ${alb.dept}`,
+            `Product: ${alb.product}`,
+            `วันที่เข้าหน้างาน (พ.ศ.): ${alb.thaiDate}`,
+            `รายละเอียดเพิ่มเติม: ${alb.note || '-'}`,
+            `จำนวนรูปภาพทั้งหมด: ${alb.photos.length} รูป`
+          ].join('\r\n');
+          folder.file('รายละเอียดงาน.txt', infoText);
+
+          for (let idx = 0; idx < alb.photos.length; idx++) {
+            const photo = alb.photos[idx];
+            const safeCaption = sanitizeFolderName(photo.caption || `photo_${idx + 1}`);
+            const fileName = `${String(idx + 1).padStart(2, '0')}_${safeCaption}.jpg`;
+
+            progLabel.textContent = `กำลังรวมไฟล์ ZIP: ${alb.client} (${alb.thaiDate}) — ${fileName}`;
+            if (photo.dataUrl.startsWith('data:')) {
+              const base64Data = photo.dataUrl.split(',')[1];
+              folder.file(fileName, base64Data, { base64: true });
+            } else {
+              try {
+                const resp = await fetch(photo.dataUrl);
+                const arrBuf = await resp.arrayBuffer();
+                folder.file(fileName, arrBuf);
+              } catch (e) {}
+            }
+
+            doneCount++;
+            const pct = Math.round((doneCount / totalPhotos) * 100);
+            progPct.textContent = `${pct}%`;
+            progBar.style.width = `${pct}%`;
+          }
+        }
+
+        progLabel.textContent = 'กำลังบีบอัดไฟล์ ZIP...';
+        const blob = await zip.generateAsync({ type: 'blob' });
+        const mVal = document.getElementById('export-month-filter').value;
+        const zipName = targetAlbums.length === 1
+          ? `${sanitizeFolderName(targetAlbums[0].client)}_${sanitizeFolderName(targetAlbums[0].dept)}_${sanitizeFolderName(targetAlbums[0].thaiDate)}.zip`
+          : (mVal !== 'ALL' ? `CSPM_WorkDrive_${mVal.replace('/', '-')}.zip` : `CSPM_WorkDrive_${targetAlbums.length}_Albums.zip`);
+
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = zipName;
+        link.click();
+        setTimeout(() => URL.revokeObjectURL(link.href), 2000);
+
+        progLabel.textContent = `ดาวน์โหลดไฟล์ ZIP สำเร็จ (${doneCount} รูป)!`;
+        showNasStatus(false, `สร้างไฟล์ "${zipName}" เรียบร้อยแล้ว (${targetAlbums.length} อัลบั้ม รวม ${doneCount} รูปภาพ)`);
+        const zipAlbList = targetAlbums.map(a => `${a.client} (${a.thaiDate})`).join(', ');
+        recordActivityLog('download_zip', {
+          albumTitle: targetAlbums.length === 1
+            ? `${targetAlbums[0].client} • ${targetAlbums[0].dept} • ${targetAlbums[0].product} (${targetAlbums[0].thaiDate})`
+            : `ดาวน์โหลด ZIP รวม ${targetAlbums.length} อัลบั้ม`,
+          photoCount: doneCount,
+          detail: `ดาวน์โหลดไฟล์ ZIP (${zipName}) — ${targetAlbums.length} อัลบั้ม (${doneCount} รูป): ${zipAlbList}`
+        });
+        saveAlbums();
+      } catch (err) {
+        showNasStatus(true, `เกิดข้อผิดพลาดในการสร้างไฟล์ ZIP: ${err.message || err}`);
+      } finally {
+        startBtn.disabled = false;
+        lucide.createIcons();
+      }
+    }
+
+    async function executeDirectNasSave() {
+      const filtered = getFilteredExportableAlbums();
+      const targetAlbums = filtered.filter(a => exportSelectedAlbumIds.has(a.id));
+
+      if (targetAlbums.length === 0) {
+        showNasStatus(true, 'กรุณาติ๊กเลือกอย่างน้อย 1 อัลบั้มที่ต้องการบันทึกลง NAS');
         return;
       }
 
       // Check browser support for File System Access API (Chrome / Edge Desktop)
       if (typeof window.showDirectoryPicker !== 'function') {
         showNasStatus(true, 'เบราว์เซอร์บนอุปกรณ์นี้ (เช่น มือถือ) ไม่รองรับการเขียนลงไดรฟ์ NAS โดยตรง กำลังดาวน์โหลดเป็นไฟล์ ZIP แทน...');
-        if (nasExportMode === 'single') {
-          await downloadAlbumZip();
-        }
+        await executeSelectedZipDownload();
         return;
       }
 
-      const startBtn = document.getElementById('nas-start-btn');
+      const startBtn = document.getElementById('export-start-btn');
       const progBox = document.getElementById('nas-progress-box');
       const progLabel = document.getElementById('nas-progress-label');
       const progPct = document.getElementById('nas-progress-pct');
@@ -3059,6 +3921,17 @@ create policy "Public Access workdrive-photos" on storage.objects
         }
 
         progLabel.textContent = `บันทึกลง NAS สำเร็จครบทั้ง ${savedCount} รูป!`;
+        const nasAlbList = targetAlbums.map(a => `${a.client} (${a.thaiDate})`).join(', ');
+        recordActivityLog('export_nas', {
+          albumTitle: targetAlbums.length === 1
+            ? `${targetAlbums[0].client} • ${targetAlbums[0].dept} • ${targetAlbums[0].product} (${targetAlbums[0].thaiDate})`
+            : `บันทึกลง NAS รวม ${targetAlbums.length} อัลบั้ม`,
+          photoCount: savedCount,
+          detail: `บันทึกลง NAS บริษัท — ${targetAlbums.length} อัลบั้ม (${savedCount} รูป): ${nasAlbList}${shouldClearCloud ? ' (พร้อมเคลียร์ออกจาก Cloud)' : ''}`
+        });
+        if (!shouldClearCloud) {
+          saveAlbums();
+        }
 
         // Optionally remove archived albums from Cloud to free up space
         if (shouldClearCloud) {
@@ -3079,18 +3952,17 @@ create policy "Public Access workdrive-photos" on storage.objects
 
           setTimeout(() => {
             closeNasExportModal();
-            if (nasExportMode === 'single') {
+            if (activeAlbumId && archivedIds.has(activeAlbumId)) {
               navigateToLevel('product');
             } else {
-              goHome();
+              showFolderDashboard();
             }
           }, 1400);
         } else {
-          showNasStatus(false, `บันทึกลงโฟลเดอร์ NAS "${rootDirHandle.name}" เรียบร้อยแล้ว (${savedCount} รูป) โดยจัดเรียงตาม ชื่อลูกค้า / สังกัด / Product / วันที่ พ.ศ. อัตโนมัติ`);
+          showNasStatus(false, `บันทึกลงโฟลเดอร์ NAS "${rootDirHandle.name}" เรียบร้อยแล้ว (${targetAlbums.length} อัลบั้ม รวม ${savedCount} รูป)`);
         }
       } catch (err) {
         if (err && err.name === 'AbortError') {
-          // User cancelled folder picker
           return;
         }
         console.error('NAS Direct Save Error:', err);
@@ -3190,6 +4062,8 @@ create policy "Public Access workdrive-photos" on storage.objects
       const album = albums.find(a => a.id === albumId);
       if (!album) return;
 
+      renderProductSuggestions();
+
       // Populate dept select
       const depts = getDepartments();
       const deptSel = document.getElementById('edit-album-dept');
@@ -3212,6 +4086,9 @@ create policy "Public Access workdrive-photos" on storage.objects
       document.getElementById('edit-album-date-picker').value = thaiDateToIso(album.thaiDate);
       document.getElementById('edit-album-note').value = album.note || '';
 
+      pendingEditAlbumCover = album.coverUrl || '';
+      updateAlbumCoverPreviewUI('edit', pendingEditAlbumCover);
+
       document.getElementById('edit-album-modal').classList.remove('hidden');
       lucide.createIcons();
     }
@@ -3225,9 +4102,10 @@ create policy "Public Access workdrive-photos" on storage.objects
 
     function closeEditAlbumModal() {
       document.getElementById('edit-album-modal').classList.add('hidden');
+      pendingEditAlbumCover = '';
     }
 
-    function submitEditAlbum(e) {
+    async function submitEditAlbum(e) {
       e.preventDefault();
       const id = document.getElementById('edit-album-id').value;
       const album = albums.find(a => a.id === id);
@@ -3241,11 +4119,23 @@ create policy "Public Access workdrive-photos" on storage.objects
 
       if (!nextClient || !nextDept || !nextProduct || !nextThaiDate) return;
 
+      const prodList = getProducts();
+      if (!prodList.some(p => p.toLowerCase() === nextProduct.toLowerCase())) {
+        prodList.unshift(nextProduct);
+        saveProducts(prodList);
+      }
+
+      let finalCover = pendingEditAlbumCover || '';
+      if (finalCover && finalCover.startsWith('data:')) {
+        finalCover = await uploadCoverDataUrlToStorage(album.id, finalCover);
+      }
+
       album.client = nextClient;
       album.dept = nextDept;
       album.product = nextProduct;
       album.thaiDate = nextThaiDate;
       album.note = nextNote;
+      album.coverUrl = finalCover;
 
       navPath = { client: album.client, dept: album.dept, product: album.product };
       saveAlbums();
@@ -3261,6 +4151,13 @@ create policy "Public Access workdrive-photos" on storage.objects
     // ==================== IPHONE FULL-SCREEN PWA SETUP (ICON & MANIFEST) ====================
     function setupIphoneFullScreenApp() {
       // Icon + manifest are static files: apple-touch-icon.png, icon-192.png, manifest.webmanifest
+
+      // Offline support: the service worker (sw.js) saves the app, libraries and fonts on the first online visit
+      if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js').catch((err) => console.warn('Service worker not registered:', err));
+        });
+      }
 
       // Hide install pill only if already running in full-screen standalone mode
       const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
@@ -3402,6 +4299,11 @@ create policy "Public Access workdrive-photos" on storage.objects
           if (targetAlb) {
             await removeCloudPhotosForAlbums([targetAlb]);
             albums = albums.filter(a => a.id !== targetId);
+            recordActivityLog('delete_album', {
+              albumTitle: `${targetAlb.client} • ${targetAlb.dept} • ${targetAlb.product} (${targetAlb.thaiDate})`,
+              photoCount: targetAlb.photos.length,
+              detail: `ลบอัลบั้มวันที่ ${targetAlb.thaiDate} ของลูกค้า ${targetAlb.client} (มีรูปภาพ ${targetAlb.photos.length} รูป)`
+            });
             saveAlbums();
           }
           closeDeleteConfirmModal();
@@ -3412,22 +4314,44 @@ create policy "Public Access workdrive-photos" on storage.objects
           }
         } else if (type === 'client') {
           const toDelete = albums.filter(a => a.client === targetId);
+          const totalPics = toDelete.reduce((s, a) => s + a.photos.length, 0);
           await removeCloudPhotosForAlbums(toDelete);
           albums = albums.filter(a => a.client !== targetId);
+          recordActivityLog('delete_folder', {
+            albumTitle: `ลูกค้า: ${targetId}`,
+            photoCount: totalPics,
+            detail: `ลบโฟลเดอร์ลูกค้า "${targetId}" (${toDelete.length} อัลบั้ม, ${totalPics} รูป)`
+          });
           saveAlbums();
           closeDeleteConfirmModal();
           showFolderDashboard();
         } else if (type === 'dept') {
           const toDelete = albums.filter(a => a.client === navPath.client && a.dept === targetId);
+          const totalPics = toDelete.reduce((s, a) => s + a.photos.length, 0);
           await removeCloudPhotosForAlbums(toDelete);
           albums = albums.filter(a => !(a.client === navPath.client && a.dept === targetId));
+          recordActivityLog('delete_folder', {
+            albumTitle: `${navPath.client} > สังกัด ${targetId}`,
+            photoCount: totalPics,
+            detail: `ลบโฟลเดอร์สังกัด "${targetId}" ใน ${navPath.client} (${toDelete.length} อัลบั้ม, ${totalPics} รูป)`
+          });
           saveAlbums();
           closeDeleteConfirmModal();
           showFolderDashboard();
         } else if (type === 'product') {
           const toDelete = albums.filter(a => a.client === navPath.client && a.dept === navPath.dept && a.product === targetId);
+          const totalPics = toDelete.reduce((s, a) => s + a.photos.length, 0);
           await removeCloudPhotosForAlbums(toDelete);
           albums = albums.filter(a => !(a.client === navPath.client && a.dept === navPath.dept && a.product === targetId));
+          const stillUsedElsewhere = albums.some(a => a.product === targetId);
+          if (!stillUsedElsewhere) {
+            saveProducts(getProducts().filter(p => p !== targetId));
+          }
+          recordActivityLog('delete_folder', {
+            albumTitle: `${navPath.client} > ${navPath.dept} > ${targetId}`,
+            photoCount: totalPics,
+            detail: `ลบโฟลเดอร์ Product "${targetId}" (${toDelete.length} อัลบั้ม, ${totalPics} รูป)`
+          });
           saveAlbums();
           closeDeleteConfirmModal();
           showFolderDashboard();
@@ -3438,6 +4362,11 @@ create policy "Public Access workdrive-photos" on storage.objects
             await removeCloudPhotosForAlbums([{ photos: toDeletePhotos }]);
             album.photos = album.photos.filter(p => !selectedPhotoIds.has(p.id));
             selectedPhotoIds.clear();
+            recordActivityLog('delete_photos', {
+              albumTitle: `${album.client} • ${album.dept} • ${album.product} (${album.thaiDate})`,
+              photoCount: toDeletePhotos.length,
+              detail: `ลบรูปภาพจำนวน ${toDeletePhotos.length} รูป ออกจากอัลบั้มวันที่ ${album.thaiDate}`
+            });
             saveAlbums();
           }
           closeDeleteConfirmModal();
@@ -3451,6 +4380,11 @@ create policy "Public Access workdrive-photos" on storage.objects
             }
             album.photos = album.photos.filter(p => p.id !== targetId);
             selectedPhotoIds.delete(targetId);
+            recordActivityLog('delete_photos', {
+              albumTitle: `${album.client} • ${album.dept} • ${album.product} (${album.thaiDate})`,
+              photoCount: 1,
+              detail: `ลบรูปภาพ "${targetPhoto ? (targetPhoto.caption || 'ภาพถ่ายหน้างาน') : 'ภาพถ่าย'}" ออกจากอัลบั้มวันที่ ${album.thaiDate}`
+            });
             saveAlbums();
           }
           closeDeleteConfirmModal();
@@ -3464,41 +4398,283 @@ create policy "Public Access workdrive-photos" on storage.objects
       }
     }
 
+    // ==================== ADMIN ACTIVITY LOGS (ONLY FOR SARUNCHANA.H) ====================
+    function getSystemLogContainer() {
+      let container = albums.find(a => a.id === '__cspm_activity_logs__');
+      if (!container) {
+        container = { id: '__cspm_activity_logs__', isSystemLogContainer: true, photos: [], logs: [] };
+        albums.push(container);
+      }
+      if (!Array.isArray(container.logs)) container.logs = [];
+      return container;
+    }
+
+    function getThaiNowFormatted() {
+      const now = new Date();
+      const dd = String(now.getDate()).padStart(2, '0');
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const beY = now.getFullYear() + 543;
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      return `${dd}/${mm}/${beY} ${hh}:${min} น.`;
+    }
+
+    function recordActivityLog(actionType, info = {}) {
+      if (!currentUser) return;
+      const container = getSystemLogContainer();
+      const entry = {
+        id: 'log-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+        actionType,
+        username: currentUser.name || 'unknown',
+        dept: currentUser.dept || '-',
+        albumTitle: info.albumTitle || '-',
+        photoCount: info.photoCount || 0,
+        detail: info.detail || '',
+        thaiTimestamp: getThaiNowFormatted(),
+        createdAtMs: Date.now()
+      };
+      container.logs.unshift(entry);
+      if (container.logs.length > 600) {
+        container.logs = container.logs.slice(0, 600);
+      }
+    }
+
+    function getAllActivityLogsWithFallback() {
+      const container = albums.find(a => a.id === '__cspm_activity_logs__');
+      const explicitLogs = (container && Array.isArray(container.logs)) ? [...container.logs] : [];
+
+      // If no explicit logs exist yet, infer past photo uploads from existing album photos so Admin sees history right away
+      if (explicitLogs.length === 0) {
+        albums.filter(a => !a.isSystemLogContainer).forEach(alb => {
+          if (alb.photos && alb.photos.length > 0) {
+            const byUser = new Map();
+            alb.photos.forEach(p => {
+              const u = p.takenBy || 'ไม่ระบุผู้ถ่าย';
+              byUser.set(u, (byUser.get(u) || 0) + 1);
+            });
+            byUser.forEach((cnt, u) => {
+              explicitLogs.push({
+                id: `inferred-${alb.id}-${u}`,
+                actionType: 'add_photos',
+                username: u,
+                dept: alb.dept || '-',
+                albumTitle: `${alb.client} • ${alb.dept} • ${alb.product} (${alb.thaiDate})`,
+                photoCount: cnt,
+                detail: `มีรูปภาพในอัลบั้มจำนวน ${cnt} รูป (ประวัติเดิมในระบบ)`,
+                thaiTimestamp: `วันที่อัลบั้ม ${alb.thaiDate}`,
+                createdAtMs: 0
+              });
+            });
+          }
+        });
+      }
+      return explicitLogs;
+    }
+
+    async function openAdminLogsModal() {
+      if (!isAdminUser()) {
+        alert('ขออภัย เฉพาะบัญชีแอดมิน (sarunchana.h) เท่านั้นที่สามารถดูประวัติการใช้งานทีมได้');
+        return;
+      }
+      document.getElementById('admin-logs-modal').classList.remove('hidden');
+      renderAdminLogsList();
+      lucide.createIcons();
+      if (isCloudConnected && navigator.onLine) {
+        await syncFromCloud(false, false);
+        renderAdminLogsList();
+      }
+    }
+
+    function closeAdminLogsModal() {
+      document.getElementById('admin-logs-modal').classList.add('hidden');
+    }
+
+    function renderAdminLogsList() {
+      if (!isAdminUser()) return;
+      const logs = getAllActivityLogsWithFallback();
+      const actionFilter = document.getElementById('admin-log-type-filter').value;
+      const userFilter = document.getElementById('admin-log-user-filter').value;
+      const query = (document.getElementById('admin-log-search').value || '').trim().toLowerCase();
+
+      // Update summary counts
+      const addCount = logs.filter(l => l.actionType === 'add_photos').length;
+      const delCount = logs.filter(l => ['delete_album', 'delete_folder', 'delete_photos'].includes(l.actionType)).length;
+      const dlCount = logs.filter(l => ['download_zip', 'download_photo', 'export_nas'].includes(l.actionType)).length;
+
+      document.getElementById('admin-stat-add').textContent = addCount;
+      document.getElementById('admin-stat-del').textContent = delCount;
+      document.getElementById('admin-stat-dl').textContent = dlCount;
+
+      // Populate user filter dropdown preserving selection
+      const userSel = document.getElementById('admin-log-user-filter');
+      const uniqueUsers = Array.from(new Set(logs.map(l => l.username).filter(Boolean)));
+      const prevUser = userFilter || 'ALL';
+      userSel.innerHTML = `<option value="ALL">ผู้ใช้งานทุกคน (${uniqueUsers.length})</option>` +
+        uniqueUsers.map(u => `<option value="${escapeHtml(u)}">${escapeHtml(u)}</option>`).join('');
+      if (uniqueUsers.includes(prevUser)) userSel.value = prevUser;
+
+      // Filter logs
+      const filtered = logs.filter(l => {
+        if (actionFilter === 'add' && l.actionType !== 'add_photos') return false;
+        if (actionFilter === 'delete' && !['delete_album', 'delete_folder', 'delete_photos'].includes(l.actionType)) return false;
+        if (actionFilter === 'download' && !['download_zip', 'download_photo', 'export_nas'].includes(l.actionType)) return false;
+        if (actionFilter === 'album' && l.actionType !== 'create_album') return false;
+        if (userSel.value !== 'ALL' && l.username !== userSel.value) return false;
+        if (query) {
+          const hay = `${l.username} ${l.dept} ${l.albumTitle} ${l.detail} ${l.thaiTimestamp}`.toLowerCase();
+          if (!hay.includes(query)) return false;
+        }
+        return true;
+      });
+
+      const listEl = document.getElementById('admin-logs-list');
+      if (filtered.length === 0) {
+        listEl.innerHTML = `
+          <div class="text-center py-10 text-slate-400">
+            <i data-lucide="clipboard-list" class="w-8 h-8 mx-auto mb-2 opacity-60"></i>
+            <p class="text-xs font-medium">ไม่พบรายการประวัติการใช้งานตามเงื่อนไขที่เลือก</p>
+          </div>`;
+        lucide.createIcons();
+        return;
+      }
+
+      const badgeConfig = {
+        add_photos: { label: 'เพิ่มรูปภาพ', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200', icon: 'image-plus' },
+        create_album: { label: 'สร้างอัลบั้ม', cls: 'bg-slate-100 text-slate-700 border-slate-200', icon: 'folder-plus' },
+        delete_album: { label: 'ลบอัลบั้ม', cls: 'bg-red-50 text-[#EB2D2D] border-red-200', icon: 'trash-2' },
+        delete_folder: { label: 'ลบโฟลเดอร์', cls: 'bg-red-50 text-[#EB2D2D] border-red-200', icon: 'folder-x' },
+        delete_photos: { label: 'ลบรูปภาพ', cls: 'bg-rose-50 text-rose-700 border-rose-200', icon: 'trash' },
+        download_zip: { label: 'โหลด ZIP', cls: 'bg-blue-50 text-blue-700 border-blue-200', icon: 'archive' },
+        download_photo: { label: 'โหลดรูปภาพ', cls: 'bg-sky-50 text-sky-700 border-sky-200', icon: 'download' },
+        export_nas: { label: 'บันทึกลง NAS', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: 'server' }
+      };
+
+      listEl.innerHTML = filtered.map(log => {
+        const cfg = badgeConfig[log.actionType] || { label: log.actionType, cls: 'bg-slate-100 text-slate-700 border-slate-200', icon: 'activity' };
+        return `
+          <div class="p-3.5 bg-white hover:bg-slate-50/90 rounded-xl border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 transition">
+            <div class="flex items-start gap-3 min-w-0">
+              <div class="w-9 h-9 rounded-full bg-[#1B212C] text-white font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                ${escapeHtml((log.username || 'U').charAt(0).toUpperCase())}
+              </div>
+              <div class="min-w-0">
+                <div class="flex flex-wrap items-center gap-1.5">
+                  <span class="font-bold text-xs text-slate-900">${escapeHtml(log.username)}</span>
+                  <span class="text-[11px] text-slate-400">(${escapeHtml(log.dept || '-')})</span>
+                  <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full border text-[10px] font-semibold ${cfg.cls}">
+                    <i data-lucide="${cfg.icon}" class="w-3 h-3"></i> ${cfg.label}
+                  </span>
+                </div>
+                <p class="text-xs font-semibold text-slate-800 mt-1 truncate">${escapeHtml(log.albumTitle)}</p>
+                <p class="text-[11px] text-slate-500 mt-0.5 leading-relaxed">${escapeHtml(log.detail)}</p>
+              </div>
+            </div>
+            <div class="text-left sm:text-right shrink-0 pl-12 sm:pl-0">
+              <span class="inline-block px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-mono text-[11px] font-medium">
+                ${escapeHtml(log.thaiTimestamp || '-')}
+              </span>
+            </div>
+          </div>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    function exportAdminLogsCsv() {
+      if (!isAdminUser()) return;
+      const logs = getAllActivityLogsWithFallback();
+      if (logs.length === 0) {
+        alert('ยังไม่มีข้อมูลประวัติสำหรับส่งออก');
+        return;
+      }
+      const rows = [
+        ['วันเวลา', 'ผู้ใช้งาน', 'สังกัด', 'ประเภทกิจกรรม', 'อัลบั้ม / โฟลเดอร์', 'จำนวนรูป', 'รายละเอียด']
+      ];
+      logs.forEach(l => {
+        rows.push([
+          l.thaiTimestamp || '',
+          l.username || '',
+          l.dept || '',
+          l.actionType || '',
+          l.albumTitle || '',
+          String(l.photoCount || 0),
+          l.detail || ''
+        ]);
+      });
+      const csvContent = '﻿' + rows.map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('
+');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `CSPM_WorkDrive_Activity_Logs.csv`;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(link.href), 1500);
+    }
+
     window.addEventListener('DOMContentLoaded', () => { setupIphoneFullScreenApp(); init(); });
   </script>
 
-  <!-- ==================== MODAL: DIRECT SAVE TO COMPANY NAS ==================== -->
+  <!-- ==================== MODAL: UNIFIED EXPORT (NAS & ZIP WITH MONTH + ALBUM SELECTION) ==================== -->
   <div id="nas-export-modal" class="hidden fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden border border-slate-100">
       <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
         <h3 class="font-semibold text-sm flex items-center gap-2">
-          <i data-lucide="server" class="w-5 h-5 text-blue-400"></i>
-          <span id="nas-modal-title">บันทึกลง NAS บริษัทโดยตรง</span>
+          <i data-lucide="folder-down" class="w-5 h-5 text-[#EB2D2D]"></i>
+          <span id="nas-modal-title">ส่งออกรูปภาพ (บันทึกลง NAS / โหลด ZIP)</span>
         </h3>
         <button type="button" onclick="closeNasExportModal()" class="text-slate-400 hover:text-white cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <div class="p-6 space-y-4 text-xs">
-        <div class="p-3.5 rounded-xl bg-blue-50/80 border border-blue-200/80 text-slate-700 space-y-1.5">
-          <p class="font-bold text-blue-800 flex items-center gap-1.5">
-            <i data-lucide="folder-tree" class="w-4 h-4"></i> โครงสร้างโฟลเดอร์ที่จะสร้างบน NAS อัตโนมัติ:
-          </p>
-          <p id="nas-folder-preview" class="font-mono text-[11px] bg-white px-2.5 py-1.5 rounded-lg border border-blue-100 text-slate-800 break-all">
-            [โฟลเดอร์ NAS ที่เลือก] / ชื่อลูกค้า / สังกัด / Product / วัน-เดือน-ปีพ.ศ. /
-          </p>
-          <p class="text-[11px] text-slate-500 pt-0.5" id="nas-summary-count">
-            เตรียมบันทึก 0 รูปภาพ
-          </p>
+      <div class="p-6 space-y-4 max-h-[84vh] overflow-y-auto text-xs">
+        <!-- Mode Switcher: NAS vs ZIP -->
+        <div class="flex items-center gap-2 p-1 bg-[#F5F7FA] rounded-xl border border-slate-200">
+          <button id="export-tab-nas" type="button" onclick="switchExportModalMode('nas')"
+            class="flex-1 py-2 px-3 rounded-lg text-xs font-semibold bg-blue-600 text-white shadow-2xs transition cursor-pointer flex items-center justify-center gap-1.5">
+            <i data-lucide="server" class="w-3.5 h-3.5"></i> บันทึกลง NAS โดยตรง
+          </button>
+          <button id="export-tab-zip" type="button" onclick="switchExportModalMode('zip')"
+            class="flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center justify-center gap-1.5">
+            <i data-lucide="archive" class="w-3.5 h-3.5"></i> ดาวน์โหลดเป็นไฟล์ ZIP
+          </button>
         </div>
 
-        <!-- Option to clean Cloud space after NAS save -->
-        <div class="p-3 rounded-xl bg-amber-50/80 border border-amber-200/80">
+        <!-- Step 1: Filter by Month / Year & Customer -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">เลือกเดือน / ปี พ.ศ.</label>
+            <select id="export-month-filter" onchange="onExportFilterChanged()"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:border-[#EB2D2D] outline-none"></select>
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">กรองตามชื่อลูกค้า</label>
+            <select id="export-client-filter" onchange="onExportFilterChanged()"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:border-[#EB2D2D] outline-none"></select>
+          </div>
+        </div>
+
+        <!-- Step 2: Select Albums Checklist -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="inline-flex items-center gap-2 cursor-pointer select-none font-semibold text-slate-700">
+              <input id="export-select-all-cb" type="checkbox" onchange="toggleExportSelectAll(this.checked)" class="w-4 h-4 rounded accent-[#EB2D2D] cursor-pointer" />
+              <span>เลือกอัลบั้มทั้งหมดที่แสดง</span>
+            </label>
+            <span id="nas-summary-count" class="font-semibold text-[#EB2D2D]">เลือกแล้ว 0 อัลบั้ม</span>
+          </div>
+
+          <div id="export-album-checklist" class="max-h-56 overflow-y-auto space-y-2 p-2.5 rounded-xl bg-[#F5F7FA] border border-slate-200/80">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- Option to clean Cloud space after NAS save (Only shown in NAS mode) -->
+        <div id="export-nas-options" class="p-3 rounded-xl bg-amber-50/80 border border-amber-200/80">
           <label class="inline-flex items-start gap-2.5 cursor-pointer select-none">
             <input id="nas-clear-cloud-checkbox" type="checkbox" class="w-4 h-4 mt-0.5 rounded accent-[#EB2D2D] cursor-pointer" />
             <div>
-              <span class="font-semibold text-slate-800 block">ลบอัลบั้มออกจาก Cloud หลังบันทึกลง NAS สำเร็จ</span>
+              <span class="font-semibold text-slate-800 block">ลบอัลบั้มที่เลือกออกจาก Cloud หลังบันทึกลง NAS สำเร็จ</span>
               <span class="text-[11px] text-slate-500">ช่วยคืนพื้นที่ฟรี 1 GB บน Supabase ให้ทีมใช้งานต่อได้ไม่จำกัด (ระบบจะลบเฉพาะเมื่อเขียนไฟล์ลง NAS ครบ 100% แล้วเท่านั้น)</span>
             </div>
           </label>
@@ -3507,7 +4683,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         <!-- Progress Bar -->
         <div id="nas-progress-box" class="hidden space-y-1.5">
           <div class="flex items-center justify-between text-[11px] font-medium">
-            <span id="nas-progress-label" class="text-blue-700">กำลังเชื่อมต่อโฟลเดอร์ NAS...</span>
+            <span id="nas-progress-label" class="text-blue-700">กำลังดำเนินการ...</span>
             <span id="nas-progress-pct" class="font-mono font-bold text-slate-700">0%</span>
           </div>
           <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
@@ -3518,10 +4694,10 @@ create policy "Public Access workdrive-photos" on storage.objects
         <div id="nas-status-msg" class="hidden p-3 rounded-xl text-xs font-medium"></div>
 
         <div class="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100">
-          <span class="text-[11px] text-slate-400">รองรับ Chrome / Edge บน PC ออฟฟิศ</span>
+          <span id="export-platform-hint" class="text-[11px] text-slate-400">รองรับ Chrome / Edge บน PC ออฟฟิศ</span>
           <div class="flex gap-2">
             <button type="button" onclick="closeNasExportModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 cursor-pointer">ปิด</button>
-            <button id="nas-start-btn" type="button" onclick="executeDirectNasSave()" class="px-5 py-2 rounded-xl font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer flex items-center gap-1.5">
+            <button id="export-start-btn" type="button" onclick="executeExportAction()" class="px-5 py-2.5 rounded-xl font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-xs cursor-pointer flex items-center gap-1.5">
               <i data-lucide="folder-check" class="w-4 h-4"></i> เลือกโฟลเดอร์ NAS และบันทึก
             </button>
           </div>
@@ -3530,6 +4706,40 @@ create policy "Public Access workdrive-photos" on storage.objects
     </div>
   </div>
 
+  <!-- ==================== MODAL: MANAGE / DELETE PRODUCT NAMES ==================== -->
+  <div id="manage-products-modal" onclick="if(event.target === this) closeManageProductsModal()"
+    class="hidden fixed inset-0 z-[55] bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100">
+      <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
+        <h3 class="font-semibold text-sm flex items-center gap-2">
+          <i data-lucide="package" class="w-4 h-4 text-[#EB2D2D]"></i>
+          <span>จัดการรายชื่อ Product (เพิ่ม / ลบชื่อ Product)</span>
+        </h3>
+        <button type="button" onclick="closeManageProductsModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-6 space-y-4 text-xs">
+        <div class="flex gap-2">
+          <input id="manage-new-product-input" type="text" placeholder="พิมพ์ชื่อ Product ใหม่เพื่อเพิ่มเข้าตัวเลือก..."
+            class="flex-1 px-3.5 py-2 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-xs focus:border-[#EB2D2D] outline-none" />
+          <button type="button" onclick="addNewProductToList()" class="px-4 py-2 rounded-xl bg-[#1B212C] hover:bg-slate-800 text-white font-medium cursor-pointer shrink-0">
+            + เพิ่มชื่อ
+          </button>
+        </div>
+
+        <div id="manage-products-list" class="max-h-72 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-xl p-1">
+          <!-- Rendered dynamically -->
+        </div>
+
+        <div class="pt-1 flex justify-end">
+          <button type="button" onclick="closeManageProductsModal()" class="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium cursor-pointer">
+            เสร็จสิ้น
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ==================== MODAL: RENAME FOLDER (CUSTOMER / DEPT / PRODUCT) ==================== -->
   <div id="rename-folder-modal" class="hidden fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
@@ -3558,19 +4768,19 @@ create policy "Public Access workdrive-photos" on storage.objects
     </div>
   </div>
 
-  <!-- ==================== MODAL: EDIT ALBUM NAME, DEPT, PRODUCT & THAI DATE ==================== -->
+  <!-- ==================== MODAL: EDIT ALBUM NAME, DEPT, PRODUCT, THAI DATE & COVER ==================== -->
   <div id="edit-album-modal" class="hidden fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100">
       <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
         <h3 class="font-semibold text-sm flex items-center gap-2">
           <i data-lucide="calendar-cog" class="w-5 h-5 text-[#EB2D2D]"></i>
-          <span>แก้ไขชื่อลูกค้า สังกัด Product หรือวันที่ พ.ศ.</span>
+          <span>แก้ไขชื่อลูกค้า สังกัด Product วันที่ พ.ศ. หรือรูปหน้าปก</span>
         </h3>
         <button type="button" onclick="closeEditAlbumModal()" class="text-slate-400 hover:text-white cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
-      <form onsubmit="submitEditAlbum(event)" class="p-6 space-y-4">
+      <form onsubmit="submitEditAlbum(event)" class="p-6 space-y-4 max-h-[82vh] overflow-y-auto">
         <input id="edit-album-id" type="hidden" />
 
         <div>
@@ -3585,7 +4795,12 @@ create policy "Public Access workdrive-photos" on storage.objects
         </div>
 
         <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1">3. Product *</label>
+          <div class="flex items-center justify-between mb-1">
+            <label class="block text-xs font-semibold text-slate-600">3. Product *</label>
+            <button type="button" onclick="openManageProductsModal()" class="text-[11px] font-semibold text-[#EB2D2D] hover:underline flex items-center gap-1 cursor-pointer">
+              <i data-lucide="trash-2" class="w-3 h-3"></i> จัดการ / ลบชื่อ Product
+            </button>
+          </div>
           <input id="edit-album-product" type="text" list="product-suggestions" required
             class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-[#EB2D2D] outline-none" />
         </div>
@@ -3603,6 +4818,30 @@ create policy "Public Access workdrive-photos" on storage.objects
           </div>
         </div>
 
+        <!-- Optional Album Cover Photo -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">5. รูปหน้าปกอัลบั้ม (ไม่บังคับ — หากไม่ใส่จะแสดงเป็นชื่อที่พิมพ์แทน)</label>
+          <input id="edit-album-cover-input" type="file" accept="image/*" class="hidden" onchange="handleAlbumCoverSelected(event, 'edit')" />
+          <div class="flex items-center gap-3 p-2.5 rounded-xl border border-dashed border-slate-300 bg-[#F8FAFC]">
+            <div id="edit-album-cover-preview" class="w-16 h-16 rounded-xl bg-[#1B212C] text-white flex items-center justify-center overflow-hidden shrink-0 text-[10px] text-center px-1 font-semibold">
+              แสดงชื่ออัลบั้ม
+            </div>
+            <div class="flex-1 min-w-0 space-y-1.5">
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="document.getElementById('edit-album-cover-input').click()"
+                  class="px-3 py-1.5 rounded-lg bg-[#1B212C] hover:bg-slate-800 text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer">
+                  <i data-lucide="image-plus" class="w-3.5 h-3.5 text-[#EB2D2D]"></i> เลือกรูปหน้าปก
+                </button>
+                <button id="edit-album-cover-clear-btn" type="button" onclick="clearAlbumCover('edit')"
+                  class="hidden px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-[#EB2D2D] text-xs font-medium cursor-pointer">
+                  ลบรูปหน้าปก
+                </button>
+              </div>
+              <p class="text-[11px] text-slate-400">หากลบรูปหน้าปกออก ระบบจะแสดงชื่อลูกค้า / Product / วันที่แทน</p>
+            </div>
+          </div>
+        </div>
+
         <div>
           <label class="block text-xs font-semibold text-slate-600 mb-1">รายละเอียดงาน / รหัสงาน / สถานที่</label>
           <input id="edit-album-note" type="text" placeholder="เช่น JOB-2026-101 • สำรวจหน้างาน"
@@ -3616,7 +4855,6 @@ create policy "Public Access workdrive-photos" on storage.objects
       </form>
     </div>
   </div>
-
 
   <!-- ==================== MODAL / BOTTOM SHEET: ADD TO HOME SCREEN GUIDE (MATCHES IMG_8886) ==================== -->
   <div id="install-app-modal" onclick="if(event.target === this) closeInstallAppModal()"
@@ -3781,6 +5019,108 @@ create policy "Public Access workdrive-photos" on storage.objects
             class="px-5 py-2 rounded-xl text-sm font-semibold btn-cspm-primary cursor-pointer flex items-center gap-1.5">
             <i data-lucide="trash-2" class="w-4 h-4"></i>
             <span>ยืนยันการลบ</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ==================== MODAL: ADMIN ACTIVITY STATUS LOGS (ONLY FOR SARUNCHANA.H) ==================== -->
+  <div id="admin-logs-modal" onclick="if(event.target === this) closeAdminLogsModal()"
+    class="hidden fixed inset-0 z-[65] bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden border border-slate-100">
+      <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="shield-check" class="w-5 h-5 text-amber-400"></i>
+          <div>
+            <h3 class="font-semibold text-sm flex items-center gap-2">
+              <span>รายงานสถานะการใช้งานทีม (Admin Audit Log)</span>
+              <span class="px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 text-[10px] font-bold">sarunchana.h</span>
+            </h3>
+            <p class="text-[11px] text-slate-400">ตรวจสอบว่าใครเพิ่มรูปอัลบั้มไหน ลบอัลบั้มไหน หรือดาวน์โหลดอัลบั้มไหนไป</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeAdminLogsModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 max-h-[84vh] overflow-y-auto text-xs">
+        <!-- Summary Cards -->
+        <div class="grid grid-cols-3 gap-3">
+          <div class="p-3 rounded-xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between">
+            <div>
+              <p class="text-[11px] text-emerald-700 font-medium">เพิ่มรูปภาพ</p>
+              <p id="admin-stat-add" class="text-lg font-bold text-emerald-900">0</p>
+            </div>
+            <i data-lucide="image-plus" class="w-5 h-5 text-emerald-600"></i>
+          </div>
+
+          <div class="p-3 rounded-xl bg-red-50/80 border border-red-200/80 flex items-center justify-between">
+            <div>
+              <p class="text-[11px] text-[#EB2D2D] font-medium">ลบอัลบั้ม / รูป</p>
+              <p id="admin-stat-del" class="text-lg font-bold text-red-900">0</p>
+            </div>
+            <i data-lucide="trash-2" class="w-5 h-5 text-[#EB2D2D]"></i>
+          </div>
+
+          <div class="p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 flex items-center justify-between">
+            <div>
+              <p class="text-[11px] text-blue-700 font-medium">โหลด ZIP / NAS</p>
+              <p id="admin-stat-dl" class="text-lg font-bold text-blue-900">0</p>
+            </div>
+            <i data-lucide="download" class="w-5 h-5 text-blue-600"></i>
+          </div>
+        </div>
+
+        <!-- Filters Toolbar -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-500 mb-1">ประเภทกิจกรรม</label>
+            <select id="admin-log-type-filter" onchange="renderAdminLogsList()"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:border-[#EB2D2D] outline-none">
+              <option value="ALL">ทั้งหมดทุกกิจกรรม</option>
+              <option value="add">เพิ่มรูปภาพเข้าอัลบั้ม</option>
+              <option value="delete">ลบอัลบั้ม / โฟลเดอร์ / รูปภาพ</option>
+              <option value="download">ดาวน์โหลด ZIP / รูป / NAS</option>
+              <option value="album">สร้างอัลบั้มใหม่</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-500 mb-1">ผู้ทำรายการ</label>
+            <select id="admin-log-user-filter" onchange="renderAdminLogsList()"
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:border-[#EB2D2D] outline-none">
+              <option value="ALL">ผู้ใช้งานทุกคน</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-semibold text-slate-500 mb-1">ค้นหาอัลบั้ม / ลูกค้า</label>
+            <input id="admin-log-search" type="text" oninput="renderAdminLogsList()" placeholder="พิมพ์ชื่อลูกค้า, วันที่..."
+              class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs focus:border-[#EB2D2D] outline-none" />
+          </div>
+        </div>
+
+        <!-- Activity Timeline List -->
+        <div id="admin-logs-list" class="max-h-80 overflow-y-auto space-y-2 p-2.5 rounded-xl bg-[#F5F7FA] border border-slate-200/80">
+          <!-- Rendered dynamically -->
+        </div>
+
+        <div class="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100">
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="openAdminLogsModal()"
+              class="px-3 py-2 rounded-xl bg-[#F5F7FA] hover:bg-slate-200 text-slate-700 font-medium border border-slate-200 flex items-center gap-1.5 cursor-pointer">
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> รีเฟรชประวัติล่าสุด
+            </button>
+            <button type="button" onclick="exportAdminLogsCsv()"
+              class="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold border border-emerald-200 flex items-center gap-1.5 cursor-pointer">
+              <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> โหลดรายงาน CSV
+            </button>
+          </div>
+          <button type="button" onclick="closeAdminLogsModal()" class="px-5 py-2 rounded-xl bg-[#1B212C] hover:bg-slate-800 text-white font-medium cursor-pointer">
+            ปิดหน้าต่าง
           </button>
         </div>
       </div>
