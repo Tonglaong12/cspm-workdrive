@@ -8,8 +8,10 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="CSPM WorkDrive" />
   <meta name="theme-color" content="#141920" />
-  <link id="apple-touch-icon-link" rel="apple-touch-icon" sizes="180x180" href="" />
-  <link id="web-manifest-link" rel="manifest" href="" />
+  <meta name="format-detection" content="telephone=no" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <link id="apple-touch-icon-link" rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+  <link id="web-manifest-link" rel="manifest" href="manifest.webmanifest" />
   <title>CSPM WorkDrive - Critical Services Site Photo & Album Repository</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -33,16 +35,36 @@
       -webkit-touch-callout: none;
     }
     /* iPhone Notch / Dynamic Island & Home Indicator Safe Areas */
-    .ios-safe-top {
+    html { -webkit-text-size-adjust: 100%; }
+    /* "body ..." selectors are intentionally more specific than Tailwind's runtime classes (pb-*, top-0, min-h-screen) */
+    body .ios-safe-top {
       padding-top: env(safe-area-inset-top, 0px);
     }
-    .ios-safe-bottom {
+    body .ios-safe-bottom {
       padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
     }
-    @media all and (display-mode: standalone) {
-      .ios-sticky-header {
-        top: env(safe-area-inset-top, 0px);
-      }
+    body .ios-safe-all {
+      padding-top: env(safe-area-inset-top, 0px);
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+      padding-left: env(safe-area-inset-left, 0px);
+      padding-right: env(safe-area-inset-right, 0px);
+    }
+    /* sticky header sits right under the dark status-bar cover (safe area + 4px red line) */
+    body header.ios-sticky-header {
+      top: calc(env(safe-area-inset-top, 0px) + 0.25rem);
+    }
+    /* full-height screens follow the real visible height on iPhone */
+    @supports (height: 100dvh) {
+      body .min-h-screen { min-height: 100dvh; }
+    }
+    /* landscape: keep content out of the notch */
+    #login-screen, #app-screen {
+      padding-left: env(safe-area-inset-left, 0px);
+      padding-right: env(safe-area-inset-right, 0px);
+    }
+    /* stop iOS from zooming the page when a field is focused */
+    @media (max-width: 640px) {
+      input, select, textarea { font-size: 16px !important; }
     }
     /* Corporate Data Center subtle technical grid background matching cspm.co.th */
     .cspm-hero-bg {
@@ -783,7 +805,7 @@
   </div>
 
   <!-- ==================== MODAL: LIGHTBOX VIEWER ==================== -->
-  <div id="lightbox-modal" class="hidden fixed inset-0 z-50 bg-[#0D1117]/95 backdrop-blur-sm flex flex-col">
+  <div id="lightbox-modal" class="hidden fixed inset-0 z-50 bg-[#0D1117]/95 backdrop-blur-sm flex flex-col ios-safe-all">
     <div class="px-6 py-4 flex items-center justify-between text-white border-b border-white/10">
       <div>
         <p id="lb-title" class="font-semibold text-sm">คำอธิบายภาพ</p>
@@ -3238,53 +3260,7 @@ create policy "Public Access workdrive-photos" on storage.objects
 
     // ==================== IPHONE FULL-SCREEN PWA SETUP (ICON & MANIFEST) ====================
     function setupIphoneFullScreenApp() {
-      try {
-        // Generate 180x180 Apple Touch Icon for Home Screen
-        const canvas = document.createElement('canvas');
-        canvas.width = 180;
-        canvas.height = 180;
-        const ctx = canvas.getContext('2d');
-
-        // Dark corporate background
-        ctx.fillStyle = '#141920';
-        ctx.fillRect(0, 0, 180, 180);
-
-        // Top red corporate bar
-        ctx.fillStyle = '#EB2D2D';
-        ctx.fillRect(0, 0, 180, 14);
-
-        // Brand text
-        ctx.fillStyle = '#FFFFFF';
-        ctx.font = 'bold 34px Prompt, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('CSPM', 90, 92);
-
-        ctx.fillStyle = '#FF6B70';
-        ctx.font = '600 18px Prompt, sans-serif';
-        ctx.fillText('WorkDrive', 90, 124);
-
-        const iconDataUrl = canvas.toDataURL('image/png');
-        const appleIconLink = document.getElementById('apple-touch-icon-link');
-        if (appleIconLink) appleIconLink.href = iconDataUrl;
-
-        // Dynamic Web App Manifest
-        const manifest = {
-          name: 'CSPM WorkDrive',
-          short_name: 'WorkDrive',
-          description: 'ระบบจัดเก็บภาพถ่ายหน้างานและอัลบั้มโครงการ บริษัท CSPM',
-          start_url: '.',
-          display: 'standalone',
-          background_color: '#141920',
-          theme_color: '#141920',
-          icons: [
-            { src: iconDataUrl, sizes: '180x180', type: 'image/png' },
-            { src: iconDataUrl, sizes: '512x512', type: 'image/png' }
-          ]
-        };
-        const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
-        const manifestLink = document.getElementById('web-manifest-link');
-        if (manifestLink) manifestLink.href = URL.createObjectURL(manifestBlob);
-      } catch (e) {}
+      // Icon + manifest are static files: apple-touch-icon.png, icon-192.png, manifest.webmanifest
 
       // Hide install pill only if already running in full-screen standalone mode
       const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
