@@ -789,9 +789,12 @@
             class="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-sm focus:border-[#EB2D2D] outline-none" />
         </div>
 
-        <div class="pt-2 flex justify-end gap-2">
-          <button type="button" onclick="closeNewAlbumModal()" class="px-4 py-2 rounded-xl text-sm text-slate-600 hover:bg-slate-100 cursor-pointer">ยกเลิก</button>
-          <button type="submit" class="px-5 py-2 rounded-xl text-sm font-medium btn-cspm-primary cursor-pointer">เปิดโฟลเดอร์อัลบั้ม</button>
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+          <button type="button" onclick="closeNewAlbumModal()" class="px-4 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-100 cursor-pointer">ยกเลิก</button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl text-sm font-semibold btn-cspm-primary cursor-pointer flex items-center gap-2 shadow-sm">
+            <i data-lucide="folder-plus" class="w-4 h-4"></i>
+            <span>สร้างอัลบั้มใหม่</span>
+          </button>
         </div>
       </form>
     </div>
@@ -2849,12 +2852,19 @@ create policy "Public Access workdrive-photos" on storage.objects
                   <h3 class="font-bold text-slate-900 group-hover:text-[#EB2D2D] transition">วันที่ ${escapeHtml(album.thaiDate)}</h3>
                   <p class="text-xs text-slate-500 mt-1 line-clamp-1">${escapeHtml(album.note || album.product)}</p>
                 </div>
-                <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
-                  <span class="flex items-center gap-1 font-medium text-slate-600">
-                    <i data-lucide="images" class="w-3.5 h-3.5 text-[#EB2D2D]"></i>
-                    ${album.photos.length} รูป
-                  </span>
-                  <span class="text-[#EB2D2D] font-medium flex items-center gap-0.5">เปิดดูรูปภาพ <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></span>
+                <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400 gap-2">
+                  <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="flex items-center gap-1 font-medium text-slate-600">
+                      <i data-lucide="images" class="w-3.5 h-3.5 text-[#EB2D2D]"></i>
+                      ${album.photos.length} รูป
+                    </span>
+                    ${isAdminUser() ? (
+                      (album.downloadHistory && album.downloadHistory.length > 0)
+                        ? `<span onclick="event.stopPropagation(); openAdminLogsModal('status')" class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[10px] font-semibold" title="ดาวน์โหลดแล้ว ${album.downloadHistory.length} ครั้ง ล่าสุดโดย ${escapeHtml(album.downloadHistory[0].username)}">โหลดแล้ว (${album.downloadHistory.length})</span>`
+                        : `<span onclick="event.stopPropagation(); openAdminLogsModal('status')" class="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-medium">ยังไม่โหลด</span>`
+                    ) : ''}
+                  </div>
+                  <span class="text-[#EB2D2D] font-medium flex items-center gap-0.5 shrink-0">เปิดดูรูปภาพ <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></span>
                 </div>
               </div>
             </div>
@@ -2910,6 +2920,7 @@ create policy "Public Access workdrive-photos" on storage.objects
     // ==================== CREATE & OPEN ALBUM MODAL (WITH OPTIONAL COVER) ====================
     let pendingNewAlbumCover = '';
     let pendingEditAlbumCover = '';
+    let pendingFolderAlbumCover = '';
 
     function compressCoverImageFile(file) {
       return new Promise((resolve) => {
@@ -2956,6 +2967,8 @@ create policy "Public Access workdrive-photos" on storage.objects
       const compressed = await compressCoverImageFile(file);
       if (mode === 'new') {
         pendingNewAlbumCover = compressed;
+      } else if (mode === 'folder') {
+        pendingFolderAlbumCover = compressed;
       } else {
         pendingEditAlbumCover = compressed;
       }
@@ -2966,6 +2979,8 @@ create policy "Public Access workdrive-photos" on storage.objects
     function clearAlbumCover(mode) {
       if (mode === 'new') {
         pendingNewAlbumCover = '';
+      } else if (mode === 'folder') {
+        pendingFolderAlbumCover = '';
       } else {
         pendingEditAlbumCover = '';
       }
@@ -3020,66 +3035,77 @@ create policy "Public Access workdrive-photos" on storage.objects
 
     async function createAlbum(e) {
       e.preventDefault();
-      const client = document.getElementById('album-client').value.trim();
-      const dept = document.getElementById('album-dept').value;
-      const product = document.getElementById('album-product').value.trim();
-      const thaiDate = document.getElementById('album-thai-date').value.trim();
-      const note = document.getElementById('album-note').value.trim();
+      const submitBtn = e.target ? e.target.querySelector('button[type="submit"]') : null;
+      if (submitBtn) submitBtn.disabled = true;
 
-      if (!client || !dept || !product || !thaiDate) return;
+      try {
+        const client = document.getElementById('album-client').value.trim();
+        const dept = document.getElementById('album-dept').value;
+        const product = document.getElementById('album-product').value.trim();
+        const thaiDate = document.getElementById('album-thai-date').value.trim();
+        const note = document.getElementById('album-note').value.trim();
 
-      // Save Product name to suggestions list if not already present
-      const prodList = getProducts();
-      if (!prodList.some(p => p.toLowerCase() === product.toLowerCase())) {
-        prodList.unshift(product);
-        saveProducts(prodList);
-      }
+        if (!client || !dept || !product || !thaiDate) return;
 
-      navPath = { client, dept, product };
-
-      const existing = albums.find(a =>
-        a.client.toLowerCase() === client.toLowerCase() &&
-        a.dept === dept &&
-        a.product.toLowerCase() === product.toLowerCase() &&
-        a.thaiDate === thaiDate
-      );
-
-      if (existing) {
-        if (note && !existing.note) existing.note = note;
-        if (pendingNewAlbumCover) {
-          existing.coverUrl = await uploadCoverDataUrlToStorage(existing.id, pendingNewAlbumCover);
+        // Save Product name to suggestions list if not already present
+        const prodList = getProducts();
+        if (!prodList.some(p => String(p || '').toLowerCase() === product.toLowerCase())) {
+          prodList.unshift(product);
+          saveProducts(prodList);
         }
+
+        navPath = { client, dept, product };
+
+        const existing = albums.find(a =>
+          a && !a.isSystemLogContainer &&
+          String(a.client || '').toLowerCase() === client.toLowerCase() &&
+          a.dept === dept &&
+          String(a.product || '').toLowerCase() === product.toLowerCase() &&
+          a.thaiDate === thaiDate
+        );
+
+        if (existing) {
+          if (note && !existing.note) existing.note = note;
+          if (pendingNewAlbumCover) {
+            existing.coverUrl = await uploadCoverDataUrlToStorage(existing.id, pendingNewAlbumCover);
+          }
+          saveAlbums();
+          closeNewAlbumModal();
+          openAlbum(existing.id);
+          return;
+        }
+
+        const newId = 'alb-' + Date.now();
+        let finalCover = '';
+        if (pendingNewAlbumCover) {
+          finalCover = await uploadCoverDataUrlToStorage(newId, pendingNewAlbumCover);
+        }
+
+        const newAlb = {
+          id: newId,
+          client,
+          dept,
+          product,
+          thaiDate,
+          note,
+          coverUrl: finalCover,
+          photos: []
+        };
+        albums.unshift(newAlb);
+        recordActivityLog('create_album', {
+          albumTitle: `${client} • ${dept} • ${product} (${thaiDate})`,
+          client, dept, product, thaiDate,
+          detail: `สร้างอัลบั้มงานใหม่${note ? ' (' + note + ')' : ''}`
+        });
         saveAlbums();
         closeNewAlbumModal();
-        openAlbum(existing.id);
-        return;
+        openAlbum(newAlb.id);
+      } catch (err) {
+        console.error('createAlbum error:', err);
+        alert('เกิดข้อผิดพลาดในการสร้างอัลบั้ม: ' + (err && err.message ? err.message : err));
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
       }
-
-      const newId = 'alb-' + Date.now();
-      let finalCover = '';
-      if (pendingNewAlbumCover) {
-        finalCover = await uploadCoverDataUrlToStorage(newId, pendingNewAlbumCover);
-      }
-
-      const newAlb = {
-        id: newId,
-        client,
-        dept,
-        product,
-        thaiDate,
-        note,
-        coverUrl: finalCover,
-        photos: []
-      };
-      albums.unshift(newAlb);
-      recordActivityLog('create_album', {
-        albumTitle: `${client} • ${dept} • ${product} (${thaiDate})`,
-        client, dept, product, thaiDate,
-        detail: `สร้างอัลบั้มงานใหม่${note ? ' (' + note + ')' : ''}`
-      });
-      saveAlbums();
-      closeNewAlbumModal();
-      openAlbum(newAlb.id);
     }
 
     let selectedPhotoIds = new Set();
@@ -3121,9 +3147,14 @@ create policy "Public Access workdrive-photos" on storage.objects
       document.getElementById('detail-title').textContent = album.client;
       document.getElementById('detail-dept-badge').textContent = album.dept;
       document.getElementById('detail-product-badge').textContent = album.product;
+      const adminDlBadge = isAdminUser()
+        ? ((album.downloadHistory && album.downloadHistory.length > 0)
+            ? ` • <button type="button" onclick="openAdminLogsModal('status')" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-semibold text-[11px] cursor-pointer hover:bg-blue-100">ดาวน์โหลดแล้ว ${album.downloadHistory.length} ครั้ง (ล่าสุด: ${escapeHtml(album.downloadHistory[0].username)} เมื่อ ${escapeHtml(album.downloadHistory[0].thaiTimestamp)})</button>`
+            : ` • <button type="button" onclick="openAdminLogsModal('status')" class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 font-semibold text-[11px] cursor-pointer hover:bg-amber-100">สถานะ Admin: ยังไม่เคยดาวน์โหลดอัลบั้มนี้</button>`)
+        : '';
       document.getElementById('detail-meta').innerHTML = `
         <span><strong>รายละเอียด:</strong> ${escapeHtml(album.note || '-')}</span> •
-        <span><strong>จำนวนรูปภาพ:</strong> ${album.photos.length} รูป</span>
+        <span><strong>จำนวนรูปภาพ:</strong> ${album.photos.length} รูป</span>${adminDlBadge}
       `;
       renderPhotos();
       sendPresenceHeartbeat();
@@ -3449,6 +3480,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         a.download = fileName;
         a.click();
       }
+      markAlbumDownloaded(album, 'โหลดรูปภาพเดี่ยว', 1);
       recordActivityLog('download_photo', {
         albumTitle: `${album.client} • ${album.dept} • ${album.product} (${album.thaiDate})`,
         client: album.client,
@@ -3473,6 +3505,54 @@ create policy "Public Access workdrive-photos" on storage.objects
       album.coverUrl = photo.dataUrl;
       saveAlbums();
       alert('ตั้งค่ารูปภาพนี้เป็นหน้าปกอัลบั้มเรียบร้อยแล้วครับ');
+    }
+
+    let quickTargetCoverAlbumId = null;
+
+    function triggerCardCoverUpload(albumId) {
+      quickTargetCoverAlbumId = albumId;
+      const inp = document.getElementById('quick-album-cover-input');
+      if (inp) inp.click();
+    }
+
+    async function handleQuickAlbumCoverChange(event) {
+      const file = event.target.files && event.target.files[0];
+      const targetId = quickTargetCoverAlbumId || activeAlbumId;
+      quickTargetCoverAlbumId = null;
+      event.target.value = '';
+      if (!file || !targetId) return;
+
+      const album = albums.find(a => a.id === targetId);
+      if (!album) return;
+
+      const compressed = await compressCoverImageFile(file);
+      const finalUrl = await uploadCoverDataUrlToStorage(album.id, compressed);
+      album.coverUrl = finalUrl;
+      saveAlbums();
+
+      if (activeAlbumId === album.id) {
+        openAlbum(album.id);
+      } else {
+        showFolderDashboard();
+      }
+      alert(`บันทึกรูปหน้าปกให้อัลบั้ม "${album.client} (${album.thaiDate})" เรียบร้อยแล้วครับ`);
+    }
+
+    function markAlbumDownloaded(album, methodLabel, photoCount) {
+      if (!album || album.isSystemLogContainer) return;
+      if (!Array.isArray(album.downloadHistory)) album.downloadHistory = [];
+      album.downloadHistory.unshift({
+        id: 'dl-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+        username: currentUser ? currentUser.name : 'unknown',
+        dept: currentUser ? currentUser.dept : '-',
+        method: methodLabel,
+        photoCount: photoCount || album.photos.length || 0,
+        thaiTimestamp: getThaiNowFormatted(),
+        createdAtMs: Date.now()
+      });
+      if (album.downloadHistory.length > 50) {
+        album.downloadHistory = album.downloadHistory.slice(0, 50);
+      }
     }
 
     // ==================== UNIFIED EXPORT ENGINE: SELECT MONTH & ALBUMS (NAS & ZIP) ====================
@@ -3800,6 +3880,7 @@ create policy "Public Access workdrive-photos" on storage.objects
 
         progLabel.textContent = `ดาวน์โหลดไฟล์ ZIP สำเร็จ (${doneCount} รูป)!`;
         showNasStatus(false, `สร้างไฟล์ "${zipName}" เรียบร้อยแล้ว (${targetAlbums.length} อัลบั้ม รวม ${doneCount} รูปภาพ)`);
+        targetAlbums.forEach(a => markAlbumDownloaded(a, 'โหลด ZIP', a.photos.length));
         const zipAlbList = targetAlbums.map(a => `${a.client} (${a.thaiDate})`).join(', ');
         recordActivityLog('download_zip', {
           albumTitle: targetAlbums.length === 1
@@ -3897,6 +3978,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         }
 
         progLabel.textContent = `บันทึกลง NAS สำเร็จครบทั้ง ${savedCount} รูป!`;
+        targetAlbums.forEach(a => markAlbumDownloaded(a, 'บันทึกลง NAS', a.photos.length));
         const nasAlbList = targetAlbums.map(a => `${a.client} (${a.thaiDate})`).join(', ');
         recordActivityLog('export_nas', {
           albumTitle: targetAlbums.length === 1
@@ -3964,6 +4046,17 @@ create policy "Public Access workdrive-photos" on storage.objects
       return `${adY}-${m}-${d}`;
     }
 
+    function getMatchingFolderAlbums(level, val) {
+      if (level === 'client') {
+        return albums.filter(a => !a.isSystemLogContainer && a.client === val);
+      } else if (level === 'dept') {
+        return albums.filter(a => !a.isSystemLogContainer && a.client === navPath.client && a.dept === val);
+      } else if (level === 'product') {
+        return albums.filter(a => !a.isSystemLogContainer && a.client === navPath.client && a.dept === navPath.dept && a.product === val);
+      }
+      return [];
+    }
+
     function openRenameFolderModal(level, oldValue) {
       renameFolderState = { level, oldValue };
       const titleEl = document.getElementById('rename-folder-title');
@@ -3971,17 +4064,23 @@ create policy "Public Access workdrive-photos" on storage.objects
       const inputEl = document.getElementById('rename-folder-input');
 
       if (level === 'client') {
-        titleEl.textContent = 'แก้ไขชื่อลูกค้า (Customer)';
+        titleEl.textContent = 'แก้ไขชื่อลูกค้า และรูปหน้าปก';
         labelEl.textContent = 'ชื่อลูกค้าใหม่ *';
       } else if (level === 'dept') {
-        titleEl.textContent = 'แก้ไขชื่อสังกัด';
+        titleEl.textContent = 'แก้ไขชื่อสังกัด และรูปหน้าปก';
         labelEl.textContent = 'ชื่อสังกัดใหม่ *';
       } else if (level === 'product') {
-        titleEl.textContent = 'แก้ไขชื่อ Product';
+        titleEl.textContent = 'แก้ไขชื่อ Product และรูปหน้าปก';
         labelEl.textContent = 'ชื่อ Product ใหม่ *';
       }
 
       inputEl.value = oldValue;
+
+      const matched = getMatchingFolderAlbums(level, oldValue);
+      const existingCover = (matched.find(a => a.coverUrl) || {}).coverUrl || '';
+      pendingFolderAlbumCover = existingCover;
+      updateAlbumCoverPreviewUI('folder', pendingFolderAlbumCover);
+
       document.getElementById('rename-folder-modal').classList.remove('hidden');
       setTimeout(() => {
         inputEl.focus();
@@ -3993,45 +4092,64 @@ create policy "Public Access workdrive-photos" on storage.objects
     function closeRenameFolderModal() {
       document.getElementById('rename-folder-modal').classList.add('hidden');
       renameFolderState = { level: null, oldValue: '' };
+      pendingFolderAlbumCover = '';
     }
 
-    function submitRenameFolder(e) {
+    async function submitRenameFolder(e) {
       e.preventDefault();
-      const newVal = document.getElementById('rename-folder-input').value.trim();
-      const { level, oldValue } = renameFolderState;
-      if (!newVal || !level) return;
+      const submitBtn = e.target ? e.target.querySelector('button[type="submit"]') : null;
+      if (submitBtn) submitBtn.disabled = true;
 
-      if (newVal !== oldValue) {
-        if (level === 'client') {
-          albums.forEach(a => {
-            if (a.client === oldValue) a.client = newVal;
-          });
-          if (navPath.client === oldValue) navPath.client = newVal;
-        } else if (level === 'dept') {
-          albums.forEach(a => {
-            if (a.client === navPath.client && a.dept === oldValue) {
-              a.dept = newVal;
-            }
-          });
-          const depts = getDepartments();
-          if (!depts.includes(newVal)) {
-            depts.push(newVal);
-            saveDepartments(depts);
-          }
-          if (navPath.dept === oldValue) navPath.dept = newVal;
-        } else if (level === 'product') {
-          albums.forEach(a => {
-            if (a.client === navPath.client && a.dept === navPath.dept && a.product === oldValue) {
-              a.product = newVal;
-            }
-          });
-          if (navPath.product === oldValue) navPath.product = newVal;
+      try {
+        const newVal = document.getElementById('rename-folder-input').value.trim();
+        const { level, oldValue } = renameFolderState;
+        if (!newVal || !level) return;
+
+        const matched = getMatchingFolderAlbums(level, oldValue);
+        const prevCover = (matched.find(a => a.coverUrl) || {}).coverUrl || '';
+
+        let finalCover = pendingFolderAlbumCover || '';
+        if (finalCover && finalCover.startsWith('data:')) {
+          const refId = matched[0] ? matched[0].id : ('fld-' + Date.now());
+          finalCover = await uploadCoverDataUrlToStorage(refId, finalCover);
         }
-        saveAlbums();
-      }
 
-      closeRenameFolderModal();
-      showFolderDashboard();
+        const coverChanged = finalCover !== prevCover;
+
+        if (newVal !== oldValue || coverChanged) {
+          matched.forEach(a => {
+            if (newVal !== oldValue) {
+              if (level === 'client') a.client = newVal;
+              else if (level === 'dept') a.dept = newVal;
+              else if (level === 'product') a.product = newVal;
+            }
+            if (coverChanged) {
+              a.coverUrl = finalCover;
+            }
+          });
+
+          if (newVal !== oldValue) {
+            if (level === 'client' && navPath.client === oldValue) {
+              navPath.client = newVal;
+            } else if (level === 'dept') {
+              const depts = getDepartments();
+              if (!depts.includes(newVal)) {
+                depts.push(newVal);
+                saveDepartments(depts);
+              }
+              if (navPath.dept === oldValue) navPath.dept = newVal;
+            } else if (level === 'product' && navPath.product === oldValue) {
+              navPath.product = newVal;
+            }
+          }
+          saveAlbums();
+        }
+
+        closeRenameFolderModal();
+        showFolderDashboard();
+      } finally {
+        if (submitBtn) submitBtn.disabled = false;
+      }
     }
 
     function openEditAlbumModal(albumId) {
@@ -4378,7 +4496,7 @@ create policy "Public Access workdrive-photos" on storage.objects
     function getSystemLogContainer() {
       let container = albums.find(a => a.id === '__cspm_activity_logs__');
       if (!container) {
-        container = { id: '__cspm_activity_logs__', isSystemLogContainer: true, photos: [], logs: [] };
+        container = { id: '__cspm_activity_logs__', isSystemLogContainer: true, client: '', dept: '', product: '', thaiDate: '', photos: [], logs: [] };
         albums.push(container);
       }
       if (!Array.isArray(container.logs)) container.logs = [];
@@ -4447,16 +4565,105 @@ create policy "Public Access workdrive-photos" on storage.objects
       return explicitLogs;
     }
 
-    async function openAdminLogsModal() {
+    function switchAdminModalTab(tab) {
+      const statusPanel = document.getElementById('admin-panel-status');
+      const logsPanel = document.getElementById('admin-panel-logs');
+      const tabStatus = document.getElementById('admin-tab-status');
+      const tabLogs = document.getElementById('admin-tab-logs');
+
+      if (tab === 'logs') {
+        statusPanel.classList.add('hidden');
+        logsPanel.classList.remove('hidden');
+        tabLogs.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold bg-[#1B212C] text-white shadow-2xs transition cursor-pointer flex items-center justify-center gap-1.5';
+        tabStatus.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center justify-center gap-1.5';
+        renderAdminLogsList();
+      } else {
+        logsPanel.classList.add('hidden');
+        statusPanel.classList.remove('hidden');
+        tabStatus.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold bg-[#1B212C] text-white shadow-2xs transition cursor-pointer flex items-center justify-center gap-1.5';
+        tabLogs.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center justify-center gap-1.5';
+        renderAdminAlbumStatusList();
+      }
+      lucide.createIcons();
+    }
+
+    function renderAdminAlbumStatusList() {
+      if (!isAdminUser()) return;
+      const realAlbums = albums.filter(a => !a.isSystemLogContainer);
+      const statusFilter = document.getElementById('admin-alb-status-filter').value;
+      const query = (document.getElementById('admin-alb-search').value || '').trim().toLowerCase();
+
+      const downloadedAlbs = realAlbums.filter(a => Array.isArray(a.downloadHistory) && a.downloadHistory.length > 0);
+      const notDownloadedAlbs = realAlbums.filter(a => !Array.isArray(a.downloadHistory) || a.downloadHistory.length === 0);
+
+      document.getElementById('admin-alb-total').textContent = realAlbums.length;
+      document.getElementById('admin-alb-downloaded').textContent = downloadedAlbs.length;
+      document.getElementById('admin-alb-pending').textContent = notDownloadedAlbs.length;
+
+      let filtered = realAlbums;
+      if (statusFilter === 'DOWNLOADED') {
+        filtered = downloadedAlbs;
+      } else if (statusFilter === 'NOT_DOWNLOADED') {
+        filtered = notDownloadedAlbs;
+      }
+
+      if (query) {
+        filtered = filtered.filter(a =>
+          `${a.client} ${a.dept} ${a.product} ${a.thaiDate} ${a.note || ''}`.toLowerCase().includes(query)
+        );
+      }
+
+      const listEl = document.getElementById('admin-alb-status-list');
+      if (filtered.length === 0) {
+        listEl.innerHTML = `<p class="text-center text-xs text-slate-400 py-8">ไม่พบอัลบั้มตามเงื่อนไขที่เลือก</p>`;
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(alb => {
+        const hist = Array.isArray(alb.downloadHistory) ? alb.downloadHistory : [];
+        const isDl = hist.length > 0;
+        const latest = isDl ? hist[0] : null;
+        return `
+          <div onclick="closeAdminLogsModal(); openAlbum('${alb.id}')"
+            class="p-3.5 bg-white hover:bg-slate-50 rounded-xl border ${isDl ? 'border-blue-200/90' : 'border-amber-200/90'} flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 cursor-pointer transition">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="font-bold text-xs text-slate-900">${escapeHtml(alb.client)}</span>
+                <span class="px-2 py-0.2 rounded bg-slate-100 text-slate-700 font-semibold text-[10px]">${escapeHtml(alb.dept)}</span>
+                <span class="px-2 py-0.2 rounded bg-red-50 text-[#EB2D2D] font-mono font-bold text-[10px]">${escapeHtml(alb.thaiDate)}</span>
+              </div>
+              <p class="text-[11px] text-slate-600 truncate mt-0.5">${escapeHtml(alb.product)} • <strong>${alb.photos.length} รูป</strong></p>
+              ${isDl
+                ? `<p class="text-[11px] text-blue-700 mt-1">ล่าสุด: <strong>${escapeHtml(latest.username)}</strong> (${escapeHtml(latest.method)}) เมื่อ ${escapeHtml(latest.thaiTimestamp)}</p>`
+                : `<p class="text-[11px] text-amber-700 mt-1">ยังไม่มีการดาวน์โหลดอัลบั้มนี้ (ZIP / NAS)</p>`
+              }
+            </div>
+            <div class="shrink-0">
+              ${isDl
+                ? `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-bold">
+                    <i data-lucide="check-circle-2" class="w-3.5 h-3.5"></i> โหลดแล้ว (${hist.length} ครั้ง)
+                  </span>`
+                : `<span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[11px] font-semibold">
+                    <i data-lucide="clock" class="w-3.5 h-3.5"></i> ยังไม่โหลด
+                  </span>`
+              }
+            </div>
+          </div>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    async function openAdminLogsModal(defaultTab = 'status') {
       if (!isAdminUser()) {
         alert('ขออภัย เฉพาะบัญชีแอดมิน (sarunchana.h) เท่านั้นที่สามารถดูประวัติการใช้งานทีมได้');
         return;
       }
       document.getElementById('admin-logs-modal').classList.remove('hidden');
-      renderAdminLogsList();
-      lucide.createIcons();
+      switchAdminModalTab(defaultTab);
       if (isCloudConnected && navigator.onLine) {
         await syncFromCloud(false, false);
+        renderAdminAlbumStatusList();
         renderAdminLogsList();
       }
     }
@@ -4716,13 +4923,13 @@ create policy "Public Access workdrive-photos" on storage.objects
     </div>
   </div>
 
-  <!-- ==================== MODAL: RENAME FOLDER (CUSTOMER / DEPT / PRODUCT) ==================== -->
+  <!-- ==================== MODAL: RENAME FOLDER & COVER (CUSTOMER / DEPT / PRODUCT) ==================== -->
   <div id="rename-folder-modal" class="hidden fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl overflow-hidden border border-slate-100">
       <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
         <h3 class="font-semibold text-sm flex items-center gap-2">
           <i data-lucide="pencil" class="w-4 h-4 text-[#EB2D2D]"></i>
-          <span id="rename-folder-title">แก้ไขชื่อโฟลเดอร์</span>
+          <span id="rename-folder-title">แก้ไขชื่อโฟลเดอร์และรูปหน้าปก</span>
         </h3>
         <button type="button" onclick="closeRenameFolderModal()" class="text-slate-400 hover:text-white cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
@@ -4735,6 +4942,31 @@ create policy "Public Access workdrive-photos" on storage.objects
             class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-[#EB2D2D] outline-none" />
           <p id="rename-folder-hint" class="text-[11px] text-slate-400 mt-1.5">การเปลี่ยนชื่อจะอัปเดตทุกอัลบั้มที่อยู่ภายใต้โฟลเดอร์นี้โดยอัตโนมัติ</p>
         </div>
+
+        <!-- Optional Cover Photo for Folder -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1.5">รูปหน้าปก (ไม่บังคับ — หากไม่ใส่จะแสดงเป็นชื่อที่พิมพ์แทน)</label>
+          <input id="folder-album-cover-input" type="file" accept="image/*" class="hidden" onchange="handleAlbumCoverSelected(event, 'folder')" />
+          <div class="flex items-center gap-3 p-2.5 rounded-xl border border-dashed border-slate-300 bg-[#F8FAFC]">
+            <div id="folder-album-cover-preview" class="w-16 h-16 rounded-xl bg-[#1B212C] text-white flex items-center justify-center overflow-hidden shrink-0 text-[10px] text-center px-1 font-semibold">
+              แสดงชื่อ<br/>อัลบั้ม
+            </div>
+            <div class="flex-1 min-w-0 space-y-1.5">
+              <div class="flex flex-wrap items-center gap-2">
+                <button type="button" onclick="document.getElementById('folder-album-cover-input').click()"
+                  class="px-3 py-1.5 rounded-lg bg-[#1B212C] hover:bg-slate-800 text-white text-xs font-medium flex items-center gap-1.5 cursor-pointer">
+                  <i data-lucide="image-plus" class="w-3.5 h-3.5 text-[#EB2D2D]"></i> เลือกรูปหน้าปก
+                </button>
+                <button id="folder-album-cover-clear-btn" type="button" onclick="clearAlbumCover('folder')"
+                  class="hidden px-2.5 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-[#EB2D2D] text-xs font-medium cursor-pointer">
+                  ลบรูปหน้าปก
+                </button>
+              </div>
+              <p class="text-[11px] text-slate-400">เพิ่มหรือเปลี่ยนรูปหน้าปกให้แสดงบนการ์ดโฟลเดอร์นี้ทันที</p>
+            </div>
+          </div>
+        </div>
+
         <div class="pt-1 flex justify-end gap-2">
           <button type="button" onclick="closeRenameFolderModal()" class="px-4 py-2 rounded-xl text-sm text-slate-600 hover:bg-slate-100 cursor-pointer">ยกเลิก</button>
           <button type="submit" class="px-5 py-2 rounded-xl text-sm font-medium btn-cspm-primary cursor-pointer">บันทึกการแก้ไข</button>
@@ -5001,7 +5233,7 @@ create policy "Public Access workdrive-photos" on storage.objects
   </div>
 
 
-  <!-- ==================== MODAL: ADMIN ACTIVITY STATUS LOGS (ONLY FOR SARUNCHANA.H) ==================== -->
+  <!-- ==================== MODAL: ADMIN ACTIVITY & ALBUM DOWNLOAD STATUS (ONLY FOR SARUNCHANA.H) ==================== -->
   <div id="admin-logs-modal" onclick="if(event.target === this) closeAdminLogsModal()"
     class="hidden fixed inset-0 z-[65] bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl overflow-hidden border border-slate-100">
@@ -5010,10 +5242,10 @@ create policy "Public Access workdrive-photos" on storage.objects
           <i data-lucide="shield-check" class="w-5 h-5 text-amber-400"></i>
           <div>
             <h3 class="font-semibold text-sm flex items-center gap-2">
-              <span>รายงานสถานะการใช้งานทีม (Admin Audit Log)</span>
+              <span>ระบบตรวจสอบสำหรับแอดมิน (Admin Monitor)</span>
               <span class="px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 text-[10px] font-bold">sarunchana.h</span>
             </h3>
-            <p class="text-[11px] text-slate-400">ตรวจสอบว่าใครเพิ่มรูปอัลบั้มไหน ลบอัลบั้มไหน หรือดาวน์โหลดอัลบั้มไหนไป</p>
+            <p class="text-[11px] text-slate-400">เช็กสถานะอัลบั้มที่ดาวน์โหลดแล้ว / ยังไม่โหลด และประวัติการเพิ่ม-ลบรูปของทีม</p>
           </div>
         </div>
         <button type="button" onclick="closeAdminLogsModal()" class="text-slate-400 hover:text-white cursor-pointer">
@@ -5022,72 +5254,134 @@ create policy "Public Access workdrive-photos" on storage.objects
       </div>
 
       <div class="p-6 space-y-4 max-h-[84vh] overflow-y-auto text-xs">
-        <!-- Summary Cards -->
-        <div class="grid grid-cols-3 gap-3">
-          <div class="p-3 rounded-xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between">
-            <div>
-              <p class="text-[11px] text-emerald-700 font-medium">เพิ่มรูปภาพ</p>
-              <p id="admin-stat-add" class="text-lg font-bold text-emerald-900">0</p>
+        <!-- Main Admin View Switcher Tabs -->
+        <div class="flex items-center gap-2 p-1 bg-[#F5F7FA] rounded-xl border border-slate-200">
+          <button id="admin-tab-status" type="button" onclick="switchAdminModalTab('status')"
+            class="flex-1 py-2 px-3 rounded-lg text-xs font-semibold bg-[#1B212C] text-white shadow-2xs transition cursor-pointer flex items-center justify-center gap-1.5">
+            <i data-lucide="folder-check" class="w-3.5 h-3.5 text-amber-400"></i> เช็กสถานะอัลบั้มที่โหลดแล้ว
+          </button>
+          <button id="admin-tab-logs" type="button" onclick="switchAdminModalTab('logs')"
+            class="flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center justify-center gap-1.5">
+            <i data-lucide="history" class="w-3.5 h-3.5 text-[#EB2D2D]"></i> ประวัติการเพิ่ม / ลบ / โหลดทั้งหมด
+          </button>
+        </div>
+
+        <!-- ==================== TAB 1: ALBUM DOWNLOAD STATUS CHECKER ==================== -->
+        <div id="admin-panel-status" class="space-y-4">
+          <div class="grid grid-cols-3 gap-3">
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between">
+              <div>
+                <p class="text-[11px] text-slate-500 font-medium">อัลบั้มทั้งหมด</p>
+                <p id="admin-alb-total" class="text-lg font-bold text-slate-900">0</p>
+              </div>
+              <i data-lucide="folders" class="w-5 h-5 text-slate-600"></i>
             </div>
-            <i data-lucide="image-plus" class="w-5 h-5 text-emerald-600"></i>
+
+            <div class="p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 flex items-center justify-between">
+              <div>
+                <p class="text-[11px] text-blue-700 font-medium">ดาวน์โหลดแล้ว</p>
+                <p id="admin-alb-downloaded" class="text-lg font-bold text-blue-900">0</p>
+              </div>
+              <i data-lucide="check-circle-2" class="w-5 h-5 text-blue-600"></i>
+            </div>
+
+            <div class="p-3 rounded-xl bg-amber-50/80 border border-amber-200/80 flex items-center justify-between">
+              <div>
+                <p class="text-[11px] text-amber-700 font-medium">ยังไม่เคยดาวน์โหลด</p>
+                <p id="admin-alb-pending" class="text-lg font-bold text-amber-900">0</p>
+              </div>
+              <i data-lucide="clock" class="w-5 h-5 text-amber-600"></i>
+            </div>
           </div>
 
-          <div class="p-3 rounded-xl bg-red-50/80 border border-red-200/80 flex items-center justify-between">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
             <div>
-              <p class="text-[11px] text-[#EB2D2D] font-medium">ลบอัลบั้ม / รูป</p>
-              <p id="admin-stat-del" class="text-lg font-bold text-red-900">0</p>
+              <label class="block text-[11px] font-semibold text-slate-500 mb-1">สถานะการดาวน์โหลด</label>
+              <select id="admin-alb-status-filter" onchange="renderAdminAlbumStatusList()"
+                class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:border-[#EB2D2D] outline-none">
+                <option value="ALL">แสดงทุกอัลบั้ม</option>
+                <option value="DOWNLOADED">เฉพาะอัลบั้มที่ดาวน์โหลดแล้ว</option>
+                <option value="NOT_DOWNLOADED">เฉพาะอัลบั้มที่ยังไม่เคยดาวน์โหลด</option>
+              </select>
             </div>
-            <i data-lucide="trash-2" class="w-5 h-5 text-[#EB2D2D]"></i>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 mb-1">ค้นหาชื่อลูกค้า / Product / วันที่</label>
+              <input id="admin-alb-search" type="text" oninput="renderAdminAlbumStatusList()" placeholder="พิมพ์ชื่อลูกค้า, สังกัด, วันที่..."
+                class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs focus:border-[#EB2D2D] outline-none" />
+            </div>
           </div>
 
-          <div class="p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 flex items-center justify-between">
-            <div>
-              <p class="text-[11px] text-blue-700 font-medium">โหลด ZIP / NAS</p>
-              <p id="admin-stat-dl" class="text-lg font-bold text-blue-900">0</p>
-            </div>
-            <i data-lucide="download" class="w-5 h-5 text-blue-600"></i>
+          <div id="admin-alb-status-list" class="max-h-80 overflow-y-auto space-y-2 p-2.5 rounded-xl bg-[#F5F7FA] border border-slate-200/80">
+            <!-- Rendered dynamically -->
           </div>
         </div>
 
-        <!-- Filters Toolbar -->
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-          <div>
-            <label class="block text-[11px] font-semibold text-slate-500 mb-1">ประเภทกิจกรรม</label>
-            <select id="admin-log-type-filter" onchange="renderAdminLogsList()"
-              class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:border-[#EB2D2D] outline-none">
-              <option value="ALL">ทั้งหมดทุกกิจกรรม</option>
-              <option value="add">เพิ่มรูปภาพเข้าอัลบั้ม</option>
-              <option value="delete">ลบอัลบั้ม / โฟลเดอร์ / รูปภาพ</option>
-              <option value="download">ดาวน์โหลด ZIP / รูป / NAS</option>
-              <option value="album">สร้างอัลบั้มใหม่</option>
-            </select>
+        <!-- ==================== TAB 2: FULL ACTIVITY TIMELINE LOGS ==================== -->
+        <div id="admin-panel-logs" class="hidden space-y-4">
+          <div class="grid grid-cols-3 gap-3">
+            <div class="p-3 rounded-xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between">
+              <div>
+                <p class="text-[11px] text-emerald-700 font-medium">เพิ่มรูปภาพ</p>
+                <p id="admin-stat-add" class="text-lg font-bold text-emerald-900">0</p>
+              </div>
+              <i data-lucide="image-plus" class="w-5 h-5 text-emerald-600"></i>
+            </div>
+
+            <div class="p-3 rounded-xl bg-red-50/80 border border-red-200/80 flex items-center justify-between">
+              <div>
+                <p class="text-[11px] text-[#EB2D2D] font-medium">ลบอัลบั้ม / รูป</p>
+                <p id="admin-stat-del" class="text-lg font-bold text-red-900">0</p>
+              </div>
+              <i data-lucide="trash-2" class="w-5 h-5 text-[#EB2D2D]"></i>
+            </div>
+
+            <div class="p-3 rounded-xl bg-blue-50/80 border border-blue-200/80 flex items-center justify-between">
+              <div>
+                <p class="text-[11px] text-blue-700 font-medium">โหลด ZIP / NAS</p>
+                <p id="admin-stat-dl" class="text-lg font-bold text-blue-900">0</p>
+              </div>
+              <i data-lucide="download" class="w-5 h-5 text-blue-600"></i>
+            </div>
           </div>
 
-          <div>
-            <label class="block text-[11px] font-semibold text-slate-500 mb-1">ผู้ทำรายการ</label>
-            <select id="admin-log-user-filter" onchange="renderAdminLogsList()"
-              class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:border-[#EB2D2D] outline-none">
-              <option value="ALL">ผู้ใช้งานทุกคน</option>
-            </select>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 mb-1">ประเภทกิจกรรม</label>
+              <select id="admin-log-type-filter" onchange="renderAdminLogsList()"
+                class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:border-[#EB2D2D] outline-none">
+                <option value="ALL">ทั้งหมดทุกกิจกรรม</option>
+                <option value="add">เพิ่มรูปภาพเข้าอัลบั้ม</option>
+                <option value="delete">ลบอัลบั้ม / โฟลเดอร์ / รูปภาพ</option>
+                <option value="download">ดาวน์โหลด ZIP / รูป / NAS</option>
+                <option value="album">สร้างอัลบั้มใหม่</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 mb-1">ผู้ทำรายการ</label>
+              <select id="admin-log-user-filter" onchange="renderAdminLogsList()"
+                class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:border-[#EB2D2D] outline-none">
+                <option value="ALL">ผู้ใช้งานทุกคน</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 mb-1">ค้นหาอัลบั้ม / ลูกค้า</label>
+              <input id="admin-log-search" type="text" oninput="renderAdminLogsList()" placeholder="พิมพ์ชื่อลูกค้า, วันที่..."
+                class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs focus:border-[#EB2D2D] outline-none" />
+            </div>
           </div>
 
-          <div>
-            <label class="block text-[11px] font-semibold text-slate-500 mb-1">ค้นหาอัลบั้ม / ลูกค้า</label>
-            <input id="admin-log-search" type="text" oninput="renderAdminLogsList()" placeholder="พิมพ์ชื่อลูกค้า, วันที่..."
-              class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs focus:border-[#EB2D2D] outline-none" />
+          <div id="admin-logs-list" class="max-h-80 overflow-y-auto space-y-2 p-2.5 rounded-xl bg-[#F5F7FA] border border-slate-200/80">
+            <!-- Rendered dynamically -->
           </div>
-        </div>
-
-        <!-- Activity Timeline List -->
-        <div id="admin-logs-list" class="max-h-80 overflow-y-auto space-y-2 p-2.5 rounded-xl bg-[#F5F7FA] border border-slate-200/80">
-          <!-- Rendered dynamically -->
         </div>
 
         <div class="pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100">
           <div class="flex items-center gap-2">
             <button type="button" onclick="openAdminLogsModal()"
               class="px-3 py-2 rounded-xl bg-[#F5F7FA] hover:bg-slate-200 text-slate-700 font-medium border border-slate-200 flex items-center gap-1.5 cursor-pointer">
-              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> รีเฟรชประวัติล่าสุด
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> รีเฟรชข้อมูลล่าสุด
             </button>
             <button type="button" onclick="exportAdminLogsCsv()"
               class="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold border border-emerald-200 flex items-center gap-1.5 cursor-pointer">
@@ -5101,7 +5395,6 @@ create policy "Public Access workdrive-photos" on storage.objects
       </div>
     </div>
   </div>
-
   <!-- ==================== MODAL: SUPABASE CLOUD CONFIG ==================== -->
   <div id="cloud-config-modal" class="hidden fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden border border-slate-100">
