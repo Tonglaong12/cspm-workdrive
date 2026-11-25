@@ -213,6 +213,31 @@
     }
     .cspm-marquee:hover .cspm-marquee-track { animation-play-state: paused; }
 
+
+    /* ===== Admin System Update Scrolling Marquee ===== */
+    .cspm-update-marquee {
+      overflow: hidden;
+      position: relative;
+      width: 100%;
+    }
+    .cspm-update-marquee-track {
+      display: flex;
+      width: max-content;
+      animation: cspm-update-scroll 16s linear infinite;
+    }
+    .cspm-update-marquee:hover .cspm-update-marquee-track {
+      animation-play-state: paused;
+    }
+    .cspm-update-marquee-item {
+      flex-shrink: 0;
+      padding-right: 3rem;
+      white-space: nowrap;
+    }
+    @keyframes cspm-update-scroll {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+
     /* ===== Hello! welcome screen after login ===== */
     #welcome-splash {
       padding: env(safe-area-inset-top, 0px) 1.5rem env(safe-area-inset-bottom, 0px);
@@ -629,6 +654,13 @@
             </div>
           </div>
 
+          <!-- Admin System Update Broadcast Button (Visible ONLY for sarunchana.h) -->
+          <button id="admin-update-nav-btn" type="button" onclick="openAdminUpdateModal()"
+            class="hidden px-3 py-2 rounded-xl bg-amber-300 hover:bg-amber-400 text-amber-950 border border-amber-400 text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition"
+            title="ส่งหน้าต่างแจ้งเตือนอัปเดตระบบพร้อมข้อความเลื่อน และดูสถานะคนกด Hold / กากบาท (เฉพาะ Admin)">
+            <i data-lucide="megaphone" class="w-4 h-4 text-amber-950"></i>
+            <span class="hidden sm:inline">แจ้งอัปเดต</span>
+          </button>
           <!-- Admin Activity Status Button (Visible ONLY for sarunchana.h) -->
           <button id="admin-logs-nav-btn" type="button" onclick="openAdminLogsModal()"
             class="hidden px-3 py-2 rounded-xl bg-[#1B212C] hover:bg-slate-800 text-white border border-amber-400/50 text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer transition"
@@ -2740,8 +2772,9 @@ create policy "Public Access workdrive-photos" on storage.objects
 
     function startPresenceTracking() {
       sendPresenceHeartbeat();
+      checkSystemUpdateNoticeForUser();
       if (presenceTimer) clearInterval(presenceTimer);
-      presenceTimer = setInterval(sendPresenceHeartbeat, 4000);
+      presenceTimer = setInterval(() => { sendPresenceHeartbeat(); checkSystemUpdateNoticeForUser(); }, 4000);
     }
 
     function stopPresenceTracking() {
@@ -2865,7 +2898,10 @@ create policy "Public Access workdrive-photos" on storage.objects
     }
 
     window.addEventListener('storage', (e) => {
-      if (e.key === PRESENCE_KEY && currentUser) {
+      if (e.key === SYSTEM_UPDATE_KEY && currentUser) {
+        checkSystemUpdateNoticeForUser();
+        renderAdminUpdateResponses();
+      } else if (e.key === PRESENCE_KEY && currentUser) {
         renderOnlineUsers();
       } else if (e.key === STORAGE_KEY && currentUser) {
         albums = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -2892,6 +2928,164 @@ create policy "Public Access workdrive-photos" on storage.objects
       }
     });
 
+    
+    // ==================== ADMIN SYSTEM UPDATE BROADCAST (SCROLLING + HOLD / X) ====================
+    const SYSTEM_UPDATE_KEY = 'cspm_workdrive_system_update_v1';
+    let lastSeenUpdateId = null;
+
+    function getSystemUpdateState() {
+      try {
+        const raw = localStorage.getItem(SYSTEM_UPDATE_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        return null;
+      }
+    }
+
+    function saveSystemUpdateState(stateObj) {
+      try {
+        if (!stateObj) localStorage.removeItem(SYSTEM_UPDATE_KEY);
+        else localStorage.setItem(SYSTEM_UPDATE_KEY, JSON.stringify(stateObj));
+      } catch (e) {}
+    }
+
+    function openAdminUpdateModal() {
+      if (!isAdminUser()) return;
+      const cur = getSystemUpdateState();
+      const inp = document.getElementById('admin-update-message-input');
+      if (inp) {
+        inp.value = (cur && cur.message) ? cur.message : 'แจ้งอัปเดตระบบ CSPM WorkDrive เร็วๆ นี้ หากใครยังทำงานอยู่ให้กด Hold ก่อนนะครับ';
+      }
+      renderAdminUpdateResponses();
+      document.getElementById('admin-update-compose-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeAdminUpdateModal() {
+      document.getElementById('admin-update-compose-modal').classList.add('hidden');
+    }
+
+    function publishSystemUpdateNotice() {
+      if (!isAdminUser()) return;
+      const inp = document.getElementById('admin-update-message-input');
+      const msg = (inp && inp.value || '').trim();
+      if (!msg) {
+        alert('กรุณาพิมพ์ข้อความแจ้งเตือนก่อนครับ');
+        return;
+      }
+      const nextState = {
+        id: 'upd-' + Date.now(),
+        message: msg,
+        sentBy: currentUser ? currentUser.name : 'sarunchana.h',
+        sentAtThai: getThaiNowFormatted(),
+        active: true,
+        responses: {}
+      };
+      saveSystemUpdateState(nextState);
+      lastSeenUpdateId = null;
+      renderAdminUpdateResponses();
+      checkSystemUpdateNoticeForUser();
+      alert('ส่งหน้าต่างแจ้งเตือนอัปเดตระบบเรียบร้อยแล้วครับ');
+    }
+
+    function clearActiveSystemUpdate() {
+      if (!isAdminUser()) return;
+      saveSystemUpdateState(null);
+      lastSeenUpdateId = null;
+      const noticeModal = document.getElementById('system-update-notice-modal');
+      if (noticeModal) noticeModal.classList.add('hidden');
+      renderAdminUpdateResponses();
+    }
+
+    function checkSystemUpdateNoticeForUser() {
+      if (!currentUser || isAdminUser()) return;
+      const st = getSystemUpdateState();
+      const modal = document.getElementById('system-update-notice-modal');
+      if (!modal) return;
+      if (!st || !st.active || !st.message) {
+        modal.classList.add('hidden');
+        return;
+      }
+      const uKey = (currentUser.name || '').trim().toLowerCase();
+      const myResp = st.responses && st.responses[uKey];
+      if (myResp && myResp.choice === 'dismissed' && st.id === lastSeenUpdateId) {
+        return;
+      }
+      const t1 = document.getElementById('update-marquee-text-1');
+      const t2 = document.getElementById('update-marquee-text-2');
+      if (t1) t1.textContent = st.message;
+      if (t2) t2.textContent = st.message;
+
+      const holdBox = document.getElementById('user-update-hold-status');
+      if (holdBox) {
+        if (myResp && myResp.choice === 'hold') {
+          holdBox.classList.remove('hidden');
+          holdBox.textContent = `คุณกด Hold ไว้เมื่อ ${myResp.timeThai} (ระบบแจ้งแอดมินแล้วว่าคุณกำลังทำงานอยู่)`;
+        } else {
+          holdBox.classList.add('hidden');
+        }
+      }
+      modal.classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function respondSystemUpdate(choice) {
+      if (!currentUser) return;
+      const st = getSystemUpdateState();
+      const modal = document.getElementById('system-update-notice-modal');
+      if (st && st.active) {
+        if (!st.responses || typeof st.responses !== 'object') st.responses = {};
+        const uKey = (currentUser.name || '').trim().toLowerCase();
+        st.responses[uKey] = {
+          username: currentUser.name,
+          dept: currentUser.dept || '-',
+          activity: getCurrentActivityLabel(),
+          choice: choice,
+          timeThai: getThaiNowFormatted()
+        };
+        saveSystemUpdateState(st);
+      }
+      if (choice === 'dismissed') {
+        lastSeenUpdateId = st ? st.id : null;
+        if (modal) modal.classList.add('hidden');
+      } else if (choice === 'hold') {
+        const holdBox = document.getElementById('user-update-hold-status');
+        if (holdBox) {
+          holdBox.classList.remove('hidden');
+          holdBox.textContent = `บันทึกสถานะ Hold เรียบร้อยแล้ว (${getThaiNowFormatted()}) — แอดมินจะเห็นว่าคุณกำลังทำงานอยู่ครับ`;
+        }
+      }
+    }
+
+    function renderAdminUpdateResponses() {
+      const listEl = document.getElementById('admin-update-responses-list');
+      if (!listEl) return;
+      const st = getSystemUpdateState();
+      if (!st || !st.active) {
+        listEl.innerHTML = `<p class="text-center text-slate-400 py-5">ยังไม่มีประกาศแจ้งเตือนอัปเดตที่เปิดใช้งานอยู่</p>`;
+        return;
+      }
+      const entries = Object.values(st.responses || {});
+      if (entries.length === 0) {
+        listEl.innerHTML = `<p class="text-center text-slate-400 py-5">รอผู้ใช้งานตอบกลับ (Hold หรือ กากบาท)...</p>`;
+        return;
+      }
+      listEl.innerHTML = entries.map(r => {
+        const isHold = r.choice === 'hold';
+        return `
+          <div class="p-2.5 bg-white rounded-lg flex items-center justify-between gap-2">
+            <div class="min-w-0">
+              <p class="font-bold text-slate-900 truncate">${escapeHtml(r.username)} <span class="font-normal text-slate-400">(${escapeHtml(r.dept)})</span></p>
+              <p class="text-[11px] text-slate-500 truncate">${escapeHtml(r.activity || '')} • ${escapeHtml(r.timeThai)}</p>
+            </div>
+            <span class="shrink-0 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${isHold ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-slate-100 text-slate-600'}">
+              ${isHold ? 'HOLD (ยังทำอยู่)' : 'ปิดแล้ว (×)'}
+            </span>
+          </div>
+        `;
+      }).join('');
+    }
+
     function isAdminUser() {
       if (!currentUser || !currentUser.name) return false;
       return currentUser.name.trim().toLowerCase() === 'sarunchana.h';
@@ -2905,12 +3099,15 @@ create policy "Public Access workdrive-photos" on storage.objects
       document.getElementById('user-avatar').textContent = currentUser.name.charAt(0).toUpperCase();
 
       const adminBtn = document.getElementById('admin-logs-nav-btn');
+      const adminUpdBtn = document.getElementById('admin-update-nav-btn');
       const adminBadge = document.getElementById('user-admin-badge');
       if (isAdminUser()) {
         if (adminBtn) adminBtn.classList.remove('hidden');
+        if (adminUpdBtn) adminUpdBtn.classList.remove('hidden');
         if (adminBadge) adminBadge.classList.remove('hidden');
       } else {
         if (adminBtn) adminBtn.classList.add('hidden');
+        if (adminUpdBtn) adminUpdBtn.classList.add('hidden');
         if (adminBadge) adminBadge.classList.add('hidden');
       }
 
@@ -7849,6 +8046,119 @@ create policy "Public Access workdrive-photos" on storage.objects
     </div>
   </div>
 
+
+
+  <!-- ==================== MODAL: ADMIN SYSTEM UPDATE COMPOSER & HOLD MONITOR ==================== -->
+  <div id="admin-update-compose-modal" onclick="if(event.target === this) closeAdminUpdateModal()"
+    class="hidden fixed inset-0 z-[70] bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden border border-slate-100">
+      <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="megaphone" class="w-5 h-5 text-amber-400"></i>
+          <div>
+            <h3 class="font-semibold text-sm">แจ้งเตือนการอัปเดตระบบ (ข้อความเลื่อน)</h3>
+            <p class="text-[11px] text-slate-400">พิมพ์ข้อความแจ้งทีม และดูรายชื่อผู้ที่ยังทำงานอยู่ (กด Hold) หรือปิดแจ้งเตือนแล้ว (กากบาท)</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeAdminUpdateModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 text-xs max-h-[82vh] overflow-y-auto">
+        <div>
+          <label class="block font-bold text-slate-800 mb-1.5">ข้อความแจ้งเตือนที่จะแสดงเป็นข้อความเลื่อน *</label>
+          <textarea id="admin-update-message-input" rows="3"
+            placeholder="เช่น แจ้งอัปเดตระบบ CSPM WorkDrive เร็วๆ นี้ หากใครยังทำงานอยู่ให้กด Hold ก่อนนะครับ"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] outline-none text-xs leading-relaxed"></textarea>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <button type="button" onclick="clearActiveSystemUpdate()"
+            class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="bell-off" class="w-3.5 h-3.5"></i>
+            <span>ยกเลิกประกาศแจ้งเตือน</span>
+          </button>
+          <button type="button" onclick="publishSystemUpdateNotice()"
+            class="px-5 py-2 rounded-xl font-bold bg-[#EB2D2D] hover:bg-[#C8141B] text-white shadow-xs cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="send" class="w-4 h-4"></i>
+            <span>ส่งแจ้งเตือนขึ้นหน้าจอทีม</span>
+          </button>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-800 flex items-center gap-1.5">
+              <i data-lucide="users" class="w-4 h-4 text-[#EB2D2D]"></i>
+              <span>สถานะการตอบกลับของทีม (Hold / กากบาท)</span>
+            </span>
+            <button type="button" onclick="renderAdminUpdateResponses()" class="text-[11px] font-semibold text-[#EB2D2D] hover:underline cursor-pointer">
+              รีเฟรชรายชื่อ
+            </button>
+          </div>
+          <div id="admin-update-responses-list" class="max-h-52 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200 bg-[#F8FAFC] p-1">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: USER SYSTEM UPDATE NOTICE WITH SCROLLING TEXT & HOLD / X ==================== -->
+  <div id="system-update-notice-modal"
+    class="hidden fixed inset-0 z-[75] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border-2 border-amber-400">
+      <div class="px-5 py-4 bg-[#1B212C] text-white flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-9 h-9 rounded-xl bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0">
+            <i data-lucide="megaphone" class="w-5 h-5"></i>
+          </div>
+          <div class="min-w-0">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-300 block">SYSTEM UPDATE NOTICE</span>
+            <h3 class="font-bold text-sm truncate">แจ้งเตือนการอัปเดตระบบ</h3>
+          </div>
+        </div>
+        <button type="button" onclick="respondSystemUpdate('dismissed')"
+          class="w-8 h-8 rounded-lg bg-white/10 hover:bg-[#EB2D2D] text-slate-200 hover:text-white flex items-center justify-center shrink-0 transition cursor-pointer"
+          title="ไม่ได้ทำงานอยู่ — ปิดหน้าต่าง (กากบาท)">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <!-- Scrolling Marquee Message Box -->
+        <div class="rounded-xl bg-amber-50 border border-amber-300 py-3 px-2 overflow-hidden">
+          <div class="cspm-update-marquee" role="marquee" aria-label="ข้อความแจ้งเตือนอัปเดตระบบ">
+            <div class="cspm-update-marquee-track text-sm font-bold text-amber-950">
+              <span id="update-marquee-text-1" class="cspm-update-marquee-item">กำลังอัปเดตระบบ...</span>
+              <span id="update-marquee-text-2" class="cspm-update-marquee-item" aria-hidden="true">กำลังอัปเดตระบบ...</span>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-xs text-slate-600 leading-relaxed">
+          หากคุณยังทำงานอยู่ (เช่น กำลังอัปโหลดรูปหรือบันทึกข้อมูล) ให้กดปุ่ม <strong class="text-amber-900">Hold</strong> เพื่อแจ้งแอดมิน แต่หากไม่ได้ทำอยู่สามารถกดปุ่ม <strong class="text-slate-800">กากบาท (×)</strong> เพื่อปิดหน้าต่างได้ทันทีครับ
+        </p>
+
+        <div id="user-update-hold-status" class="hidden p-3 rounded-xl bg-amber-100/80 border border-amber-300 text-xs font-semibold text-amber-950">
+          <!-- Hold confirmation text -->
+        </div>
+
+        <div class="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100">
+          <button type="button" onclick="respondSystemUpdate('dismissed')"
+            class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="x-circle" class="w-4 h-4"></i>
+            <span>ไม่ได้ทำอยู่ (ปิด ×)</span>
+          </button>
+          <button type="button" onclick="respondSystemUpdate('hold')"
+            class="px-5 py-2.5 rounded-xl text-xs font-bold bg-amber-400 hover:bg-amber-500 text-amber-950 shadow-xs cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="pause-circle" class="w-4 h-4"></i>
+            <span>ยังทำงานอยู่ (Hold)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ==================== FLOATING SCROLL BUTTONS (top / bottom) ==================== -->
   <div id="scroll-fab" class="hidden" aria-label="เลื่อนหน้า">
