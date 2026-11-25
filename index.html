@@ -213,6 +213,31 @@
     }
     .cspm-marquee:hover .cspm-marquee-track { animation-play-state: paused; }
 
+
+    /* ===== Admin System Update Scrolling Marquee ===== */
+    .cspm-update-marquee {
+      overflow: hidden;
+      position: relative;
+      width: 100%;
+    }
+    .cspm-update-marquee-track {
+      display: flex;
+      width: max-content;
+      animation: cspm-update-scroll 16s linear infinite;
+    }
+    .cspm-update-marquee:hover .cspm-update-marquee-track {
+      animation-play-state: paused;
+    }
+    .cspm-update-marquee-item {
+      flex-shrink: 0;
+      padding-right: 3rem;
+      white-space: nowrap;
+    }
+    @keyframes cspm-update-scroll {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-50%); }
+    }
+
     /* ===== Hello! welcome screen after login ===== */
     #welcome-splash {
       padding: env(safe-area-inset-top, 0px) 1.5rem env(safe-area-inset-bottom, 0px);
@@ -297,39 +322,6 @@
     }
     #type-tabs button:active {
       transform: translateY(1px) scale(0.985);
-    }
-
-    /* ==================== VIBRANT ANIMATED CATEGORY TABS ==================== */
-    @keyframes tab-icon-wiggle {
-      0%, 100% { transform: rotate(0deg) scale(1); }
-      25% { transform: rotate(-10deg) scale(1.14); }
-      50% { transform: rotate(8deg) scale(1.14); }
-      75% { transform: rotate(-4deg) scale(1.06); }
-    }
-    @keyframes tab-sheen-sweep {
-      0% { transform: translateX(-140%) skewX(-20deg); }
-      45%, 100% { transform: translateX(260%) skewX(-20deg); }
-    }
-    .cspm-cat-tab {
-      position: relative;
-      overflow: hidden;
-    }
-    .cspm-cat-tab.is-active::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 45%;
-      height: 100%;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), transparent);
-      animation: tab-sheen-sweep 3.4s ease-in-out infinite;
-      pointer-events: none;
-    }
-    .cspm-cat-tab.is-active .cspm-tab-icon {
-      animation: tab-icon-wiggle 2.2s ease-in-out infinite;
-    }
-    .cspm-cat-tab:hover .cspm-tab-icon {
-      animation: tab-icon-wiggle 0.6s ease-in-out;
     }
 
   </style>
@@ -629,6 +621,13 @@
             </div>
           </div>
 
+          <!-- Admin System Update Broadcast Button (Visible ONLY for sarunchana.h) -->
+          <button id="admin-update-nav-btn" type="button" onclick="openAdminUpdateModal()"
+            class="hidden px-3 py-2 rounded-xl bg-amber-300 hover:bg-amber-400 text-amber-950 border border-amber-400 text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition"
+            title="ส่งหน้าต่างแจ้งเตือนอัปเดตระบบพร้อมข้อความเลื่อน และดูสถานะคนกด Hold / กากบาท (เฉพาะ Admin)">
+            <i data-lucide="megaphone" class="w-4 h-4 text-amber-950"></i>
+            <span class="hidden sm:inline">แจ้งอัปเดต</span>
+          </button>
           <!-- Admin Activity Status Button (Visible ONLY for sarunchana.h) -->
           <button id="admin-logs-nav-btn" type="button" onclick="openAdminLogsModal()"
             class="hidden px-3 py-2 rounded-xl bg-[#1B212C] hover:bg-slate-800 text-white border border-amber-400/50 text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer transition"
@@ -769,7 +768,7 @@
               <i data-lucide="building-2" class="w-5 h-5"></i>
             </div>
             <div>
-              <p class="text-xs text-slate-400">Facility Services / Customer</p>
+              <p class="text-xs text-slate-400">Customer / Facility Services</p>
               <p id="stat-customers" class="text-xl font-bold text-slate-900">0</p>
             </div>
           </div>
@@ -796,7 +795,7 @@
         </div>
 
         <!-- Customer / Facility Services tabs (top level only) -->
-        <div id="type-tabs" class="mb-5 grid grid-cols-2 gap-2.5 p-1.5 bg-slate-100/90 rounded-2xl border-2 border-slate-200/90 shadow-sm"></div>
+        <div id="type-tabs" class="mb-4 grid grid-cols-2 gap-1.5 p-1 bg-white rounded-2xl border border-slate-200 shadow-2xs"></div>
 
         <!-- Hierarchical Breadcrumb & Action Toolbar -->
         <div class="bg-white rounded-2xl border border-slate-200 p-4 mb-5 shadow-2xs flex flex-wrap items-center justify-between gap-3">
@@ -882,6 +881,11 @@
                 อัปโหลดรูปจากเครื่อง
               </button>
 
+              ${isAdminUser() ? `<button onclick="openAdminMoveAlbumModal(activeAlbumId)"
+                class="px-3.5 py-2.5 bg-amber-300 hover:bg-amber-400 text-amber-950 border border-amber-400 text-sm font-semibold rounded-xl flex items-center gap-1.5 transition cursor-pointer" title="โยกอัลบั้มนี้ไปใส่ในอัลบั้มอื่น (เฉพาะ Admin)">
+                <i data-lucide="folder-input" class="w-4 h-4"></i>
+                <span>โยกไปอัลบั้มอื่น</span>
+              </button>` : ''}
               <button onclick="openEditAlbumModal(activeAlbumId)"
                 class="px-3.5 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-sm font-medium rounded-xl flex items-center gap-1.5 transition cursor-pointer" title="แก้ไขชื่อลูกค้า สังกัด Product วันที่ พ.ศ. หรือรูปหน้าปกอัลบั้ม">
                 <i data-lucide="pencil" class="w-4 h-4"></i>
@@ -994,7 +998,7 @@
       </div>
       <form onsubmit="createAlbum(event)" class="p-6 space-y-4 max-h-[82vh] overflow-y-auto">
         <!-- Album group: Customer / Facility Services -->
-        <div>
+        <div id="album-type-field-wrap">
           <label class="block text-xs font-semibold text-slate-600 mb-1.5">ประเภท *</label>
           <input type="hidden" id="album-type" value="customer" />
           <div class="grid grid-cols-2 gap-1.5 p-1 bg-[#F5F7FA] rounded-xl border border-slate-200/80">
@@ -1624,27 +1628,6 @@ create policy "Public Access workdrive-photos" on storage.objects
           .sort((a, z) => (z.createdAtMs || 0) - (a.createdAtMs || 0))
           .slice(0, 600);
         return { id: '__cspm_activity_logs__', isSystemLogContainer: true, photos: [], logs: mergedLogs };
-      }
-      if ((l && l.id === '__cspm_snapshots__') || (r && r.id === '__cspm_snapshots__')) {
-        const snapMap = new Map();
-        [...(r && r.snapshots ? r.snapshots : []), ...(l && l.snapshots ? l.snapshots : [])].forEach(s => {
-          if (s && s.id && !snapMap.has(s.id)) {
-            snapMap.set(s.id, s);
-          }
-        });
-        const mergedSnaps = Array.from(snapMap.values())
-          .sort((a, z) => (z.createdAtMs || 0) - (a.createdAtMs || 0))
-          .slice(0, 25);
-        return { id: '__cspm_snapshots__', isSystemLogContainer: true, photos: [], snapshots: mergedSnaps };
-      }
-      if ((l && l.id === '__cspm_trash__') || (r && r.id === '__cspm_trash__')) {
-        const trashMap = new Map();
-        [...(r && r.items ? r.items : []), ...(l && l.items ? l.items : [])].forEach(it => {
-          if (it && it.storagePath && !trashMap.has(it.storagePath)) {
-            trashMap.set(it.storagePath, it);
-          }
-        });
-        return { id: '__cspm_trash__', isSystemLogContainer: true, photos: [], items: Array.from(trashMap.values()) };
       }
       const out = mergeObjectFields({ ...l, photos: undefined }, b ? { ...b, photos: undefined } : null, { ...r, photos: undefined });
       out.photos = mergeKeyedList(l.photos || [], b ? (b.photos || []) : [], r.photos || [], p => p.id, mergeObjectFields);
@@ -2289,37 +2272,16 @@ create policy "Public Access workdrive-photos" on storage.objects
       if (!box) return;
       if (navPath.client) { box.classList.add('hidden'); return; }
       box.classList.remove('hidden');
+      const counts = getTypeCounts();
       box.innerHTML = ['facility', 'customer'].map(t => {
         const active = t === currentAlbumType;
-        const isFac = t === 'facility';
-        const icon = isFac ? 'factory' : 'building-2';
-        const subText = isFac ? 'งานบริการอาคารและระบบ' : 'โครงการลูกค้าองค์กร';
-
-        const activeStyle = isFac
-          ? 'is-active bg-gradient-to-r from-[#EB2D2D] via-[#DC2626] to-[#B91C1C] text-white shadow-lg shadow-red-500/30 ring-2 ring-red-400/50'
-          : 'is-active bg-gradient-to-r from-[#1D4ED8] via-[#2563EB] to-[#1E40AF] text-white shadow-lg shadow-blue-500/30 ring-2 ring-blue-400/50';
-
-        const inactiveStyle = isFac
-          ? 'bg-slate-200/80 text-slate-600 hover:bg-red-50/90 hover:text-[#EB2D2D] border border-slate-300/80'
-          : 'bg-slate-200/80 text-slate-600 hover:bg-blue-50/90 hover:text-blue-700 border border-slate-300/80';
-
-        const iconBoxStyle = active
-          ? 'bg-white/20 text-white'
-          : (isFac ? 'bg-slate-300/70 text-[#EB2D2D]' : 'bg-slate-300/70 text-blue-600');
-
+        const icon = t === 'facility' ? 'factory' : 'building-2';
         return `
           <button type="button" onclick="switchTypeTab('${t}')"
-            class="cspm-cat-tab py-3 px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2.5 transition-all duration-200 cursor-pointer ${active ? activeStyle : inactiveStyle}">
-            <span class="w-8 h-8 rounded-lg ${iconBoxStyle} flex items-center justify-center shrink-0">
-              <i data-lucide="${icon}" class="cspm-tab-icon w-4 h-4"></i>
-            </span>
-            <div class="flex flex-col items-start text-left leading-tight">
-              <span class="flex items-center gap-1.5">
-                <span>${typeLabel(t)}</span>
-                ${active ? '<span class="relative flex h-2 w-2"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-300 opacity-85"></span><span class="relative inline-flex rounded-full h-2 w-2 bg-amber-300"></span></span>' : ''}
-              </span>
-              <span class="hidden sm:inline text-[10px] font-normal ${active ? 'text-white/85' : 'text-slate-500'}">${subText}</span>
-            </div>
+            class="py-2.5 px-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 transition cursor-pointer ${active ? 'bg-[#1B212C] text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-50'}">
+            <i data-lucide="${icon}" class="w-4 h-4 ${active ? 'text-[#EB2D2D]' : 'text-slate-400'}"></i>
+            <span>${typeLabel(t)}</span>
+            <span class="px-1.5 py-0.5 rounded-full text-[11px] ${active ? 'bg-white/15 text-white' : 'bg-slate-100 text-slate-500'}">${counts[t]}</span>
           </button>`;
       }).join('');
     }
@@ -2740,8 +2702,9 @@ create policy "Public Access workdrive-photos" on storage.objects
 
     function startPresenceTracking() {
       sendPresenceHeartbeat();
+      checkSystemUpdateNoticeForUser();
       if (presenceTimer) clearInterval(presenceTimer);
-      presenceTimer = setInterval(sendPresenceHeartbeat, 4000);
+      presenceTimer = setInterval(() => { sendPresenceHeartbeat(); checkSystemUpdateNoticeForUser(); }, 4000);
     }
 
     function stopPresenceTracking() {
@@ -2865,7 +2828,10 @@ create policy "Public Access workdrive-photos" on storage.objects
     }
 
     window.addEventListener('storage', (e) => {
-      if (e.key === PRESENCE_KEY && currentUser) {
+      if (e.key === SYSTEM_UPDATE_KEY && currentUser) {
+        checkSystemUpdateNoticeForUser();
+        renderAdminUpdateResponses();
+      } else if (e.key === PRESENCE_KEY && currentUser) {
         renderOnlineUsers();
       } else if (e.key === STORAGE_KEY && currentUser) {
         albums = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
@@ -2905,12 +2871,15 @@ create policy "Public Access workdrive-photos" on storage.objects
       document.getElementById('user-avatar').textContent = currentUser.name.charAt(0).toUpperCase();
 
       const adminBtn = document.getElementById('admin-logs-nav-btn');
+      const adminUpdBtn = document.getElementById('admin-update-nav-btn');
       const adminBadge = document.getElementById('user-admin-badge');
       if (isAdminUser()) {
         if (adminBtn) adminBtn.classList.remove('hidden');
+        if (adminUpdBtn) adminUpdBtn.classList.remove('hidden');
         if (adminBadge) adminBadge.classList.remove('hidden');
       } else {
         if (adminBtn) adminBtn.classList.add('hidden');
+        if (adminUpdBtn) adminUpdBtn.classList.add('hidden');
         if (adminBadge) adminBadge.classList.add('hidden');
       }
 
@@ -3009,7 +2978,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         a.photos.forEach(p => totalBytes += (p.sizeBytes || 0));
       });
       const typeCounts = getTypeCounts();
-      document.getElementById('stat-customers').textContent = `${typeCounts.facility} / ${typeCounts.customer}`;
+      document.getElementById('stat-customers').textContent = `${typeCounts.customer} / ${typeCounts.facility}`;
       const statAlbumsEl = document.getElementById('stat-albums');
       if (statAlbumsEl) statAlbumsEl.textContent = realAlbums.length;
       document.getElementById('stat-photos').textContent = totalPhotos;
@@ -3390,7 +3359,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         levelHeading.textContent = currentAlbumType === 'facility' ? 'เลือกชื่อ Facility Services' : 'เลือกชื่อลูกค้า (Customer)';
         addLabel.textContent = currentAlbumType === 'facility' ? 'เพิ่ม Facility Services / อัลบั้มใหม่' : 'เพิ่มลูกค้า / อัลบั้มใหม่';
       } else if (!navPath.dept) {
-        const isScCtx = isServiceCenterClientName(navPath.client);
+        const isScCtx = String(navPath.client || '').trim().toLowerCase() === 'service center';
         const isFacDivCtx = isNonScFacilityClient(navPath.client);
         levelBadge.textContent = 'ขั้นตอนที่ 2 / 4';
         if (isScCtx) {
@@ -3404,7 +3373,7 @@ create policy "Public Access workdrive-photos" on storage.objects
           addLabel.textContent = 'เพิ่มสังกัดในลูกค้านี้';
         }
       } else if (!navPath.product) {
-        const isScCtx = isServiceCenterClientName(navPath.client);
+        const isScCtx = String(navPath.client || '').trim().toLowerCase() === 'service center';
         const isFacDivCtx = isNonScFacilityClient(navPath.client);
         levelBadge.textContent = isScCtx ? 'ขั้นตอนที่ 3 / 5' : 'ขั้นตอนที่ 3 / 4';
         if (isScCtx) {
@@ -3417,15 +3386,15 @@ create policy "Public Access workdrive-photos" on storage.objects
           levelHeading.textContent = `เลือก Product — สังกัด ${navPath.dept}`;
           addLabel.textContent = 'เพิ่ม Product ใหม่';
         }
-      } else if ((isNonScFacilityClient(navPath.client) || isServiceCenterClientName(navPath.client)) && !navPath.facCustomer) {
-        const isScCtx = isServiceCenterClientName(navPath.client);
+      } else if ((isNonScFacilityClient(navPath.client) || String(navPath.client || '').trim().toLowerCase() === 'service center') && !navPath.facCustomer) {
+        const isScCtx = String(navPath.client || '').trim().toLowerCase() === 'service center';
         levelBadge.textContent = isScCtx ? 'ขั้นตอนที่ 4 / 5' : 'ขั้นตอนที่ 4 / 5';
         levelHeading.textContent = isScCtx
           ? `เลือก Customer — ${navPath.product} (${navPath.dept})`
           : `เลือก Customer — ${navPath.product} (${navPath.dept})`;
         addLabel.textContent = 'เพิ่มอัลบั้ม Customer';
       } else {
-        const isFacDivCtx = isNonScFacilityClient(navPath.client) || isServiceCenterClientName(navPath.client);
+        const isFacDivCtx = isNonScFacilityClient(navPath.client) || String(navPath.client || '').trim().toLowerCase() === 'service center';
         levelBadge.textContent = isFacDivCtx ? 'ขั้นตอนที่ 5 / 5' : 'ขั้นตอนที่ 4 / 4';
         levelHeading.textContent = isFacDivCtx
           ? `เลือกวัน/เดือน/ปีพ.ศ. — ${navPath.facCustomer} (${navPath.product})`
@@ -3437,24 +3406,17 @@ create policy "Public Access workdrive-photos" on storage.objects
 
     const DEFAULT_FAC_TEAMS = ['Tanee Team', 'Taywin Team', 'Kitsana Team'];
 
-    function isServiceCenterClientName(name) {
-      const s = String(name || '').trim().toLowerCase();
-      return s === 'service center' || s.startsWith('service center') || s.includes('service center');
-    }
-
     function isNonScFacilityClient(clientName) {
       if (!clientName) return false;
-      if (isServiceCenterClientName(clientName)) return false;
       const t = typeOfClient(clientName);
       if (t !== 'facility') return false;
-      return true;
+      return String(clientName).trim().toLowerCase() !== 'service center';
     }
 
     function isNonScFacilityAlbum(a) {
       if (!a || a.isSystemLogContainer) return false;
       if (getAlbumType(a) !== 'facility') return false;
-      if (a.isServiceCenter) return false;
-      return !isServiceCenterClientName(a.client);
+      return String(a.client || '').trim().toLowerCase() !== 'service center';
     }
 
     function getFacDivisionOfAlbum(a) {
@@ -3473,7 +3435,7 @@ create policy "Public Access workdrive-photos" on storage.objects
     }
 
     function getFacTeamOfAlbum(a) {
-      return (a.facTeam || a.product || '').trim();
+      return (a.facTeam || a.product || 'Tanee Team').trim();
     }
 
     function refreshFacTeamAndDivisionDatalists(clientName) {
@@ -3882,6 +3844,10 @@ create policy "Public Access workdrive-photos" on storage.objects
                   <span class="px-2.5 py-1 rounded-full bg-white/95 text-slate-700 text-[11px] font-medium shadow-2xs">
                     ${item.depts.size} สังกัด
                   </span>
+                  ${isAdminUser() ? `<button type="button" onclick="event.stopPropagation(); openAdminMoveFolderToScModal('${safeJsName}')"
+                    class="p-1.5 rounded-full bg-amber-300/95 hover:bg-amber-400 text-amber-950 shadow-2xs transition cursor-pointer" title="โยกโฟลเดอร์นี้ไปไว้ใน Service Center (Admin)">
+                    <i data-lucide="folder-input" class="w-3.5 h-3.5"></i>
+                  </button>` : ''}
                   <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('client', '${safeJsName}')"
                     class="p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-600 hover:text-amber-700 shadow-2xs transition cursor-pointer" title="แก้ไขชื่อลูกค้า / รูปหน้าปก">
                     <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
@@ -3944,12 +3910,13 @@ create policy "Public Access workdrive-photos" on storage.objects
           `;}).join('');
         }
         enableDragReorderOnContainer('albums-container', 'ord-item', `norm_clients::${currentAlbumType}`);
+        enableAdminCardMergeByDrag('albums-container', 'ord-item', 'client');
         lucide.createIcons();
         return;
       }
 
       if (!navPath.dept) {
-        const isScCtx = isServiceCenterClientName(navPath.client);
+        const isScCtx = String(navPath.client || '').trim().toLowerCase() === 'service center';
         const isFacDivCtx = isNonScFacilityClient(navPath.client);
         const subUnitLabel = isScCtx ? 'ศูนย์บริการภาค' : (isFacDivCtx ? 'Division' : 'สังกัด');
         const subBadgeText = isScCtx ? 'ศูนย์บริการภาค (REGIONAL SERVICE CENTER)' : (isFacDivCtx ? 'DIVISION' : 'สังกัด (DEPARTMENT)');
@@ -4107,7 +4074,7 @@ create policy "Public Access workdrive-photos" on storage.objects
           );
         }
 
-        countText.textContent = `${items.length} ${grpLabel}`;
+        countText.textContent = `${items.length} Product`;
         if (items.length === 0) {
           renderEmptyState('ยังไม่มีโฟลเดอร์ Product ในสังกัดนี้', 'กดปุ่ม "+ เพิ่ม Product ใหม่" เพื่อสร้างโฟลเดอร์');
           return;
@@ -4200,8 +4167,8 @@ create policy "Public Access workdrive-photos" on storage.objects
       }
 
       const isFacDateCtx = isNonScFacilityClient(navPath.client);
-      if ((isFacDateCtx || isServiceCenterClientName(navPath.client)) && !navPath.facCustomer) {
-        const isScCustCtx = isServiceCenterClientName(navPath.client);
+      if ((isFacDateCtx || String(navPath.client || '').trim().toLowerCase() === 'service center') && !navPath.facCustomer) {
+        const isScCustCtx = String(navPath.client || '').trim().toLowerCase() === 'service center';
         const teamAlbs = albums.filter(a =>
           !a.isSystemLogContainer &&
           a.client === navPath.client &&
@@ -4276,7 +4243,7 @@ create policy "Public Access workdrive-photos" on storage.objects
       let dateAlbums = albums.filter(a =>
         !a.isSystemLogContainer &&
         a.client === navPath.client &&
-        (isServiceCenterClientName(navPath.client) ? (getScCenterOfAlbum(a) === navPath.dept && a.product === navPath.product && (!navPath.facCustomer || getScCustomerOfAlbum(a) === navPath.facCustomer)) : (isFacDateCtx ? (getFacDivisionOfAlbum(a) === navPath.dept && getFacTeamOfAlbum(a) === navPath.product && (!navPath.facCustomer || getFacCustomerOfAlbum(a) === navPath.facCustomer)) : (a.dept === navPath.dept && a.product === navPath.product)))
+        (String(navPath.client || '').trim().toLowerCase() === 'service center' ? (getScCenterOfAlbum(a) === navPath.dept && a.product === navPath.product && (!navPath.facCustomer || getScCustomerOfAlbum(a) === navPath.facCustomer)) : (isFacDateCtx ? (getFacDivisionOfAlbum(a) === navPath.dept && getFacTeamOfAlbum(a) === navPath.product && (!navPath.facCustomer || getFacCustomerOfAlbum(a) === navPath.facCustomer)) : (a.dept === navPath.dept && a.product === navPath.product)))
       );
 
       if (query) {
@@ -4306,7 +4273,7 @@ create policy "Public Access workdrive-photos" on storage.objects
                 ${cover
                   ? `<img src="${cover}" style="object-position: ${escapeHtml(coverPos)};" class="w-full h-full object-cover group-hover:scale-105 transition duration-300" />`
                   : `<div class="w-full h-full cspm-hero-bg px-5 pt-11 pb-4 flex flex-col items-center justify-center text-center">
-                      <span class="text-white font-bold text-base leading-snug line-clamp-1">${escapeHtml(isServiceCenterClientName(album.client) ? getScCustomerOfAlbum(album) : album.client)}</span>
+                      <span class="text-white font-bold text-base leading-snug line-clamp-1">${escapeHtml(String(album.client || '').trim().toLowerCase() === 'service center' ? getScCustomerOfAlbum(album) : album.client)}</span>
                       <span class="text-[#FF6B70] font-semibold text-xs mt-1 line-clamp-1">${escapeHtml(album.product)}</span>
                       <span class="text-slate-300 font-mono text-xs mt-1">วันที่ ${escapeHtml(album.thaiDate)}</span>
                     </div>`
@@ -4319,6 +4286,10 @@ create policy "Public Access workdrive-photos" on storage.objects
                   <span class="px-2.5 py-1 rounded-full bg-[#1B212C]/90 text-white text-[11px] font-medium border border-white/10">
                     ${escapeHtml(album.dept)}
                   </span>
+                  ${isAdminUser() ? `<button type="button" onclick="event.stopPropagation(); openAdminMoveAlbumModal('${album.id}')"
+                    class="p-1.5 rounded-full bg-amber-300/95 hover:bg-amber-400 text-amber-950 shadow-2xs transition cursor-pointer" title="โยกอัลบั้มไปใส่ในอัลบั้มอื่น (Admin)">
+                    <i data-lucide="folder-input" class="w-3.5 h-3.5"></i>
+                  </button>` : ''}
                   <button type="button" onclick="event.stopPropagation(); openEditAlbumModal('${album.id}')"
                     class="p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-700 hover:text-amber-700 shadow-2xs transition cursor-pointer" title="แก้ไขวันที่ / ชื่อ / รูปหน้าปก">
                     <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
@@ -4382,6 +4353,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         `).join('');
       }
       enableDragReorderOnContainer('albums-container', 'ord-item', `norm_date::${navPath.client}::${navPath.dept}::${navPath.product}`);
+      enableAdminCardMergeByDrag('albums-container', 'ord-item', 'album');
       lucide.createIcons();
     }
 
@@ -4689,7 +4661,7 @@ create policy "Public Access workdrive-photos" on storage.objects
       thaiDateInp.value = today.thai;
       noteInp.value = '';
 
-      const isScByClient = isServiceCenterClientName(clientInp.value);
+      const isScByClient = String(clientInp.value || '').trim().toLowerCase() === 'service center';
       const isScInit = isServiceCenterFlow || isScByClient || (navPath.dept && isServiceCenterDeptName(navPath.dept));
       const scCb = document.getElementById('album-is-sc');
       if (scCb) scCb.checked = !!isScInit;
@@ -4705,7 +4677,7 @@ create policy "Public Access workdrive-photos" on storage.objects
       const divInp = document.getElementById('album-fac-division');
       const teamInp = document.getElementById('album-fac-team');
       if (divInp) divInp.value = useFacDivTeam ? (navPath.dept || '') : '';
-      if (teamInp) teamInp.value = useFacDivTeam ? (navPath.product || 'Tanee Team') : '';
+      if (teamInp) teamInp.value = useFacDivTeam ? (navPath.product || 'Tanee Team') : 'Tanee Team';
       const custInpNew = document.getElementById('album-fac-customer');
       if (custInpNew) custInpNew.value = useFacDivTeam ? (navPath.facCustomer || '') : '';
       syncFacModalFields('new', useFacDivTeam);
@@ -4721,6 +4693,11 @@ create policy "Public Access workdrive-photos" on storage.objects
       pendingNewAlbumCoverPos = '50% 50%';
       updateAlbumCoverPreviewUI('new', '', '50% 50%');
 
+      const typeWrapEl = document.getElementById('album-type-field-wrap');
+      const hasExplicitTopType = !!(navPath.client || (currentAlbumType === 'facility' || currentAlbumType === 'customer'));
+      if (typeWrapEl) {
+        typeWrapEl.classList.toggle('hidden', hasExplicitTopType);
+      }
       document.getElementById('new-album-modal').classList.remove('hidden');
       lucide.createIcons();
     }
@@ -5969,7 +5946,7 @@ create policy "Public Access workdrive-photos" on storage.objects
       const editDivInp = document.getElementById('edit-album-fac-division');
       const editTeamInp = document.getElementById('edit-album-fac-team');
       if (editDivInp) editDivInp.value = isFacEdit ? getFacDivisionOfAlbum(album) : '';
-      if (editTeamInp) editTeamInp.value = isFacEdit ? getFacTeamOfAlbum(album) : '';
+      if (editTeamInp) editTeamInp.value = isFacEdit ? getFacTeamOfAlbum(album) : 'Tanee Team';
       const editCustInp = document.getElementById('edit-album-fac-customer');
       if (editCustInp) editCustInp.value = isFacEdit ? getFacCustomerOfAlbum(album) : '';
       syncFacModalFields('edit', isFacEdit);
@@ -6128,26 +6105,29 @@ create policy "Public Access workdrive-photos" on storage.objects
       const descEl = document.getElementById('delete-modal-desc');
 
       if (type === 'album') {
-        const alb = albums.find(a => a.id === targetId);
+        const alb = albums.find(a => a && !a.isSystemLogContainer && a.id === targetId);
         if (!alb) return;
+        const dispClient = String(alb.client || '').trim().toLowerCase() === 'service center' ? getScCustomerOfAlbum(alb) : alb.client;
         titleEl.textContent = 'ยืนยันการลบอัลบั้ม';
-        headingEl.textContent = `ลบอัลบั้มวันที่ ${alb.thaiDate} (${alb.client})?`;
-        descEl.textContent = `รูปภาพทั้งหมด ${alb.photos.length} รูปภายในอัลบั้มนี้จะถูกลบออกจากระบบและ Cloud อย่างถาวร`;
+        headingEl.textContent = `ลบอัลบั้มวันที่ ${alb.thaiDate} (${dispClient})?`;
+        descEl.textContent = `รูปภาพทั้งหมด ${(alb.photos || []).length} รูปภายในอัลบั้มนี้จะถูกลบออกจากระบบและ Cloud อย่างถาวร`;
       } else if (type === 'client') {
-        const matched = albums.filter(a => a.client === targetId);
-        const totalPics = matched.reduce((s, a) => s + a.photos.length, 0);
+        const matched = albums.filter(a => a && !a.isSystemLogContainer && a.client === targetId);
+        const totalPics = matched.reduce((s, a) => s + (a.photos || []).length, 0);
         titleEl.textContent = 'ยืนยันการลบโฟลเดอร์ลูกค้า';
         headingEl.textContent = `ลบโฟลเดอร์ลูกค้า "${targetId}"?`;
         descEl.textContent = `ระบบจะลบอัลบั้มย่อยทั้งหมด ${matched.length} อัลบั้ม และรูปภาพรวม ${totalPics} รูป ภายใต้ลูกค้ารายนี้`;
       } else if (type === 'dept') {
-        const matched = albums.filter(a => a.client === navPath.client && a.dept === targetId);
-        const totalPics = matched.reduce((s, a) => s + a.photos.length, 0);
+        const facCtx = isNonScFacilityClient(navPath.client);
+        const matched = albums.filter(a => a && !a.isSystemLogContainer && a.client === navPath.client && (facCtx ? getFacDivisionOfAlbum(a) === targetId : a.dept === targetId));
+        const totalPics = matched.reduce((s, a) => s + (a.photos || []).length, 0);
         titleEl.textContent = 'ยืนยันการลบโฟลเดอร์สังกัด';
         headingEl.textContent = `ลบโฟลเดอร์สังกัด "${targetId}" ใน ${navPath.client}?`;
         descEl.textContent = `ระบบจะลบอัลบั้มย่อยทั้งหมด ${matched.length} อัลบั้ม และรูปภาพรวม ${totalPics} รูป ภายใต้สังกัดนี้`;
       } else if (type === 'product') {
-        const matched = albums.filter(a => a.client === navPath.client && a.dept === navPath.dept && a.product === targetId);
-        const totalPics = matched.reduce((s, a) => s + a.photos.length, 0);
+        const facCtx = isNonScFacilityClient(navPath.client);
+        const matched = albums.filter(a => a && !a.isSystemLogContainer && a.client === navPath.client && (facCtx ? (getFacDivisionOfAlbum(a) === navPath.dept && getFacTeamOfAlbum(a) === targetId) : (a.dept === navPath.dept && a.product === targetId)));
+        const totalPics = matched.reduce((s, a) => s + (a.photos || []).length, 0);
         titleEl.textContent = 'ยืนยันการลบโฟลเดอร์ Product';
         headingEl.textContent = `ลบโฟลเดอร์ "${targetId}"?`;
         descEl.textContent = `ระบบจะลบอัลบั้มวันที่ทั้งหมด ${matched.length} อัลบั้ม และรูปภาพรวม ${totalPics} รูป ภายใต้ Product นี้`;
@@ -6175,177 +6155,19 @@ create policy "Public Access workdrive-photos" on storage.objects
       pendingDeleteTask = { type: null, targetId: null };
     }
 
-    function getTrashContainer() {
-      let container = albums.find(a => a.id === '__cspm_trash__');
-      if (!container) {
-        container = { id: '__cspm_trash__', isSystemLogContainer: true, photos: [], items: [] };
-        albums.push(container);
-      }
-      if (!Array.isArray(container.items)) container.items = [];
-      return container;
-    }
-
-    async function removeCloudPhotosForAlbums(targetAlbums, permanent = false) {
+    async function removeCloudPhotosForAlbums(targetAlbums) {
+      if (!isCloudConnected || !supabaseClient) return;
       const paths = [];
       targetAlbums.forEach(alb => {
         (alb.photos || []).forEach(p => {
-          if (p && p.storagePath) paths.push(p.storagePath);
+          if (p.storagePath) paths.push(p.storagePath);
         });
       });
-
-      if (!permanent) {
-        if (paths.length > 0) {
-          const trash = getTrashContainer();
-          const existingSet = new Set(trash.items.map(it => it.storagePath));
-          paths.forEach(sp => {
-            if (!existingSet.has(sp)) {
-              trash.items.push({
-                storagePath: sp,
-                deletedBy: currentUser ? currentUser.name : 'unknown',
-                deletedAt: getThaiNowFormatted(),
-                createdAtMs: Date.now()
-              });
-              existingSet.add(sp);
-            }
-          });
-        }
-        return;
-      }
-
-      if (!isCloudConnected || !supabaseClient) return;
       if (paths.length > 0) {
         try {
           await supabaseClient.storage.from(PHOTO_BUCKET).remove(paths);
         } catch (e) {}
       }
-    }
-
-    async function emptyTrashPermanently() {
-      if (!isAdminUser()) {
-        alert('เฉพาะบัญชีแอดมิน (sarunchana.h) เท่านั้นที่สามารถล้างถังขยะถาวรได้');
-        return;
-      }
-
-      const trash = getTrashContainer();
-      const snapContainer = getSnapshotContainer();
-
-      // Collect all active storagePaths currently in use by live albums so we NEVER delete active photos
-      const activePaths = new Set();
-      albums.filter(a => !a.isSystemLogContainer).forEach(alb => {
-        (alb.photos || []).forEach(p => {
-          if (p && p.storagePath) activePaths.add(p.storagePath);
-        });
-      });
-
-      const orphanPathsSet = new Set();
-      (trash.items || []).forEach(it => {
-        if (it && it.storagePath && !activePaths.has(it.storagePath)) {
-          orphanPathsSet.add(it.storagePath);
-        }
-      });
-      (snapContainer.snapshots || []).forEach(snap => {
-        (snap.albumsData || []).forEach(alb => {
-          (alb.photos || []).forEach(p => {
-            if (p && p.storagePath && !activePaths.has(p.storagePath)) {
-              orphanPathsSet.add(p.storagePath);
-            }
-          });
-        });
-      });
-
-      const pathsToDelete = Array.from(orphanPathsSet);
-      const snapCount = (snapContainer.snapshots || []).length;
-
-      if (pathsToDelete.length === 0 && snapCount === 0 && (trash.items || []).length === 0) {
-        alert('ถังขยะว่างเปล่า ไม่มีไฟล์รูปที่ถูกลบค้างอยู่ในระบบครับ');
-        return;
-      }
-
-      const confirmed = confirm(
-        `⚠️ ยืนยันการล้างถังขยะถาวร (Empty Trash)?\n\n` +
-        `• ไฟล์รูปที่ถูกลบค้างใน Storage: ${pathsToDelete.length} ไฟล์\n` +
-        `• จุดย้อนเวลา (Snapshots): ${snapCount} จุด\n\n` +
-        `หลังกดยืนยัน ระบบจะลบไฟล์เหล่านี้ออกจาก Cloud Storage ถาวรเพื่อคืนพื้นที่ และจะไม่สามารถกด Reset ย้อนกลับไปก่อนหน้านี้ได้อีก`
-      );
-      if (!confirmed) return;
-
-      const btn = document.getElementById('admin-empty-trash-btn');
-      const origHtml = btn ? btn.innerHTML : '';
-      if (btn) {
-        btn.disabled = true;
-        btn.innerHTML = '<span>กำลังล้างถังขยะ...</span>';
-      }
-
-      try {
-        if (isCloudConnected && supabaseClient && pathsToDelete.length > 0) {
-          // Delete in batches of 100
-          for (let i = 0; i < pathsToDelete.length; i += 100) {
-            const batch = pathsToDelete.slice(i, i + 100);
-            try {
-              await supabaseClient.storage.from(PHOTO_BUCKET).remove(batch);
-            } catch (e) {}
-          }
-        }
-
-        // Clear trash container & old snapshots
-        trash.items = [];
-        snapContainer.snapshots = [];
-
-        // Strip snapshotId links from existing logs so stale Reset buttons won't show
-        const logContainer = getSystemLogContainer();
-        (logContainer.logs || []).forEach(l => {
-          if (l.snapshotId) delete l.snapshotId;
-        });
-
-        recordActivityLog('empty_trash', {
-          albumTitle: 'ล้างถังขยะถาวร (Admin Empty Trash)',
-          photoCount: pathsToDelete.length,
-          detail: `แอดมิน ${currentUser.name} ล้างถังขยะถาวร ลบไฟล์รูปค้างใน Storage จำนวน ${pathsToDelete.length} ไฟล์ และล้างจุดย้อนเวลา ${snapCount} จุด เพื่อคืนพื้นที่`
-        });
-
-        saveAlbums();
-        updateTrashCountBadge();
-        renderAdminLogsList();
-        alert(`ล้างถังขยะถาวรเรียบร้อยแล้วครับ! ลบไฟล์รูปที่ค้างอยู่ ${pathsToDelete.length} ไฟล์ เพื่อคืนพื้นที่ให้ระบบเรียบร้อย`);
-      } catch (err) {
-        alert('เกิดข้อผิดพลาดขณะล้างถังขยะ: ' + (err && err.message ? err.message : err));
-      } finally {
-        if (btn) {
-          btn.disabled = false;
-          btn.innerHTML = origHtml;
-          lucide.createIcons();
-        }
-      }
-    }
-
-    function updateTrashCountBadge() {
-      const badge = document.getElementById('admin-trash-count-badge');
-      if (!badge) return;
-      const activePaths = new Set();
-      albums.filter(a => !a.isSystemLogContainer).forEach(alb => {
-        (alb.photos || []).forEach(p => {
-          if (p && p.storagePath) activePaths.add(p.storagePath);
-        });
-      });
-      const trash = albums.find(a => a.id === '__cspm_trash__');
-      const snapContainer = albums.find(a => a.id === '__cspm_snapshots__');
-      const orphanSet = new Set();
-      if (trash && Array.isArray(trash.items)) {
-        trash.items.forEach(it => {
-          if (it && it.storagePath && !activePaths.has(it.storagePath)) orphanSet.add(it.storagePath);
-        });
-      }
-      if (snapContainer && Array.isArray(snapContainer.snapshots)) {
-        snapContainer.snapshots.forEach(s => {
-          (s.albumsData || []).forEach(alb => {
-            (alb.photos || []).forEach(p => {
-              if (p && p.storagePath && !activePaths.has(p.storagePath)) orphanSet.add(p.storagePath);
-            });
-          });
-        });
-      }
-      const cnt = orphanSet.size;
-      badge.textContent = cnt > 0 ? `${cnt} ไฟล์` : 'ว่าง';
     }
 
     async function executeConfirmedDelete() {
@@ -6356,30 +6178,31 @@ create policy "Public Access workdrive-photos" on storage.objects
       btn.disabled = true;
 
       try {
-        captureTimeSnapshot(`ก่อนทำรายการลบ (${type}) โดย ${currentUser ? currentUser.name : 'user'}`);
         if (type === 'album') {
-          const targetAlb = albums.find(a => a.id === targetId);
+          const targetAlb = albums.find(a => a && !a.isSystemLogContainer && a.id === targetId);
           if (targetAlb) {
             await removeCloudPhotosForAlbums([targetAlb]);
-            albums = albums.filter(a => a.id !== targetId);
+            albums = albums.filter(a => a && a.id !== targetId);
             recordActivityLog('delete_album', {
               albumTitle: `${targetAlb.client} • ${targetAlb.dept} • ${targetAlb.product} (${targetAlb.thaiDate})`,
-              photoCount: targetAlb.photos.length,
-              detail: `ลบอัลบั้มวันที่ ${targetAlb.thaiDate} ของลูกค้า ${targetAlb.client} (มีรูปภาพ ${targetAlb.photos.length} รูป)`
+              photoCount: (targetAlb.photos || []).length,
+              detail: `ลบอัลบั้มวันที่ ${targetAlb.thaiDate} ของลูกค้า ${targetAlb.client} (มีรูปภาพ ${(targetAlb.photos || []).length} รูป)`
             });
             saveAlbums();
           }
           closeDeleteConfirmModal();
           if (activeAlbumId === targetId) {
+            activeAlbumId = null;
             navigateToLevel('product');
           } else {
             showFolderDashboard();
           }
         } else if (type === 'client') {
-          const toDelete = albums.filter(a => a.client === targetId);
-          const totalPics = toDelete.reduce((s, a) => s + a.photos.length, 0);
+          const toDelete = albums.filter(a => a && !a.isSystemLogContainer && a.client === targetId);
+          const delIds = new Set(toDelete.map(a => a.id));
+          const totalPics = toDelete.reduce((s, a) => s + (a.photos || []).length, 0);
           await removeCloudPhotosForAlbums(toDelete);
-          albums = albums.filter(a => a.client !== targetId);
+          albums = albums.filter(a => a && !delIds.has(a.id));
           recordActivityLog('delete_folder', {
             albumTitle: `ลูกค้า: ${targetId}`,
             photoCount: totalPics,
@@ -6389,10 +6212,12 @@ create policy "Public Access workdrive-photos" on storage.objects
           closeDeleteConfirmModal();
           showFolderDashboard();
         } else if (type === 'dept') {
-          const toDelete = albums.filter(a => a.client === navPath.client && a.dept === targetId);
-          const totalPics = toDelete.reduce((s, a) => s + a.photos.length, 0);
+          const facCtx = isNonScFacilityClient(navPath.client);
+          const toDelete = albums.filter(a => a && !a.isSystemLogContainer && a.client === navPath.client && (facCtx ? getFacDivisionOfAlbum(a) === targetId : a.dept === targetId));
+          const delIds = new Set(toDelete.map(a => a.id));
+          const totalPics = toDelete.reduce((s, a) => s + (a.photos || []).length, 0);
           await removeCloudPhotosForAlbums(toDelete);
-          albums = albums.filter(a => !(a.client === navPath.client && a.dept === targetId));
+          albums = albums.filter(a => a && !delIds.has(a.id));
           recordActivityLog('delete_folder', {
             albumTitle: `${navPath.client} > สังกัด ${targetId}`,
             photoCount: totalPics,
@@ -6402,10 +6227,12 @@ create policy "Public Access workdrive-photos" on storage.objects
           closeDeleteConfirmModal();
           showFolderDashboard();
         } else if (type === 'product') {
-          const toDelete = albums.filter(a => a.client === navPath.client && a.dept === navPath.dept && a.product === targetId);
-          const totalPics = toDelete.reduce((s, a) => s + a.photos.length, 0);
+          const facCtx = isNonScFacilityClient(navPath.client);
+          const toDelete = albums.filter(a => a && !a.isSystemLogContainer && a.client === navPath.client && (facCtx ? (getFacDivisionOfAlbum(a) === navPath.dept && getFacTeamOfAlbum(a) === targetId) : (a.dept === navPath.dept && a.product === targetId)));
+          const delIds = new Set(toDelete.map(a => a.id));
+          const totalPics = toDelete.reduce((s, a) => s + (a.photos || []).length, 0);
           await removeCloudPhotosForAlbums(toDelete);
-          albums = albums.filter(a => !(a.client === navPath.client && a.dept === navPath.dept && a.product === targetId));
+          albums = albums.filter(a => a && !delIds.has(a.id));
           const stillUsedElsewhere = albums.some(a => a.product === targetId);
           if (!stillUsedElsewhere) {
             saveProducts(getProducts().filter(p => p !== targetId));
@@ -6482,85 +6309,12 @@ create policy "Public Access workdrive-photos" on storage.objects
       return `${dd}/${mm}/${beY} ${hh}:${min} น.`;
     }
 
-    function getSnapshotContainer() {
-      let container = albums.find(a => a.id === '__cspm_snapshots__');
-      if (!container) {
-        container = { id: '__cspm_snapshots__', isSystemLogContainer: true, photos: [], snapshots: [] };
-        albums.push(container);
-      }
-      if (!Array.isArray(container.snapshots)) container.snapshots = [];
-      return container;
-    }
-
-    function captureTimeSnapshot(label) {
-      const snapContainer = getSnapshotContainer();
-      const cleanAlbums = albums
-        .filter(a => !a.isSystemLogContainer)
-        .map(a => JSON.parse(JSON.stringify(a)));
-
-      const snapId = 'snap-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4);
-      snapContainer.snapshots.unshift({
-        id: snapId,
-        label: label || 'บันทึกจุดย้อนเวลา',
-        username: currentUser ? currentUser.name : 'system',
-        thaiTimestamp: getThaiNowFormatted(),
-        createdAtMs: Date.now(),
-        albumCount: cleanAlbums.length,
-        photoCount: cleanAlbums.reduce((s, a) => s + (a.photos ? a.photos.length : 0), 0),
-        albumsData: cleanAlbums
-      });
-
-      if (snapContainer.snapshots.length > 25) {
-        snapContainer.snapshots = snapContainer.snapshots.slice(0, 25);
-      }
-      return snapId;
-    }
-
-    function restoreToSnapshot(snapId) {
-      if (!isAdminUser()) {
-        alert('เฉพาะบัญชีแอดมิน (sarunchana.h) เท่านั้นที่สามารถย้อนเวลาได้');
-        return;
-      }
-      const snapContainer = getSnapshotContainer();
-      const targetSnap = snapContainer.snapshots.find(s => s.id === snapId);
-      if (!targetSnap || !Array.isArray(targetSnap.albumsData)) {
-        alert('ไม่พบข้อมูลจุดย้อนเวลานี้');
-        return;
-      }
-
-      const ok = confirm(
-        `ยืนยันการ Reset ข้อมูลทั้งหมดย้อนกลับไป ณ เวลา:\n"${targetSnap.thaiTimestamp}"\n(${targetSnap.label})\n\nข้อมูลอัลบั้มและรูปภาพทั้งหมดจะกลับไปเป็นสภาพ ณ เวลานั้นทันที`
-      );
-      if (!ok) return;
-
-      captureTimeSnapshot(`ก่อน Reset กลับไป ${targetSnap.thaiTimestamp}`);
-
-      const sysContainers = albums.filter(a => a.isSystemLogContainer);
-      const restoredAlbums = JSON.parse(JSON.stringify(targetSnap.albumsData));
-      albums = [...restoredAlbums, ...sysContainers];
-
-      recordActivityLog('restore_snapshot', {
-        albumTitle: `Reset ย้อนเวลาไปที่ ${targetSnap.thaiTimestamp}`,
-        photoCount: targetSnap.photoCount,
-        detail: `แอดมิน ${currentUser.name} สั่ง Reset ข้อมูลย้อนกลับไป ณ เวลา ${targetSnap.thaiTimestamp} (${targetSnap.label})`
-      });
-
-      saveAlbums();
-      closeAdminLogsModal();
-      goHome();
-      alert(`ย้อนเวลาข้อมูลกลับไป ณ "${targetSnap.thaiTimestamp}" เรียบร้อยแล้วครับ`);
-    }
-
     function recordActivityLog(actionType, info = {}) {
       if (!currentUser) return;
-      const snapId = (actionType !== 'restore_snapshot')
-        ? captureTimeSnapshot(info.detail || actionType)
-        : null;
       const container = getSystemLogContainer();
       const entry = {
         id: 'log-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
         actionType,
-        snapshotId: snapId,
         username: currentUser.name || 'unknown',
         dept: currentUser.dept || '-',
         albumTitle: info.albumTitle || '-',
@@ -6702,7 +6456,6 @@ create policy "Public Access workdrive-photos" on storage.objects
         return;
       }
       document.getElementById('admin-logs-modal').classList.remove('hidden');
-      updateTrashCountBadge();
       switchAdminModalTab(defaultTab);
       if (isCloudConnected && navigator.onLine) {
         await syncFromCloud(false, false);
@@ -6772,9 +6525,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         delete_photos: { label: 'ลบรูปภาพ', cls: 'bg-rose-50 text-rose-700 border-rose-200', icon: 'trash' },
         download_zip: { label: 'โหลด ZIP', cls: 'bg-blue-50 text-blue-700 border-blue-200', icon: 'archive' },
         download_photo: { label: 'โหลดรูปภาพ', cls: 'bg-sky-50 text-sky-700 border-sky-200', icon: 'download' },
-        export_nas: { label: 'บันทึกลง NAS', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: 'server' },
-        restore_snapshot: { label: 'Reset ย้อนเวลา', cls: 'bg-amber-50 text-amber-800 border-amber-300', icon: 'history' },
-        empty_trash: { label: 'ล้างถังขยะถาวร', cls: 'bg-red-100 text-red-800 border-red-300', icon: 'flame' }
+        export_nas: { label: 'บันทึกลง NAS', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: 'server' }
       };
 
       listEl.innerHTML = filtered.map(log => {
@@ -6797,17 +6548,10 @@ create policy "Public Access workdrive-photos" on storage.objects
                 <p class="text-[11px] text-slate-500 mt-0.5 leading-relaxed">${escapeHtml(log.detail)}</p>
               </div>
             </div>
-            <div class="text-left sm:text-right shrink-0 pl-12 sm:pl-0 flex flex-col sm:items-end gap-1.5">
+            <div class="text-left sm:text-right shrink-0 pl-12 sm:pl-0">
               <span class="inline-block px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-mono text-[11px] font-medium">
                 ${escapeHtml(log.thaiTimestamp || '-')}
               </span>
-              ${log.snapshotId ? `
-                <button type="button" onclick="restoreToSnapshot('${log.snapshotId}')"
-                  class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-500 text-amber-800 hover:text-white border border-amber-300 text-[11px] font-semibold transition cursor-pointer"
-                  title="ย้อนข้อมูลทั้งหมดกลับไปที่จุดเวลานี้">
-                  <i data-lucide="history" class="w-3 h-3"></i> Reset กลับไปเวลานี้
-                </button>
-              ` : ''}
             </div>
           </div>
         `;
@@ -7005,6 +6749,284 @@ create policy "Public Access workdrive-photos" on storage.objects
       if (modal) modal.classList.add('hidden');
     }
 
+
+
+    function openAdminMoveFolderToScModal(sourceClientName) {
+      if (!isAdminUser()) {
+        alert('ขออภัย เฉพาะแอดมิน (sarunchana.h) เท่านั้นที่สามารถโยกโฟลเดอร์ได้ครับ');
+        return;
+      }
+      const matched = albums.filter(a => a && !a.isSystemLogContainer && a.client === sourceClientName);
+      const totalPics = matched.reduce((s, a) => s + (a.photos || []).length, 0);
+
+      document.getElementById('admin-move-sc-source-client').value = sourceClientName;
+      document.getElementById('admin-move-sc-source-summary').textContent =
+        `${sourceClientName} (${matched.length} อัลบั้ม • ${totalPics} รูป)`;
+
+      const scAlbs = albums.filter(a => a && !a.isSystemLogContainer && String(a.client || '').trim().toLowerCase() === 'service center');
+      const centerNames = Array.from(new Set([
+        ...getServiceCentersList(),
+        ...scAlbs.map(getScCenterOfAlbum).filter(Boolean)
+      ]));
+      const dl = document.getElementById('sc-center-move-suggestions');
+      if (dl) {
+        dl.innerHTML = centerNames.map(c => `<option value="${escapeHtml(c)}"></option>`).join('');
+      }
+
+      const defaultCenter = centerNames.find(c => c.includes('พิษณุโลก')) || 'พิษณุโลก';
+      document.getElementById('admin-move-sc-center').value = defaultCenter;
+      document.getElementById('admin-move-sc-product').value = '';
+      renderProductSuggestions();
+
+      document.getElementById('admin-move-folder-sc-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeAdminMoveFolderToScModal() {
+      document.getElementById('admin-move-folder-sc-modal').classList.add('hidden');
+    }
+
+    function getDefaultServiceCenterClientName() {
+      const existingScClients = Array.from(new Set(
+        albums
+          .filter(a => a && !a.isSystemLogContainer && String(a.client || '').trim().toLowerCase().includes('service center'))
+          .map(a => String(a.client || '').trim())
+      ));
+      const rpsMatch = existingScClients.find(c => c.toLowerCase().includes('rps'));
+      return rpsMatch || existingScClients[0] || 'Service Center (RPS)';
+    }
+
+    function mergeAlbumIntoExistingIfDuplicate(alb) {
+      const dup = albums.find(other =>
+        other && !other.isSystemLogContainer && other.id !== alb.id &&
+        String(other.client || '').trim().toLowerCase() === String(alb.client || '').trim().toLowerCase() &&
+        String(other.dept || '').trim().toLowerCase() === String(alb.dept || '').trim().toLowerCase() &&
+        String(other.product || '').trim().toLowerCase() === String(alb.product || '').trim().toLowerCase() &&
+        String(other.thaiDate || '').trim() === String(alb.thaiDate || '').trim()
+      );
+      if (!dup) return alb;
+      if (!Array.isArray(dup.photos)) dup.photos = [];
+      if (Array.isArray(alb.photos) && alb.photos.length > 0) {
+        dup.photos.push(...alb.photos);
+      }
+      if (!dup.coverUrl && alb.coverUrl) {
+        dup.coverUrl = alb.coverUrl;
+        dup.coverPosition = alb.coverPosition || '50% 50%';
+      }
+      albums = albums.filter(x => x.id !== alb.id);
+      return dup;
+    }
+
+    function submitAdminMoveFolderToSc(e) {
+      e.preventDefault();
+      if (!isAdminUser()) return;
+      const srcClient = document.getElementById('admin-move-sc-source-client').value.trim();
+      const targetCenter = document.getElementById('admin-move-sc-center').value.trim();
+      const overrideProd = document.getElementById('admin-move-sc-product').value.trim();
+      if (!srcClient || !targetCenter) return;
+
+      const targetScClient = getDefaultServiceCenterClientName();
+      const matched = albums.filter(a => a && !a.isSystemLogContainer && a.client === srcClient);
+      let movedCount = 0;
+
+      matched.forEach(alb => {
+        const custLabel = alb.facCustomer || alb.customerName || alb.siteName || srcClient;
+        const nextProd = overrideProd || alb.product || alb.dept || 'ทั่วไป';
+        alb.type = 'facility';
+        alb.client = targetScClient;
+        alb.dept = targetCenter;
+        alb.product = nextProd;
+        alb.isServiceCenter = true;
+        alb.serviceCenter = targetCenter;
+        alb.scCustomer = custLabel;
+        alb.siteName = custLabel;
+        mergeAlbumIntoExistingIfDuplicate(alb);
+        movedCount++;
+      });
+
+      const centers = getServiceCentersList();
+      if (!centers.includes(targetCenter)) {
+        centers.unshift(targetCenter);
+        saveServiceCentersList(centers);
+      }
+
+      if (overrideProd) {
+        const prodList = getProducts();
+        if (!prodList.some(p => String(p || '').toLowerCase() === overrideProd.toLowerCase())) {
+          prodList.unshift(overrideProd);
+          saveProducts(prodList);
+        }
+      }
+
+      recordActivityLog('move_folder_to_sc', {
+        albumTitle: `${srcClient} → Service Center > ${targetCenter}`,
+        photoCount: matched.reduce((s, a) => s + (a.photos || []).length, 0),
+        detail: `แอดมินโยกโฟลเดอร์ "${srcClient}" (${movedCount} อัลบั้ม) ไปไว้ใน Service Center > ศูนย์บริการภาค "${targetCenter}"`
+      });
+
+      saveAlbums();
+      closeAdminMoveFolderToScModal();
+      showFolderDashboard();
+      alert(`โยก "${srcClient}" ไปไว้ใน Service Center > ${targetCenter} เรียบร้อยแล้วครับ`);
+    }
+
+
+    function enableAdminCardMergeByDrag(containerId, attrName, level) {
+      if (!isAdminUser()) return;
+      const container = document.getElementById(containerId);
+      if (!container) return;
+      const cards = Array.from(container.querySelectorAll(`[data-${attrName}]`));
+      if (cards.length < 2) return;
+
+      let sourceKey = null;
+
+      cards.forEach(card => {
+        const keyVal = card.getAttribute(`data-${attrName}`);
+        if (!keyVal) return;
+
+        card.addEventListener('dragstart', () => {
+          sourceKey = keyVal;
+          card.dataset.mergeSource = keyVal;
+        });
+
+        card.addEventListener('dragover', (e) => {
+          if (!sourceKey || sourceKey === keyVal) return;
+          e.preventDefault();
+          card.classList.add('ring-2', 'ring-blue-500', 'bg-blue-50/30');
+        });
+
+        card.addEventListener('dragleave', () => {
+          card.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-50/30');
+        });
+
+        card.addEventListener('drop', (e) => {
+          card.classList.remove('ring-2', 'ring-blue-500', 'bg-blue-50/30');
+          const dragSrc = sourceKey || card.dataset.mergeSource;
+          sourceKey = null;
+          if (!dragSrc || dragSrc === keyVal) return;
+          e.preventDefault();
+          e.stopPropagation();
+
+          if (!confirm(`ต้องการโยกและเมิร์จ "${dragSrc}" เข้าไปรวมใน "${keyVal}" ใช่หรือไม่?`)) return;
+
+          if (level === 'client') {
+            const srcAlbs = albums.filter(a => a && !a.isSystemLogContainer && a.client === dragSrc);
+            srcAlbs.forEach(alb => {
+              const custLabel = alb.facCustomer || alb.customerName || alb.siteName || dragSrc;
+              alb.client = keyVal;
+              if (String(keyVal).toLowerCase().includes('service center')) {
+                alb.isServiceCenter = true;
+                alb.scCustomer = custLabel;
+                alb.siteName = custLabel;
+              }
+              mergeAlbumIntoExistingIfDuplicate(alb);
+            });
+            recordActivityLog('merge_folder', {
+              albumTitle: `${dragSrc} → ${keyVal}`,
+              detail: `แอดมินลากเมิร์จโฟลเดอร์ "${dragSrc}" เข้าไปรวมใน "${keyVal}"`
+            });
+            saveAlbums();
+            showFolderDashboard();
+          } else if (level === 'album') {
+            const srcAlb = albums.find(a => a && !a.isSystemLogContainer && a.id === dragSrc);
+            const tgtAlb = albums.find(a => a && !a.isSystemLogContainer && a.id === keyVal);
+            if (srcAlb && tgtAlb) {
+              if (!Array.isArray(tgtAlb.photos)) tgtAlb.photos = [];
+              if (Array.isArray(srcAlb.photos) && srcAlb.photos.length > 0) {
+                tgtAlb.photos.push(...srcAlb.photos);
+              }
+              albums = albums.filter(a => a.id !== srcAlb.id);
+              recordActivityLog('merge_album', {
+                albumTitle: `${srcAlb.thaiDate} → ${tgtAlb.thaiDate}`,
+                detail: `แอดมินลากเมิร์จอัลบั้ม "${srcAlb.thaiDate}" เข้าไปรวมใน "${tgtAlb.thaiDate}"`
+              });
+              saveAlbums();
+              showFolderDashboard();
+            }
+          }
+        });
+      });
+    }
+
+    // ==================== ADMIN MOVE ALBUM INTO ANOTHER ALBUM ====================
+    function openAdminMoveAlbumModal(sourceAlbumId) {
+      if (!isAdminUser()) {
+        alert('ขออภัย เฉพาะแอดมิน (sarunchana.h) เท่านั้นที่สามารถโยกอัลบั้มได้ครับ');
+        return;
+      }
+      const srcAlb = albums.find(a => a && !a.isSystemLogContainer && a.id === sourceAlbumId);
+      if (!srcAlb) return;
+
+      const candidates = albums.filter(a => a && !a.isSystemLogContainer && a.id !== srcAlb.id);
+      if (candidates.length === 0) {
+        alert('ยังไม่มีอัลบั้มปลายทางอื่นในระบบครับ');
+        return;
+      }
+
+      document.getElementById('admin-move-source-id').value = srcAlb.id;
+      const srcDispClient = String(srcAlb.client || '').trim().toLowerCase() === 'service center' ? getScCustomerOfAlbum(srcAlb) : srcAlb.client;
+      document.getElementById('admin-move-source-summary').textContent =
+        `${srcDispClient} • ${srcAlb.dept} • ${srcAlb.product} • วันที่ ${srcAlb.thaiDate} (${(srcAlb.photos || []).length} รูป)`;
+
+      const sel = document.getElementById('admin-move-target-select');
+      sel.innerHTML = candidates.map(c => {
+        const cDispClient = String(c.client || '').trim().toLowerCase() === 'service center' ? getScCustomerOfAlbum(c) : c.client;
+        const label = `${cDispClient} • ${c.dept} • ${c.product} • วันที่ ${c.thaiDate} (${(c.photos || []).length} รูป)`;
+        return `<option value="${escapeHtml(c.id)}">${escapeHtml(label)}</option>`;
+      }).join('');
+
+      document.getElementById('admin-move-album-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeAdminMoveAlbumModal() {
+      document.getElementById('admin-move-album-modal').classList.add('hidden');
+    }
+
+    function submitAdminMoveAlbum(e) {
+      e.preventDefault();
+      if (!isAdminUser()) return;
+      const srcId = document.getElementById('admin-move-source-id').value;
+      const targetId = document.getElementById('admin-move-target-select').value;
+      if (!srcId || !targetId || srcId === targetId) return;
+
+      const srcIdx = albums.findIndex(a => a && !a.isSystemLogContainer && a.id === srcId);
+      const tgtIdx = albums.findIndex(a => a && !a.isSystemLogContainer && a.id === targetId);
+      if (srcIdx === -1 || tgtIdx === -1) return;
+
+      const srcAlb = albums[srcIdx];
+      const tgtAlb = albums[tgtIdx];
+      const movedPhotos = Array.isArray(srcAlb.photos) ? [...srcAlb.photos] : [];
+
+      if (!Array.isArray(tgtAlb.photos)) tgtAlb.photos = [];
+      tgtAlb.photos.push(...movedPhotos);
+
+      if (!tgtAlb.coverUrl && srcAlb.coverUrl) {
+        tgtAlb.coverUrl = srcAlb.coverUrl;
+        tgtAlb.coverPosition = srcAlb.coverPosition || '50% 50%';
+      }
+
+      const srcLabel = `${srcAlb.client} • ${srcAlb.dept} • ${srcAlb.product} (${srcAlb.thaiDate})`;
+      const tgtLabel = `${tgtAlb.client} • ${tgtAlb.dept} • ${tgtAlb.product} (${tgtAlb.thaiDate})`;
+
+      recordActivityLog('move_album', {
+        albumTitle: `${srcLabel} → ${tgtLabel}`,
+        photoCount: movedPhotos.length,
+        detail: `แอดมินโยกอัลบั้ม "${srcLabel}" (${movedPhotos.length} รูป) เข้าไปรวมในอัลบั้ม "${tgtLabel}"`
+      });
+
+      albums.splice(srcIdx, 1);
+      saveAlbums();
+      closeAdminMoveAlbumModal();
+
+      if (activeAlbumId === srcId) {
+        openAlbum(tgtAlb.id);
+      } else {
+        showFolderDashboard();
+      }
+      alert(`โยกอัลบั้มเรียบร้อยแล้วครับ (${movedPhotos.length} รูปถูกย้ายไปรวมในอัลบั้มปลายทางแล้ว)`);
+    }
+
     window.addEventListener('DOMContentLoaded', () => { initSavedTheme(); setupIphoneFullScreenApp(); init(); });
   </script>
 
@@ -7097,6 +7119,93 @@ create policy "Public Access workdrive-photos" on storage.objects
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+
+
+  <!-- ==================== MODAL: ADMIN MOVE FOLDER INTO SERVICE CENTER ==================== -->
+  <div id="admin-move-folder-sc-modal" onclick="if(event.target === this) closeAdminMoveFolderToScModal()"
+    class="hidden fixed inset-0 z-[60] bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100">
+      <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
+        <h3 class="font-semibold text-sm flex items-center gap-2">
+          <i data-lucide="folder-input" class="w-4 h-4 text-amber-400"></i>
+          <span>โยกโฟลเดอร์ไปไว้ใน Service Center (เฉพาะ Admin)</span>
+        </h3>
+        <button type="button" onclick="closeAdminMoveFolderToScModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form onsubmit="submitAdminMoveFolderToSc(event)" class="p-6 space-y-4 text-xs">
+        <input id="admin-move-sc-source-client" type="hidden" />
+        <div class="p-3 rounded-xl bg-amber-50/80 border border-amber-200/80">
+          <p class="text-[11px] text-amber-900 font-semibold">โฟลเดอร์ต้นทางที่จะโยก:</p>
+          <p id="admin-move-sc-source-summary" class="text-xs font-bold text-slate-900 mt-0.5">-</p>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">เลือกศูนย์บริการภาค (จังหวัด / สาขา) *</label>
+          <input id="admin-move-sc-center" type="text" list="sc-center-move-suggestions" required placeholder="เช่น พิษณุโลก, หาดใหญ่, SC สำนักงานใหญ่"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-xs focus:border-[#EB2D2D] outline-none" />
+          <datalist id="sc-center-move-suggestions"></datalist>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1">ระบุ Product (เว้นว่างเพื่อใช้ Product เดิมของแต่ละอัลบั้ม)</label>
+          <input id="admin-move-sc-product" type="text" list="product-suggestions" placeholder="เว้นว่างไว้เพื่อคง Product เดิม หรือพิมพ์ระบุใหม่ เช่น AIR, UPS"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-xs focus:border-[#EB2D2D] outline-none" />
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2 border-t border-slate-100">
+          <button type="button" onclick="closeAdminMoveFolderToScModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 cursor-pointer">ยกเลิก</button>
+          <button type="submit" class="px-5 py-2 rounded-xl font-semibold bg-amber-400 hover:bg-amber-500 text-amber-950 cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="arrow-right-circle" class="w-4 h-4"></i>
+            <span>ยืนยันโยกไป Service Center</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: ADMIN MOVE ALBUM INTO ANOTHER ALBUM ==================== -->
+  <div id="admin-move-album-modal" onclick="if(event.target === this) closeAdminMoveAlbumModal()"
+    class="hidden fixed inset-0 z-[60] bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100">
+      <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
+        <h3 class="font-semibold text-sm flex items-center gap-2">
+          <i data-lucide="folder-input" class="w-4 h-4 text-amber-400"></i>
+          <span>โยกอัลบั้มไปใส่ในอัลบั้มอื่น (เฉพาะ Admin)</span>
+        </h3>
+        <button type="button" onclick="closeAdminMoveAlbumModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form onsubmit="submitAdminMoveAlbum(event)" class="p-6 space-y-4 text-xs">
+        <input id="admin-move-source-id" type="hidden" />
+        <div class="p-3 rounded-xl bg-amber-50/80 border border-amber-200/80">
+          <p class="text-[11px] text-amber-900 font-semibold">อัลบั้มต้นทางที่จะโยก:</p>
+          <p id="admin-move-source-summary" class="text-xs font-bold text-slate-900 mt-0.5">-</p>
+        </div>
+
+        <div>
+          <label class="block font-semibold text-slate-700 mb-1.5">เลือกอัลบั้มปลายทางที่จะนำรูปและข้อมูลไปรวมไว้ข้างใน *</label>
+          <select id="admin-move-target-select" required
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-xs focus:border-[#EB2D2D] outline-none"></select>
+        </div>
+
+        <p class="text-[11px] text-slate-500 leading-relaxed">
+          ระบบจะย้ายรูปภาพทั้งหมดในอัลบั้มต้นทางเข้าไปรวมในอัลบั้มปลายทาง และลบอัลบั้มต้นทางที่ว่างแล้วออกให้อัตโนมัติครับ
+        </p>
+
+        <div class="pt-2 flex justify-end gap-2 border-t border-slate-100">
+          <button type="button" onclick="closeAdminMoveAlbumModal()" class="px-4 py-2 rounded-xl text-slate-600 hover:bg-slate-100 cursor-pointer">ยกเลิก</button>
+          <button type="submit" class="px-5 py-2 rounded-xl font-semibold bg-amber-500 hover:bg-amber-600 text-slate-950 cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="arrow-right-circle" class="w-4 h-4"></i>
+            <span>ยืนยันโยกอัลบั้ม</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
@@ -7732,13 +7841,6 @@ create policy "Public Access workdrive-photos" on storage.objects
               class="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-semibold border border-emerald-200 flex items-center gap-1.5 cursor-pointer">
               <i data-lucide="file-spreadsheet" class="w-3.5 h-3.5"></i> โหลดรายงาน CSV
             </button>
-            <button id="admin-empty-trash-btn" type="button" onclick="emptyTrashPermanently()"
-              class="px-3 py-2 rounded-xl bg-red-50 hover:bg-[#EB2D2D] text-[#EB2D2D] hover:text-white font-semibold border border-red-200 flex items-center gap-1.5 cursor-pointer transition"
-              title="ลบไฟล์รูปที่ถูกลบไปแล้วออกจาก Supabase Storage ถาวรเพื่อคืนพื้นที่">
-              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
-              <span>ล้างถังขยะถาวร</span>
-              <span id="admin-trash-count-badge" class="px-1.5 py-0.2 rounded bg-red-100 text-red-800 text-[10px] font-bold">ว่าง</span>
-            </button>
           </div>
           <button type="button" onclick="closeAdminLogsModal()" class="px-5 py-2 rounded-xl bg-[#1B212C] hover:bg-slate-800 text-white font-medium cursor-pointer">
             ปิดหน้าต่าง
@@ -7849,6 +7951,119 @@ create policy "Public Access workdrive-photos" on storage.objects
     </div>
   </div>
 
+
+
+  <!-- ==================== MODAL: ADMIN SYSTEM UPDATE COMPOSER & HOLD MONITOR ==================== -->
+  <div id="admin-update-compose-modal" onclick="if(event.target === this) closeAdminUpdateModal()"
+    class="hidden fixed inset-0 z-[70] bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden border border-slate-100">
+      <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <i data-lucide="megaphone" class="w-5 h-5 text-amber-400"></i>
+          <div>
+            <h3 class="font-semibold text-sm">แจ้งเตือนการอัปเดตระบบ (ข้อความเลื่อน)</h3>
+            <p class="text-[11px] text-slate-400">พิมพ์ข้อความแจ้งทีม และดูรายชื่อผู้ที่ยังทำงานอยู่ (กด Hold) หรือปิดแจ้งเตือนแล้ว (กากบาท)</p>
+          </div>
+        </div>
+        <button type="button" onclick="closeAdminUpdateModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-6 space-y-4 text-xs max-h-[82vh] overflow-y-auto">
+        <div>
+          <label class="block font-bold text-slate-800 mb-1.5">ข้อความแจ้งเตือนที่จะแสดงเป็นข้อความเลื่อน *</label>
+          <textarea id="admin-update-message-input" rows="3"
+            placeholder="เช่น แจ้งอัปเดตระบบ CSPM WorkDrive เวลา 17:15 น. หากใครยังอัปโหลดหรือทำงานอยู่ให้กด Hold ก่อนนะครับ"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] outline-none text-xs leading-relaxed"></textarea>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <button type="button" onclick="clearActiveSystemUpdate()"
+            class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="bell-off" class="w-3.5 h-3.5"></i>
+            <span>ยกเลิกประกาศแจ้งเตือน</span>
+          </button>
+          <button type="button" onclick="publishSystemUpdateNotice()"
+            class="px-5 py-2 rounded-xl font-bold bg-[#EB2D2D] hover:bg-[#C8141B] text-white shadow-xs cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="send" class="w-4 h-4"></i>
+            <span>ส่งแจ้งเตือนขึ้นหน้าจอทีม</span>
+          </button>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-800 flex items-center gap-1.5">
+              <i data-lucide="users" class="w-4 h-4 text-[#EB2D2D]"></i>
+              <span>สถานะการตอบกลับของทีม (Hold / กากบาท)</span>
+            </span>
+            <button type="button" onclick="renderAdminUpdateResponses()" class="text-[11px] font-semibold text-[#EB2D2D] hover:underline cursor-pointer">
+              รีเฟรชรายชื่อ
+            </button>
+          </div>
+          <div id="admin-update-responses-list" class="max-h-52 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200 bg-[#F8FAFC] p-1">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: USER SYSTEM UPDATE NOTICE WITH SCROLLING TEXT & HOLD / X ==================== -->
+  <div id="system-update-notice-modal"
+    class="hidden fixed inset-0 z-[75] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border-2 border-amber-400">
+      <div class="px-5 py-4 bg-[#1B212C] text-white flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="w-9 h-9 rounded-xl bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0">
+            <i data-lucide="megaphone" class="w-5 h-5"></i>
+          </div>
+          <div class="min-w-0">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-300 block">SYSTEM UPDATE NOTICE</span>
+            <h3 class="font-bold text-sm truncate">แจ้งเตือนการอัปเดตระบบ</h3>
+          </div>
+        </div>
+        <button type="button" onclick="respondSystemUpdate('dismissed')"
+          class="w-8 h-8 rounded-lg bg-white/10 hover:bg-[#EB2D2D] text-slate-200 hover:text-white flex items-center justify-center shrink-0 transition cursor-pointer"
+          title="ไม่ได้ทำงานอยู่ — ปิดหน้าต่าง (กากบาท)">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <!-- Scrolling Marquee Message Box -->
+        <div class="rounded-xl bg-amber-50 border border-amber-300 py-3 px-2 overflow-hidden">
+          <div class="cspm-update-marquee" role="marquee" aria-label="ข้อความแจ้งเตือนอัปเดตระบบ">
+            <div class="cspm-update-marquee-track text-sm font-bold text-amber-950">
+              <span id="update-marquee-text-1" class="cspm-update-marquee-item">กำลังอัปเดตระบบ...</span>
+              <span id="update-marquee-text-2" class="cspm-update-marquee-item" aria-hidden="true">กำลังอัปเดตระบบ...</span>
+            </div>
+          </div>
+        </div>
+
+        <p class="text-xs text-slate-600 leading-relaxed">
+          หากคุณยังทำงานอยู่ (เช่น กำลังอัปโหลดรูปหรือบันทึกข้อมูล) ให้กดปุ่ม <strong class="text-amber-900">Hold</strong> เพื่อแจ้งแอดมิน แต่หากไม่ได้ทำอยู่สามารถกดปุ่ม <strong class="text-slate-800">กากบาท (×)</strong> เพื่อปิดหน้าต่างได้ทันทีครับ
+        </p>
+
+        <div id="user-update-hold-status" class="hidden p-3 rounded-xl bg-amber-100/80 border border-amber-300 text-xs font-semibold text-amber-950">
+          <!-- Hold confirmation text -->
+        </div>
+
+        <div class="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100">
+          <button type="button" onclick="respondSystemUpdate('dismissed')"
+            class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="x-circle" class="w-4 h-4"></i>
+            <span>ไม่ได้ทำอยู่ (ปิด ×)</span>
+          </button>
+          <button type="button" onclick="respondSystemUpdate('hold')"
+            class="px-5 py-2.5 rounded-xl text-xs font-bold bg-amber-400 hover:bg-amber-500 text-amber-950 shadow-xs cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="pause-circle" class="w-4 h-4"></i>
+            <span>ยังทำงานอยู่ (Hold)</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- ==================== FLOATING SCROLL BUTTONS (top / bottom) ==================== -->
   <div id="scroll-fab" class="hidden" aria-label="เลื่อนหน้า">
