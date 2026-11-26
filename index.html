@@ -1025,10 +1025,10 @@
         </button>
       </div>
       <form onsubmit="createAlbum(event)" class="p-6 space-y-4 max-h-[82vh] overflow-y-auto">
-        <!-- Album group: Customer / Facility Services -->
+        <!-- ผังโครงสร้างหลัก: Facility Services / Customer -->
         <div>
-          <label class="block text-xs font-semibold text-slate-600 mb-1.5">ประเภท *</label>
-          <input type="hidden" id="album-type" value="customer" />
+          <label class="block text-xs font-semibold text-slate-600 mb-1.5">โครงสร้างหลัก *</label>
+          <input type="hidden" id="album-type" value="facility" />
           <div class="grid grid-cols-2 gap-1.5 p-1 bg-[#F5F7FA] rounded-xl border border-slate-200/80">
             <button type="button" id="album-type-btn-facility" onclick="setNewAlbumType('facility')" class="py-2 px-3 rounded-lg text-xs font-semibold bg-[#1B212C] text-white shadow-2xs flex items-center justify-center gap-1.5 transition cursor-pointer">
               <i data-lucide="factory" class="w-3.5 h-3.5"></i> Facility Services
@@ -1039,12 +1039,52 @@
           </div>
         </div>
 
-        <!-- Service Center Mode Switch -->
-        <div class="p-3 rounded-xl bg-indigo-50/70 border border-indigo-200/80 flex items-center justify-between gap-2">
-          <label class="inline-flex items-center gap-2 cursor-pointer select-none text-xs font-bold text-indigo-950">
-            <input id="album-is-sc" type="checkbox" onchange="syncNewAlbumModeUi()" class="w-4 h-4 rounded accent-indigo-600 cursor-pointer" />
-            <span>อัลบั้มของ Service Center (ศูนย์บริการ → Product → Site งาน → วันที่)</span>
-          </label>
+        <!-- Facility Services Branch Selector (ตามผัง: Fire & Security Service / Air Conditioning Services / UPS Services / Service Center) -->
+        <div id="album-fac-branch-wrap" class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 space-y-3">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold text-slate-800">หมวดใน Facility Services *</label>
+            <span class="text-[10px] px-2 py-0.5 rounded bg-red-50 text-[#EB2D2D] font-semibold">ตามผังโครงสร้าง</span>
+          </div>
+          <select id="album-fac-branch" onchange="onAlbumDiagramBranchChange()"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800 focus:border-[#EB2D2D] outline-none">
+            <option value="Fire & Security Service">Fire &amp; Security Service → Teams → Product → Customer</option>
+            <option value="Air Conditioning Services">Air Conditioning Services → Product → Customer</option>
+            <option value="UPS Services">UPS Services → Product → Customer</option>
+            <option value="Service Center">Service Center → ศูนย์บริการภาค → Product → Customer</option>
+          </select>
+
+          <!-- Fire & Security Service -> Teams -->
+          <div id="album-fs-teams-box" class="space-y-1.5 pt-1 border-t border-slate-200/70">
+            <label class="block text-xs font-semibold text-slate-700">เลือก Teams (Fire &amp; Security Service) *</label>
+            <input id="album-fs-team-input" type="text" list="fs-team-suggestions" placeholder="เช่น Tanee Teams, Kitsana Teams, Taywin Teams"
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-sm focus:border-[#EB2D2D] outline-none" />
+            <datalist id="fs-team-suggestions">
+              <option value="Tanee Teams"></option>
+              <option value="Kitsana Teams"></option>
+              <option value="Taywin Teams"></option>
+            </datalist>
+          </div>
+
+          <!-- Service Center -> ศูนย์บริการภาค -->
+          <div id="album-sc-region-box" class="hidden space-y-1.5 pt-1 border-t border-indigo-200/80">
+            <div class="flex items-center justify-between">
+              <label class="block text-xs font-semibold text-indigo-900">เลือกศูนย์บริการภาค *</label>
+              <button type="button" onclick="document.getElementById('album-sc-add-center-box').classList.toggle('hidden')"
+                class="text-[11px] font-semibold text-indigo-600 hover:underline cursor-pointer">+ เพิ่มศูนย์บริการภาค</button>
+            </div>
+            <select id="album-album-sc-center"
+              class="w-full px-3.5 py-2 rounded-xl border border-indigo-200 bg-white text-sm focus:border-indigo-500 outline-none"></select>
+            <div id="album-sc-add-center-box" class="hidden flex gap-2">
+              <input id="album-sc-new-center-input" type="text" placeholder="เช่น กรุงเทพ, พิษณุโลก, หาดใหญ่..."
+                class="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs outline-none" />
+              <button type="button" onclick="addNewScCenter('new')" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium cursor-pointer">เพิ่ม</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Service Center Mode Switch (kept hidden/synced for backward compatibility) -->
+        <div class="hidden">
+          <input id="album-is-sc" type="checkbox" onchange="syncNewAlbumModeUi()" />
         </div>
 
         <!-- Step 1: Customer / Facility Services Name -->
@@ -1055,21 +1095,7 @@
           <datalist id="customer-suggestions"></datalist>
         </div>
 
-        <!-- Service Center: ศูนย์บริการ -->
-        <div id="album-sc-center-wrap" class="hidden space-y-2">
-          <div class="flex items-center justify-between">
-            <label class="block text-xs font-semibold text-indigo-900">1. ศูนย์บริการ (Service Center) *</label>
-            <button type="button" onclick="document.getElementById('album-sc-add-center-box').classList.toggle('hidden')"
-              class="text-[11px] font-semibold text-indigo-600 hover:underline cursor-pointer">+ เพิ่มศูนย์บริการ</button>
-          </div>
-          <select id="album-album-sc-center"
-            class="w-full px-3.5 py-2.5 rounded-xl border border-indigo-200 bg-white text-sm focus:border-indigo-500 outline-none"></select>
-          <div id="album-sc-add-center-box" class="hidden flex gap-2">
-            <input id="album-sc-new-center-input" type="text" placeholder="เช่น SC สาขาบางนา..."
-              class="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs outline-none" />
-            <button type="button" onclick="addNewScCenter('new')" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-medium cursor-pointer">เพิ่ม</button>
-          </div>
-        </div>
+
 
         <!-- Step 2: สังกัด -->
         <div>
@@ -3225,7 +3251,8 @@ create policy "Public Access workdrive-photos" on storage.objects
     // ==================== SERVICE CENTER FLOW: ศูนย์บริการ -> PRODUCT -> SITE งาน -> วันที่ ====================
     const SERVICE_CENTER_KEY = 'cspm_workdrive_service_centers_v1';
     const SC_META_KEY = 'cspm_workdrive_sc_meta_v1';
-    const DEFAULT_SERVICE_CENTERS = ['SC สำนักงานใหญ่', 'SC ภาคตะวันออก', 'SC ภาคเหนือ', 'SC ภาคใต้'];
+    const DEFAULT_SERVICE_CENTERS = ['กรุงเทพ', 'พิษณุโลก', 'หาดใหญ่', 'เชียงใหม่', 'ขอนแก่น', 'นครราชสีมา', 'สุราษฎร์ธานี'];
+    const FIRE_SECURITY_TEAMS = ['Tanee Teams', 'Kitsana Teams', 'Taywin Teams'];
 
     let isServiceCenterFlow = false;
     let scPath = { center: null, product: null, site: null };
@@ -3415,11 +3442,23 @@ create policy "Public Access workdrive-photos" on storage.objects
     }
 
 
+    function isMobileTouchDeviceForDrag() {
+      const ua = navigator.userAgent || '';
+      const isMobileUa = /Android|iPhone|iPad|iPod|Mobile|webOS|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+      const isNarrowViewport = window.matchMedia && window.matchMedia('(max-width: 768px)').matches;
+      const isCoarsePointer = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+      return Boolean(isMobileUa || (isNarrowViewport && isCoarsePointer));
+    }
+
     function enableDragReorderOnContainer(containerId, attrName, scopeKey) {
       const container = document.getElementById(containerId);
       if (!container) return;
       const items = Array.from(container.querySelectorAll(`[data-${attrName}]`));
       if (items.length < 2) return;
+      if (isMobileTouchDeviceForDrag()) {
+        items.forEach(card => card.setAttribute('draggable', 'false'));
+        return;
+      }
 
       let draggedEl = null;
 
@@ -3585,7 +3624,7 @@ create policy "Public Access workdrive-photos" on storage.objects
       if (!navPath.client) {
         levelBadge.textContent = 'ขั้นตอนที่ 1 / 4';
         levelHeading.textContent = currentAlbumType === 'facility' ? 'เลือกชื่อ Facility Services' : 'เลือกชื่อลูกค้า (Customer)';
-        addLabel.textContent = currentAlbumType === 'facility' ? 'เพิ่ม Facility Services / อัลบั้มใหม่' : 'เพิ่มลูกค้า / อัลบั้มใหม่';
+        addLabel.textContent = currentAlbumType === 'facility' ? 'เพิ่ม Division / อัลบั้มใหม่' : 'เพิ่มลูกค้า / อัลบั้มใหม่';
       } else if (!navPath.dept) {
         const isScCtx = isServiceCenterClientName(navPath.client);
         const isFacDivCtx = isNonScFacilityClient(navPath.client);
@@ -3594,8 +3633,9 @@ create policy "Public Access workdrive-photos" on storage.objects
           levelHeading.textContent = `เลือกศูนย์บริการภาค — ${navPath.client}`;
           addLabel.textContent = 'เพิ่มศูนย์บริการภาคใน Service Center';
         } else if (isFacDivCtx) {
-          levelHeading.textContent = `เลือก Division — ${navPath.client}`;
-          addLabel.textContent = 'เพิ่ม Division ในหมวดนี้';
+          const isFireSec = /fire\s*&\s*security/i.test(String(navPath.client || ''));
+          levelHeading.textContent = isFireSec ? `เลือก Teams — ${navPath.client}` : `เลือก Division — ${navPath.client}`;
+          addLabel.textContent = isFireSec ? 'เพิ่ม Teams ในหมวดนี้' : 'เพิ่ม Division ในหมวดนี้';
         } else {
           levelHeading.textContent = `เลือกสังกัด — ${navPath.client}`;
           addLabel.textContent = 'เพิ่มสังกัดในลูกค้านี้';
@@ -3632,7 +3672,7 @@ create policy "Public Access workdrive-photos" on storage.objects
     }
 
 
-    const DEFAULT_FAC_TEAMS = ['Tanee Team', 'Taywin Team', 'Kitsana Team'];
+    const DEFAULT_FAC_TEAMS = ['Tanee Teams', 'Kitsana Teams', 'Taywin Teams'];
 
     function isServiceCenterClientName(name) {
       const s = String(name || '').trim().toLowerCase();
@@ -4148,8 +4188,9 @@ create policy "Public Access workdrive-photos" on storage.objects
       if (!navPath.dept) {
         const isScCtx = isServiceCenterClientName(navPath.client);
         const isFacDivCtx = isNonScFacilityClient(navPath.client);
-        const subUnitLabel = isScCtx ? 'ศูนย์บริการภาค' : (isFacDivCtx ? 'Division' : 'สังกัด');
-        const subBadgeText = isScCtx ? 'ศูนย์บริการภาค (REGIONAL SERVICE CENTER)' : (isFacDivCtx ? 'DIVISION' : 'สังกัด (DEPARTMENT)');
+        const isFireSecRd = isFacDivCtx && /fire\s*&\s*security/i.test(String(navPath.client || ''));
+        const subUnitLabel = isScCtx ? 'ศูนย์บริการภาค' : (isFacDivCtx ? (isFireSecRd ? 'Teams' : 'Division') : 'สังกัด');
+        const subBadgeText = isScCtx ? 'ศูนย์บริการภาค (REGIONAL SERVICE CENTER)' : (isFacDivCtx ? (isFireSecRd ? 'TEAMS' : 'DIVISION') : 'สังกัด (DEPARTMENT)');
         const childGroupLabel = isFacDivCtx ? 'Team' : 'Product';
 
         const clientAlbums = albums.filter(a => !a.isSystemLogContainer && a.client === navPath.client);
@@ -4265,9 +4306,9 @@ create policy "Public Access workdrive-photos" on storage.objects
       if (!navPath.product) {
         const isFacTeamCtx = isNonScFacilityClient(navPath.client);
         const grpLabel = isFacTeamCtx ? 'Team' : 'Product';
-        const deptAlbums = albums.filter(a => !a.isSystemLogContainer && a.client === navPath.client && (isFacTeamCtx ? getFacDivisionOfAlbum(a) === navPath.dept : a.dept === navPath.dept));
+        const deptAlbums = albums.filter(a => !a.isSystemLogContainer && a.client === navPath.client && (isFacTeamCtx ? (getFacDivisionOfAlbum(a) === navPath.dept || a.dept === navPath.dept) : a.dept === navPath.dept));
         const prodMap = new Map();
-        if (isFacTeamCtx) {
+        if (isFacTeamCtx && deptAlbums.length === 0) {
           DEFAULT_FAC_TEAMS.forEach(tName => {
             const folderCov = getFolderCoverEntry('product', tName);
             prodMap.set(tName, {
@@ -4858,7 +4899,97 @@ create policy "Public Access workdrive-photos" on storage.objects
       updateAlbumCoverPreviewUI(mode, '', '50% 50%');
     }
 
-    function openNewAlbumModal() {
+        function onAlbumDiagramBranchChange() {
+      const albumType = document.getElementById('album-type').value;
+      const branchWrap = document.getElementById('album-fac-branch-wrap');
+      const branchSel = document.getElementById('album-fac-branch');
+      const fsBox = document.getElementById('album-fs-teams-box');
+      const scBox = document.getElementById('album-sc-region-box');
+      const scCb = document.getElementById('album-is-sc');
+      const clientInp = document.getElementById('album-client');
+      const clientLabel = document.getElementById('album-client-label');
+      const prodWrap = document.getElementById('album-product-field-wrap');
+      const prodInp = document.getElementById('album-product');
+      const prodLabel = document.getElementById('album-product-label');
+      const custInp = document.getElementById('album-fac-customer');
+      const custLabel = custInp ? custInp.closest('div').querySelector('label') : null;
+      const deptSel = document.getElementById('album-dept');
+      const deptFieldWrap = deptSel ? deptSel.closest('div') : null;
+      const divWrap = document.getElementById('album-fac-div-wrap');
+      const teamWrap = document.getElementById('album-fac-team-wrap');
+      const scSiteWrap = document.getElementById('album-sc-site-wrap');
+
+      if (prodWrap) prodWrap.classList.remove('hidden');
+      if (prodInp) prodInp.required = true;
+
+      if (albumType !== 'facility') {
+        if (branchWrap) branchWrap.classList.add('hidden');
+        if (scCb) scCb.checked = false;
+        if (clientLabel) clientLabel.textContent = '1. Customer (ชื่อลูกค้า) *';
+        if (deptFieldWrap) deptFieldWrap.classList.remove('hidden');
+        if (deptSel) deptSel.required = true;
+        if (prodLabel) prodLabel.textContent = '2. Product *';
+        if (divWrap) divWrap.classList.add('hidden');
+        if (teamWrap) teamWrap.classList.add('hidden');
+        if (scSiteWrap) scSiteWrap.classList.add('hidden');
+        if (custInp && custInp.closest('div')) {
+          custInp.closest('div').classList.add('hidden');
+          custInp.required = false;
+        }
+        return;
+      }
+
+      if (branchWrap) branchWrap.classList.remove('hidden');
+      if (deptFieldWrap) deptFieldWrap.classList.add('hidden');
+      if (deptSel) deptSel.required = false;
+      if (divWrap) divWrap.classList.add('hidden');
+      if (teamWrap) teamWrap.classList.add('hidden');
+      if (scSiteWrap) scSiteWrap.classList.add('hidden');
+
+      const branch = branchSel ? branchSel.value : 'Fire & Security Service';
+      if (clientInp && (!clientInp.value || ['Fire & Security Service', 'Air Conditioning Services', 'UPS Services', 'Service Center'].includes(clientInp.value))) {
+        clientInp.value = branch;
+      }
+
+      if (branch === 'Fire & Security Service') {
+        if (scCb) scCb.checked = false;
+        if (fsBox) fsBox.classList.remove('hidden');
+        if (scBox) scBox.classList.add('hidden');
+        if (clientLabel) clientLabel.textContent = '1. Facility Services (Fire & Security Service) *';
+        if (prodLabel) prodLabel.textContent = '3. Product *';
+        if (custInp && custInp.closest('div')) {
+          custInp.closest('div').classList.remove('hidden');
+          custInp.required = true;
+        }
+        if (custLabel) custLabel.textContent = '4. Customer (ชื่อลูกค้า) *';
+      } else if (branch === 'Service Center') {
+        if (scCb) scCb.checked = true;
+        if (fsBox) fsBox.classList.add('hidden');
+        if (scBox) scBox.classList.remove('hidden');
+        populateScCenterSelect('album-album-sc-center', scPath.center || '');
+        if (clientLabel) clientLabel.textContent = '1. Facility Services (Service Center) *';
+        if (prodLabel) prodLabel.textContent = '3. Product *';
+        if (custInp && custInp.closest('div')) {
+          custInp.closest('div').classList.remove('hidden');
+          custInp.required = true;
+        }
+        if (custLabel) custLabel.textContent = '4. Customer (ชื่อลูกค้า) *';
+      } else {
+        // Air Conditioning Services or UPS Services -> Product -> Customer
+        if (scCb) scCb.checked = false;
+        if (fsBox) fsBox.classList.add('hidden');
+        if (scBox) scBox.classList.add('hidden');
+        if (clientLabel) clientLabel.textContent = `1. Facility Services (${branch}) *`;
+        if (prodLabel) prodLabel.textContent = '2. Product *';
+        if (custInp && custInp.closest('div')) {
+          custInp.closest('div').classList.remove('hidden');
+          custInp.required = true;
+        }
+        if (custLabel) custLabel.textContent = '3. Customer (ชื่อลูกค้า) *';
+      }
+    }
+
+function openNewAlbumModal() {
       renderDepartmentDropdowns(navPath.dept || (currentUser && currentUser.dept));
       renderProductSuggestions();
 
@@ -4897,22 +5028,24 @@ create policy "Public Access workdrive-photos" on storage.objects
       if (isScInit && prodInp && scPath.product) prodInp.value = scPath.product;
       syncNewAlbumModeUi();
 
-      const useFacDivTeam = !isScInit && isNonScFacilityClient(clientInp.value);
-      refreshFacTeamAndDivisionDatalists(clientInp.value);
-      const divInp = document.getElementById('album-fac-division');
-      const teamInp = document.getElementById('album-fac-team');
-      if (divInp) divInp.value = useFacDivTeam ? (navPath.dept || '') : '';
-      if (teamInp) teamInp.value = useFacDivTeam ? (navPath.product || 'Tanee Team') : '';
+      const branchSel = document.getElementById('album-fac-branch');
+      const fsTeamInp = document.getElementById('album-fs-team-input');
       const custInpNew = document.getElementById('album-fac-customer');
-      if (custInpNew) custInpNew.value = useFacDivTeam ? (navPath.facCustomer || '') : '';
-      syncFacModalFields('new', useFacDivTeam);
-      clientInp.oninput = function() {
-        syncNewAlbumTypeFromClient();
-        const scChecked = !!(document.getElementById('album-is-sc') && document.getElementById('album-is-sc').checked);
-        const facNow = !scChecked && isNonScFacilityClient(this.value);
-        refreshFacTeamAndDivisionDatalists(this.value);
-        syncFacModalFields('new', facNow);
-      };
+      const curClientStr = String(clientInp.value || '');
+      if (/air\s*conditioning/i.test(curClientStr) && branchSel) branchSel.value = 'Air Conditioning Services';
+      else if (/ups/i.test(curClientStr) && branchSel) branchSel.value = 'UPS Services';
+      else if (/service\s*center/i.test(curClientStr) || isScInit) {
+        if (branchSel) branchSel.value = 'Service Center';
+      } else if (branchSel) {
+        branchSel.value = 'Fire & Security Service';
+      }
+      if (fsTeamInp) {
+        fsTeamInp.value = FIRE_SECURITY_TEAMS.includes(navPath.dept) ? navPath.dept : (navPath.product && FIRE_SECURITY_TEAMS.includes(navPath.product) ? navPath.product : '');
+      }
+      if (custInpNew) {
+        custInpNew.value = navPath.facCustomer || '';
+      }
+      onAlbumDiagramBranchChange();
 
       pendingNewAlbumCover = '';
       pendingNewAlbumCoverPos = '50% 50%';
@@ -4940,24 +5073,77 @@ create policy "Public Access workdrive-photos" on storage.objects
       if (submitBtn) submitBtn.disabled = true;
 
       try {
-        const isSc = !!(document.getElementById('album-is-sc') && document.getElementById('album-is-sc').checked);
-        const scCenter = isSc ? (document.getElementById('album-album-sc-center').value || '').trim() : '';
-        const scSite = isSc ? (document.getElementById('album-sc-site').value || '').trim() : '';
-        const client = isSc ? (scCenter || 'Service Center') : document.getElementById('album-client').value.trim();
-        const isFacDivTeam = !isSc && isNonScFacilityClient(client);
-        const facDivision = isFacDivTeam ? (document.getElementById('album-fac-division').value || '').trim() : '';
-        const facTeam = isFacDivTeam ? (document.getElementById('album-fac-team').value || '').trim() : '';
-        const facCustomer = isFacDivTeam ? (document.getElementById('album-fac-customer').value || '').trim() : '';
-        const dept = isSc ? 'Service Center' : (isFacDivTeam ? facDivision : document.getElementById('album-dept').value);
-        const product = isFacDivTeam ? facTeam : document.getElementById('album-product').value.trim();
+        const albumType = document.getElementById('album-type').value === 'facility' ? 'facility' : 'customer';
+        const branchSel = document.getElementById('album-fac-branch');
+        const branch = albumType === 'facility' ? (branchSel ? branchSel.value : 'Fire & Security Service') : 'Customer';
+        const fsTeamVal = (document.getElementById('album-fs-team-input') ? document.getElementById('album-fs-team-input').value : '').trim();
+        const scRegionVal = (document.getElementById('album-album-sc-center') ? document.getElementById('album-album-sc-center').value : '').trim();
+        const custFieldVal = (document.getElementById('album-fac-customer') ? document.getElementById('album-fac-customer').value : '').trim();
+        const rawClientInp = document.getElementById('album-client').value.trim();
+        const prodFieldVal = document.getElementById('album-product').value.trim();
         const thaiDate = document.getElementById('album-thai-date').value.trim();
         const note = document.getElementById('album-note').value.trim();
 
-        if (!client || !dept || !product || !thaiDate || (isFacDivTeam && !facCustomer)) return;
-        if (isSc && (!scCenter || !scSite)) {
-          alert('กรุณาเลือกศูนย์บริการ และกรอก Site งานให้ครบถ้วนครับ');
-          return;
+        let client = rawClientInp;
+        let dept = document.getElementById('album-dept').value || 'ทั่วไป';
+        let product = prodFieldVal;
+        let isSc = false;
+        let scCenter = '';
+        let scSite = '';
+        let isFacDivTeam = false;
+        let facDivision = '';
+        let facTeam = '';
+        let facCustomer = '';
+
+        if (albumType === 'facility') {
+          if (branch === 'Fire & Security Service') {
+            client = rawClientInp || 'Fire & Security Service';
+            if (!fsTeamVal) {
+              alert('กรุณาเลือกหรือกรอกชื่อ Teams ใน Fire & Security Service ครับ');
+              return;
+            }
+            dept = fsTeamVal;
+            product = prodFieldVal;
+            facCustomer = custFieldVal;
+            if (!product || !facCustomer) {
+              alert('กรุณากรอก Product และ Customer ให้ครบถ้วนครับ');
+              return;
+            }
+          } else if (branch === 'Service Center') {
+            client = rawClientInp || 'Service Center';
+            if (!scRegionVal) {
+              alert('กรุณาเลือกศูนย์บริการภาคครับ');
+              return;
+            }
+            isSc = true;
+            scCenter = scRegionVal;
+            dept = scRegionVal;
+            product = prodFieldVal;
+            facCustomer = custFieldVal;
+            scSite = custFieldVal;
+            if (!product || !facCustomer) {
+              alert('กรุณากรอก Product และ Customer ให้ครบถ้วนครับ');
+              return;
+            }
+          } else {
+            client = rawClientInp || branch;
+            dept = branch;
+            product = prodFieldVal;
+            facCustomer = custFieldVal;
+            if (!product || !facCustomer) {
+              alert('กรุณากรอก Product และ Customer ให้ครบถ้วนครับ');
+              return;
+            }
+          }
+        } else {
+          if (!client || !product) {
+            alert('กรุณากรอก Customer และ Product ให้ครบถ้วนครับ');
+            return;
+          }
+          dept = document.getElementById('album-dept').value || 'Customer';
         }
+
+        if (!thaiDate) return;
         if (isSc && scCenter) {
           const centers = getServiceCentersList();
           if (!centers.includes(scCenter)) {
@@ -4967,10 +5153,10 @@ create policy "Public Access workdrive-photos" on storage.objects
         }
 
         // Group (Customer / Facility Services): an existing folder name always keeps its own group
-        let albumType = document.getElementById('album-type').value === 'facility' ? 'facility' : 'customer';
+        let resolvedAlbumType = albumType;
         const existingClientType = typeOfClient(client);
-        if (existingClientType && existingClientType !== albumType) {
-          albumType = existingClientType;
+        if (existingClientType && existingClientType !== resolvedAlbumType) {
+          resolvedAlbumType = existingClientType;
           alert(`ชื่อ "${client}" มีอยู่ในกลุ่ม ${typeLabel(existingClientType)} แล้ว ระบบจะเพิ่มอัลบั้มไว้ในกลุ่มเดิมให้ครับ`);
         }
 
@@ -5011,7 +5197,7 @@ create policy "Public Access workdrive-photos" on storage.objects
 
         const newAlb = {
           id: newId,
-          type: albumType,
+          type: resolvedAlbumType,
           client,
           dept,
           product,
@@ -6599,7 +6785,13 @@ create policy "Public Access workdrive-photos" on storage.objects
           closeDeleteConfirmModal();
           showFolderDashboard();
         } else if (type === 'product') {
-          const toDelete = albums.filter(a => a.client === navPath.client && a.dept === navPath.dept && a.product === targetId);
+          const isFacDelCtx = isNonScFacilityClient(navPath.client);
+          const toDelete = albums.filter(a =>
+            !a.isSystemLogContainer &&
+            a.client === navPath.client &&
+            (isFacDelCtx ? (getFacDivisionOfAlbum(a) === navPath.dept || a.dept === navPath.dept) : a.dept === navPath.dept) &&
+            (isFacDelCtx ? (getFacTeamOfAlbum(a) === targetId || a.product === targetId) : a.product === targetId)
+          );
           const totalPics = toDelete.reduce((s, a) => s + a.photos.length, 0);
           await removeCloudPhotosForAlbums(toDelete);
           albums = albums.filter(a => !(a.client === navPath.client && a.dept === navPath.dept && a.product === targetId));
@@ -6713,10 +6905,25 @@ create policy "Public Access workdrive-photos" on storage.objects
       return snapId;
     }
 
-    function restoreToSnapshot(snapId) {
+    async function restoreToSnapshot(snapId) {
       if (!isAdminUser()) {
         alert('เฉพาะบัญชีแอดมิน (sarunchana.h) เท่านั้นที่สามารถย้อนเวลาได้');
         return;
+      }
+      if (isCloudConnected && supabaseClient && navigator.onLine) {
+        try {
+          const { data } = await withTimeout(
+            supabaseClient.from('workdrive_state').select('*').eq('id', TEAM_ROW_ID).maybeSingle(),
+            8000, 'pull-before-restore'
+          );
+          if (data && Array.isArray(data.albums)) {
+            const remoteSnaps = (data.albums.find(a => a && a.id === '__cspm_snapshots__') || {}).snapshots || [];
+            const localSnaps = (getSnapshotContainer().snapshots) || [];
+            const sMap = new Map();
+            [...remoteSnaps, ...localSnaps].forEach(s => { if (s && s.id && !sMap.has(s.id)) sMap.set(s.id, s); });
+            getSnapshotContainer().snapshots = Array.from(sMap.values()).sort((a, z) => (z.createdAtMs || 0) - (a.createdAtMs || 0)).slice(0, 25);
+          }
+        } catch (e) {}
       }
       const snapContainer = getSnapshotContainer();
       const targetSnap = snapContainer.snapshots.find(s => s.id === snapId);
@@ -6730,19 +6937,52 @@ create policy "Public Access workdrive-photos" on storage.objects
       );
       if (!ok) return;
 
-      captureTimeSnapshot(`ก่อน Reset กลับไป ${targetSnap.thaiTimestamp}`);
-
       const sysContainers = albums.filter(a => a.isSystemLogContainer);
-      const restoredAlbums = JSON.parse(JSON.stringify(targetSnap.albumsData));
-      albums = [...restoredAlbums, ...sysContainers];
+      const restoredAlbums = JSON.parse(JSON.stringify(targetSnap.albumsData.filter(a => !a || !a.isSystemLogContainer)));
 
-      recordActivityLog('restore_snapshot', {
+      const logC = getSystemLogContainer();
+      logC.logs.unshift({
+        id: 'log-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+        actionType: 'restore_snapshot',
+        snapshotId: null,
+        username: currentUser ? currentUser.name : 'sarunchana.h',
+        dept: currentUser ? (currentUser.dept || '-') : '-',
         albumTitle: `Reset ย้อนเวลาไปที่ ${targetSnap.thaiTimestamp}`,
-        photoCount: targetSnap.photoCount,
-        detail: `แอดมิน ${currentUser.name} สั่ง Reset ข้อมูลย้อนกลับไป ณ เวลา ${targetSnap.thaiTimestamp} (${targetSnap.label})`
+        photoCount: targetSnap.photoCount || 0,
+        detail: `แอดมิน ${currentUser ? currentUser.name : 'sarunchana.h'} สั่ง Reset ข้อมูลย้อนกลับไป ณ เวลา ${targetSnap.thaiTimestamp} (${targetSnap.label})`,
+        thaiTimestamp: getThaiNowFormatted(),
+        createdAtMs: Date.now()
       });
+      if (logC.logs.length > 600) logC.logs = logC.logs.slice(0, 600);
 
-      saveAlbums();
+      albums = [...restoredAlbums, ...sysContainers];
+      normalizeAlbumTypes();
+      editVersion++;
+      setPending(false);
+      persistAlbumsLocal();
+
+      if (isCloudConnected && supabaseClient && navigator.onLine) {
+        try {
+          const state = cloudStateForPush();
+          await withTimeout(
+            supabaseClient.from('workdrive_state').upsert({
+              id: TEAM_ROW_ID,
+              albums: state.albums,
+              depts: state.depts,
+              accounts: state.accounts,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'id' }),
+            20000, 'push-restore'
+          );
+          syncBase = deepCopy(state);
+          idbSet('base', syncBase).catch(() => {});
+          try { localStorage.setItem(LASTSYNC_KEY, String(Date.now())); } catch (e) {}
+        } catch (err) {
+          setPending(true);
+          pushTeamStateToCloud();
+        }
+      }
+
       closeAdminLogsModal();
       goHome();
       alert(`ย้อนเวลาข้อมูลกลับไป ณ "${targetSnap.thaiTimestamp}" เรียบร้อยแล้วครับ`);
