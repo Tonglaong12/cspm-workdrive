@@ -1756,6 +1756,37 @@ create policy "Public Access workdrive-photos" on storage.objects
         });
         return { id: '__cspm_app_settings__', isSystemLogContainer: true, photos: [], settings: mergedSet };
       }
+      if ((l && l.id === '__cspm_system_update__') || (r && r.id === '__cspm_system_update__')) {
+        const rUp = (r && r.notice && typeof r.notice === 'object') ? r.notice : null;
+        const lUp = (l && l.notice && typeof l.notice === 'object') ? l.notice : null;
+        const bUp = (b && b.notice && typeof b.notice === 'object') ? b.notice : null;
+        const pick = (a, z) => {
+          if (!a) return z;
+          if (!z) return a;
+          const ta = a.updatedAtMs || 0;
+          const tz = z.updatedAtMs || 0;
+          return ta >= tz ? a : z;
+        };
+        let chosen = pick(lUp, rUp);
+        if (bUp && chosen && chosen.id === bUp.id && (bUp.updatedAtMs || 0) > (chosen.updatedAtMs || 0)) {
+          chosen = bUp;
+        }
+        if (chosen) {
+          const mergedResp = {
+            ...(rUp && rUp.responses ? rUp.responses : {}),
+            ...(lUp && lUp.responses ? lUp.responses : {})
+          };
+          Object.keys(mergedResp).forEach(k => {
+            const rv = rUp && rUp.responses ? rUp.responses[k] : null;
+            const lv = lUp && lUp.responses ? lUp.responses[k] : null;
+            if (rv && lv) {
+              mergedResp[k] = (lv.timeMs || 0) >= (rv.timeMs || 0) ? lv : rv;
+            }
+          });
+          chosen = { ...chosen, responses: mergedResp };
+        }
+        return { id: '__cspm_system_update__', isSystemLogContainer: true, photos: [], notice: chosen };
+      }
       const out = mergeObjectFields({ ...l, photos: undefined }, b ? { ...b, photos: undefined } : null, { ...r, photos: undefined });
       out.photos = mergeKeyedList(l.photos || [], b ? (b.photos || []) : [], r.photos || [], p => p.id, mergeObjectFields);
       return out;
@@ -1937,6 +1968,7 @@ create policy "Public Access workdrive-photos" on storage.objects
     }
 
     function refreshViewsAfterSync() {
+      applyInstallBannerVisibility();
       if (!currentUser) return;
       updateStats();
       if (activeAlbumId) {
@@ -1950,6 +1982,8 @@ create policy "Public Access workdrive-photos" on storage.objects
         renderBreadcrumbAndHeaders();
         renderCurrentLevelFolders();
       }
+      checkSystemUpdateNoticeForUser();
+      renderAdminUpdateResponses();
     }
 
     function adoptRemote(remote) {
@@ -2043,6 +2077,11 @@ create policy "Public Access workdrive-photos" on storage.objects
         : localAccounts;
 
       albums = mergedAlbums;
+      const mergedSetContainer = albums.find(a => a && a.id === '__cspm_app_settings__');
+      if (mergedSetContainer && mergedSetContainer.settings && typeof mergedSetContainer.settings.showInstallBanner === 'boolean') {
+        try { localStorage.setItem(INSTALL_BANNER_ENABLED_KEY, mergedSetContainer.settings.showInstallBanner ? '1' : '0'); } catch (e) {}
+      }
+      applyInstallBannerVisibility();
       try { localStorage.setItem(DEPTS_KEY, JSON.stringify(mergedDepts)); } catch (e) {}
       try { localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(mergedAccounts)); } catch (e) {}
       persistAlbumsLocal();
@@ -2365,6 +2404,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         if (!hadLocalData) await syncPromise;
       }
 
+      applyInstallBannerVisibility();
       if (savedUser) {
         currentUser = JSON.parse(savedUser);
         showApp();
@@ -3052,7 +3092,25 @@ create policy "Public Access workdrive-photos" on storage.objects
     const SYSTEM_UPDATE_KEY = 'cspm_workdrive_system_update_v1';
     let lastSeenUpdateId = null;
 
+    function getSystemUpdateContainer() {
+      if (!Array.isArray(albums)) return null;
+      return albums.find(a => a && a.id === '__cspm_system_update__') || null;
+    }
+
+    function getOrCreateSystemUpdateContainer() {
+      let c = getSystemUpdateContainer();
+      if (!c) {
+        c = { id: '__cspm_system_update__', isSystemLogContainer: true, photos: [], notice: null };
+        albums.push(c);
+      }
+      return c;
+    }
+
     function getSystemUpdateState() {
+      const c = getSystemUpdateContainer();
+      if (c && Object.prototype.hasOwnProperty.call(c, 'notice')) {
+        return c.notice || null;
+      }
       try {
         const raw = localStorage.getItem(SYSTEM_UPDATE_KEY);
         return raw ? JSON.parse(raw) : null;
@@ -3066,6 +3124,11 @@ create policy "Public Access workdrive-photos" on storage.objects
         if (!stateObj) localStorage.removeItem(SYSTEM_UPDATE_KEY);
         else localStorage.setItem(SYSTEM_UPDATE_KEY, JSON.stringify(stateObj));
       } catch (e) {}
+      if (Array.isArray(albums)) {
+        const c = getOrCreateSystemUpdateContainer();
+        c.notice = stateObj || null;
+        saveAlbums();
+      }
     }
 
     function openAdminUpdateModal() {
@@ -3092,11 +3155,13 @@ create policy "Public Access workdrive-photos" on storage.objects
         alert('กรุณาพิมพ์ข้อความแจ้งเตือนก่อนครับ');
         return;
       }
+      const nowMs = Date.now();
       const nextState = {
-        id: 'upd-' + Date.now(),
+        id: 'upd-' + nowMs,
         message: msg,
         sentBy: currentUser ? currentUser.name : 'sarunchana.h',
         sentAtThai: getThaiNowFormatted(),
+        updatedAtMs: nowMs,
         active: true,
         responses: {}
       };
@@ -3155,12 +3220,15 @@ create policy "Public Access workdrive-photos" on storage.objects
       if (st && st.active) {
         if (!st.responses || typeof st.responses !== 'object') st.responses = {};
         const uKey = (currentUser.name || '').trim().toLowerCase();
+        const nowMs = Date.now();
+        st.updatedAtMs = nowMs;
         st.responses[uKey] = {
           username: currentUser.name,
           dept: currentUser.dept || '-',
           activity: getCurrentActivityLabel(),
           choice: choice,
-          timeThai: getThaiNowFormatted()
+          timeThai: getThaiNowFormatted(),
+          timeMs: nowMs
         };
         saveSystemUpdateState(st);
       }
@@ -6703,7 +6771,7 @@ function openNewAlbumModal() {
       }
     }
 
-    function setInstallBannerEnabled(enabled) {
+    async function setInstallBannerEnabled(enabled) {
       if (!isAdminUser()) return;
       const boolVal = !!enabled;
       try {
@@ -6716,6 +6784,9 @@ function openNewAlbumModal() {
       saveAlbums();
       applyInstallBannerVisibility();
       lucide.createIcons();
+      if (isCloudConnected && supabaseClient && navigator.onLine) {
+        await pushTeamStateToCloud();
+      }
     }
 
     function setupIphoneFullScreenApp() {
