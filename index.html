@@ -1746,32 +1746,25 @@ create policy "Public Access workdrive-photos" on storage.objects
         const rSet = (r && r.settings && typeof r.settings === 'object') ? r.settings : {};
         const lSet = (l && l.settings && typeof l.settings === 'object') ? l.settings : {};
         const bSet = (b && b.settings && typeof b.settings === 'object') ? b.settings : {};
-        const mergedSet = { ...rSet };
-        const allKeys = new Set([...Object.keys(rSet), ...Object.keys(lSet), ...Object.keys(bSet)]);
-        allKeys.forEach(k => {
-          const lv = lSet[k];
-          const bv = bSet[k];
-          if (JSON.stringify(lv) !== JSON.stringify(bv)) {
-            if (lv !== undefined) mergedSet[k] = lv;
-          }
-        });
+        const candidates = [lSet, rSet, bSet].filter(s => s && typeof s.showInstallBanner === 'boolean');
+        candidates.sort((a, z) => Number(z.updatedAtMs || 0) - Number(a.updatedAtMs || 0));
+        const winner = candidates[0] || {};
+        const mergedSet = { ...rSet, ...bSet, ...lSet };
+        if (typeof winner.showInstallBanner === 'boolean') {
+          mergedSet.showInstallBanner = winner.showInstallBanner;
+          mergedSet.updatedAtMs = winner.updatedAtMs || 0;
+          if (winner.updatedBy) mergedSet.updatedBy = winner.updatedBy;
+        }
         return { id: '__cspm_app_settings__', isSystemLogContainer: true, photos: [], settings: mergedSet };
       }
       if ((l && l.id === '__cspm_system_update__') || (r && r.id === '__cspm_system_update__')) {
         const rUp = (r && r.notice && typeof r.notice === 'object') ? r.notice : null;
         const lUp = (l && l.notice && typeof l.notice === 'object') ? l.notice : null;
         const bUp = (b && b.notice && typeof b.notice === 'object') ? b.notice : null;
-        const pick = (a, z) => {
-          if (!a) return z;
-          if (!z) return a;
-          const ta = a.updatedAtMs || 0;
-          const tz = z.updatedAtMs || 0;
-          return ta >= tz ? a : z;
-        };
-        let chosen = pick(lUp, rUp);
-        if (bUp && chosen && chosen.id === bUp.id && (bUp.updatedAtMs || 0) > (chosen.updatedAtMs || 0)) {
-          chosen = bUp;
-        }
+        const stampOf = (u) => (!u ? 0 : Math.max(Number(u.updatedAtMs || 0), Number(u.clearedAtMs || 0)));
+        const candidates = [lUp, rUp, bUp].filter(Boolean);
+        candidates.sort((a, z) => stampOf(z) - stampOf(a));
+        let chosen = candidates[0] || null;
         if (chosen) {
           const mergedResp = {
             ...(rUp && rUp.responses ? rUp.responses : {}),
@@ -2400,9 +2393,7 @@ create policy "Public Access workdrive-photos" on storage.objects
 
       initSupabaseClient();
       if (isCloudConnected) {
-        // Open instantly from the saved copy; the team data is merged in the background
-        const syncPromise = syncFromCloud(false, false);
-        if (!hadLocalData) await syncPromise;
+        await withTimeout(syncFromCloud(false, false), 4000, 'init-sync').catch(() => {});
       }
 
       applyInstallBannerVisibility();
@@ -3176,13 +3167,26 @@ create policy "Public Access workdrive-photos" on storage.objects
       alert('ส่งหน้าต่างแจ้งเตือนอัปเดตระบบเรียบร้อยแล้วครับ');
     }
 
-    function clearActiveSystemUpdate() {
+    async function clearActiveSystemUpdate() {
       if (!isAdminUser()) return;
-      saveSystemUpdateState(null);
+      const prev = getSystemUpdateState() || {};
+      const nowMs = Date.now();
+      const cancelledState = {
+        ...prev,
+        id: prev.id || ('upd-' + nowMs),
+        active: false,
+        message: '',
+        updatedAtMs: nowMs,
+        clearedAtMs: nowMs
+      };
+      saveSystemUpdateState(cancelledState);
       lastSeenUpdateId = null;
       const noticeModal = document.getElementById('system-update-notice-modal');
       if (noticeModal) noticeModal.classList.add('hidden');
       renderAdminUpdateResponses();
+      if (isCloudConnected && supabaseClient && navigator.onLine) {
+        await pushTeamStateToCloud();
+      }
     }
 
     function checkSystemUpdateNoticeForUser() {
@@ -6785,11 +6789,14 @@ function openNewAlbumModal() {
       c.settings.showInstallBanner = boolVal;
       c.settings.updatedBy = currentUser ? currentUser.name : 'sarunchana.h';
       c.settings.updatedAtMs = Date.now();
-      saveAlbums();
+      normalizeAlbumTypes();
+      editVersion++;
+      setPending(true);
+      persistAlbumsLocal();
       applyInstallBannerVisibility();
       lucide.createIcons();
       if (isCloudConnected && supabaseClient && navigator.onLine) {
-        await pushTeamStateToCloud();
+        await runCloudSync({});
       }
     }
 
