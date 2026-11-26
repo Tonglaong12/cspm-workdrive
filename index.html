@@ -1741,6 +1741,21 @@ create policy "Public Access workdrive-photos" on storage.objects
         });
         return { id: '__cspm_folder_covers__', isSystemLogContainer: true, photos: [], covers: mergedCovers };
       }
+      if ((l && l.id === '__cspm_app_settings__') || (r && r.id === '__cspm_app_settings__')) {
+        const rSet = (r && r.settings && typeof r.settings === 'object') ? r.settings : {};
+        const lSet = (l && l.settings && typeof l.settings === 'object') ? l.settings : {};
+        const bSet = (b && b.settings && typeof b.settings === 'object') ? b.settings : {};
+        const mergedSet = { ...rSet };
+        const allKeys = new Set([...Object.keys(rSet), ...Object.keys(lSet), ...Object.keys(bSet)]);
+        allKeys.forEach(k => {
+          const lv = lSet[k];
+          const bv = bSet[k];
+          if (JSON.stringify(lv) !== JSON.stringify(bv)) {
+            if (lv !== undefined) mergedSet[k] = lv;
+          }
+        });
+        return { id: '__cspm_app_settings__', isSystemLogContainer: true, photos: [], settings: mergedSet };
+      }
       const out = mergeObjectFields({ ...l, photos: undefined }, b ? { ...b, photos: undefined } : null, { ...r, photos: undefined });
       out.photos = mergeKeyedList(l.photos || [], b ? (b.photos || []) : [], r.photos || [], p => p.id, mergeObjectFields);
       return out;
@@ -1956,6 +1971,11 @@ create policy "Public Access workdrive-photos" on storage.objects
         depts: remote.depts || getDepartments(),
         accounts: remote.accounts || getRegisteredAccounts()
       });
+      const remoteSet = albums.find(a => a && a.id === '__cspm_app_settings__');
+      if (remoteSet && remoteSet.settings && typeof remoteSet.settings.showInstallBanner === 'boolean') {
+        try { localStorage.setItem(INSTALL_BANNER_ENABLED_KEY, remoteSet.settings.showInstallBanner ? '1' : '0'); } catch (e) {}
+      }
+      applyInstallBannerVisibility();
       idbSet('base', syncBase).catch(() => {});
       try { localStorage.setItem(LASTSYNC_KEY, String(Date.now())); } catch (e) {}
     }
@@ -6616,7 +6636,26 @@ function openNewAlbumModal() {
     // ==================== IPHONE FULL-SCREEN PWA SETUP (ICON & MANIFEST) ====================
     const INSTALL_BANNER_ENABLED_KEY = 'cspm_workdrive_show_install_banner_v1';
 
+    function getTeamAppSettingsContainer() {
+      if (!Array.isArray(albums)) return null;
+      return albums.find(a => a && a.id === '__cspm_app_settings__') || null;
+    }
+
+    function getOrCreateTeamAppSettingsContainer() {
+      let c = getTeamAppSettingsContainer();
+      if (!c) {
+        c = { id: '__cspm_app_settings__', isSystemLogContainer: true, photos: [], settings: {} };
+        albums.push(c);
+      }
+      if (!c.settings || typeof c.settings !== 'object') c.settings = {};
+      return c;
+    }
+
     function isInstallBannerEnabled() {
+      const c = getTeamAppSettingsContainer();
+      if (c && c.settings && typeof c.settings.showInstallBanner === 'boolean') {
+        return c.settings.showInstallBanner;
+      }
       try {
         const raw = localStorage.getItem(INSTALL_BANNER_ENABLED_KEY);
         if (raw === null) return true;
@@ -6649,10 +6688,10 @@ function openNewAlbumModal() {
         else secBox.classList.add('hidden');
       }
       if (statusBadge) {
-        statusBadge.textContent = enabled ? 'เปิดอยู่' : 'ปิดอยู่';
+        statusBadge.textContent = enabled ? 'เปิดโชว์ทั้งทีม' : 'ปิดซ่อนทั้งทีม';
         statusBadge.className = enabled
           ? 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800'
-          : 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700';
+          : 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-800';
       }
       if (btnOn && btnOff) {
         btnOn.className = enabled
@@ -6666,9 +6705,15 @@ function openNewAlbumModal() {
 
     function setInstallBannerEnabled(enabled) {
       if (!isAdminUser()) return;
+      const boolVal = !!enabled;
       try {
-        localStorage.setItem(INSTALL_BANNER_ENABLED_KEY, enabled ? '1' : '0');
+        localStorage.setItem(INSTALL_BANNER_ENABLED_KEY, boolVal ? '1' : '0');
       } catch (e) {}
+      const c = getOrCreateTeamAppSettingsContainer();
+      c.settings.showInstallBanner = boolVal;
+      c.settings.updatedBy = currentUser ? currentUser.name : 'sarunchana.h';
+      c.settings.updatedAtMs = Date.now();
+      saveAlbums();
       applyInstallBannerVisibility();
       lucide.createIcons();
     }
