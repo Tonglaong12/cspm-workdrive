@@ -3148,7 +3148,7 @@ create policy "Public Access workdrive-photos" on storage.objects
       document.getElementById('admin-update-compose-modal').classList.add('hidden');
     }
 
-    function publishSystemUpdateNotice() {
+    async function publishSystemUpdateNotice() {
       if (!isAdminUser()) return;
       const inp = document.getElementById('admin-update-message-input');
       const msg = (inp && inp.value || '').trim();
@@ -3170,6 +3170,9 @@ create policy "Public Access workdrive-photos" on storage.objects
       lastSeenUpdateId = null;
       renderAdminUpdateResponses();
       checkSystemUpdateNoticeForUser();
+      if (isCloudConnected && supabaseClient && navigator.onLine) {
+        await pushTeamStateToCloud();
+      }
       alert('ส่งหน้าต่างแจ้งเตือนอัปเดตระบบเรียบร้อยแล้วครับ');
     }
 
@@ -3191,11 +3194,11 @@ create policy "Public Access workdrive-photos" on storage.objects
         modal.classList.add('hidden');
         return;
       }
-      const uKey = (currentUser.name || '').trim().toLowerCase();
-      const myResp = st.responses && st.responses[uKey];
-      if (myResp && myResp.choice === 'dismissed' && st.id === lastSeenUpdateId) {
+      if (st.id && st.id === lastSeenUpdateId) {
         return;
       }
+      const uKey = (currentUser.name || '').trim().toLowerCase();
+      const myResp = st.responses && st.responses[uKey];
       const t1 = document.getElementById('update-marquee-text-1');
       const t2 = document.getElementById('update-marquee-text-2');
       if (t1) t1.textContent = st.message;
