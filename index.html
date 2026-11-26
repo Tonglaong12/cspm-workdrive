@@ -1024,7 +1024,7 @@
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
-      <form onsubmit="createAlbum(event)" class="p-6 space-y-4 max-h-[82vh] overflow-y-auto">
+      <form onsubmit="createAlbum(event)" novalidate class="p-6 space-y-4 max-h-[82vh] overflow-y-auto">
         <!-- ผังโครงสร้างหลัก: Facility Services / Customer -->
         <div>
           <label class="block text-xs font-semibold text-slate-600 mb-1.5">โครงสร้างหลัก *</label>
@@ -1090,7 +1090,7 @@
         <!-- Step 1: Customer / Facility Services Name -->
         <div id="album-client-field-wrap">
           <label id="album-client-label" class="block text-xs font-semibold text-slate-600 mb-1">1. ชื่อลูกค้า (Customer Name) *</label>
-          <input id="album-client" oninput="syncNewAlbumTypeFromClient()" type="text" list="customer-suggestions" required placeholder="พิมพ์หรือเลือกชื่อลูกค้า เช่น บจก. สยามคลาวด์ เซอร์วิส"
+          <input id="album-client" oninput="syncNewAlbumTypeFromClient()" type="text" list="customer-suggestions" placeholder="พิมพ์หรือเลือกชื่อลูกค้า เช่น บจก. สยามคลาวด์ เซอร์วิส"
             class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-[#EB2D2D] outline-none" />
           <datalist id="customer-suggestions"></datalist>
         </div>
@@ -1105,7 +1105,7 @@
               <i data-lucide="plus-circle" class="w-3 h-3"></i> เพิ่มสังกัดใหม่
             </button>
           </div>
-          <select id="album-dept" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] outline-none"></select>
+          <select id="album-dept" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] outline-none"></select>
           <div id="modal-add-dept-box" class="hidden mt-2 flex gap-2">
             <input id="modal-new-dept-input" type="text" placeholder="พิมพ์ชื่อสังกัดใหม่..."
               class="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 text-xs focus:border-[#EB2D2D] outline-none" />
@@ -1122,7 +1122,7 @@
               <i data-lucide="trash-2" class="w-3 h-3"></i> จัดการ / ลบชื่อ Product
             </button>
           </div>
-          <input id="album-product" type="text" list="product-suggestions" required placeholder="พิมพ์หรือเลือก Product เช่น Clean Agent (IG-100 / Novec 1230)"
+          <input id="album-product" type="text" list="product-suggestions" placeholder="พิมพ์หรือเลือก Product เช่น Clean Agent (IG-100 / Novec 1230)"
             class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-[#EB2D2D] outline-none" />
           <datalist id="product-suggestions"></datalist>
         </div>
@@ -1164,7 +1164,7 @@
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-600 mb-1">วัน/เดือน/ปีพ.ศ. ที่จะบันทึก *</label>
-            <input id="album-thai-date" type="text" required placeholder="เช่น 20/11/2569"
+            <input id="album-thai-date" type="text" placeholder="เช่น 20/11/2569"
               class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-red-50/40 font-mono font-semibold text-[#EB2D2D] text-sm focus:border-[#EB2D2D] outline-none" />
           </div>
         </div>
@@ -3153,7 +3153,8 @@ create policy "Public Access workdrive-photos" on storage.objects
       if (level === 'root') {
         navPath = { client: null, dept: null, product: null, facCustomer: null };
       } else if (level === 'client') {
-        navPath = { client: navPath.client, dept: null, product: null, facCustomer: null };
+        const skipDiv = isDirectProductCustomerFacClient(navPath.client);
+        navPath = { client: navPath.client, dept: skipDiv ? '__DIRECT_FAC__' : null, product: null, facCustomer: null };
       } else if (level === 'dept') {
         navPath = { client: navPath.client, dept: navPath.dept, product: null, facCustomer: null };
       } else if (level === 'product') {
@@ -3167,7 +3168,8 @@ create policy "Public Access workdrive-photos" on storage.objects
     function enterCustomer(clientName) {
       const clientType = typeOfClient(clientName);
       if (clientType) setCurrentAlbumType(clientType);
-      navPath = { client: clientName, dept: null, product: null, facCustomer: null };
+      const skipDiv = isDirectProductCustomerFacClient(clientName);
+      navPath = { client: clientName, dept: skipDiv ? '__DIRECT_FAC__' : null, product: null, facCustomer: null };
       activeAlbumId = null;
       showFolderDashboard();
     }
@@ -3591,7 +3593,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         );
       }
 
-      if (navPath.dept) {
+      if (navPath.dept && navPath.dept !== '__DIRECT_FAC__') {
         parts.push(`<i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-400"></i>`);
         parts.push(
           `<button onclick="navigateToLevel('dept')" class="font-semibold ${!navPath.product ? 'text-slate-900' : 'text-[#EB2D2D] hover:underline'} cursor-pointer">
@@ -3628,7 +3630,7 @@ create policy "Public Access workdrive-photos" on storage.objects
       } else if (!navPath.dept) {
         const isScCtx = isServiceCenterClientName(navPath.client);
         const isFacDivCtx = isNonScFacilityClient(navPath.client);
-        levelBadge.textContent = 'ขั้นตอนที่ 2 / 4';
+        levelBadge.textContent = (isScCtx || isFacDivCtx) ? 'ขั้นตอนที่ 2 / 5' : 'ขั้นตอนที่ 2 / 4';
         if (isScCtx) {
           levelHeading.textContent = `เลือกศูนย์บริการภาค — ${navPath.client}`;
           addLabel.textContent = 'เพิ่มศูนย์บริการภาคใน Service Center';
@@ -3642,28 +3644,37 @@ create policy "Public Access workdrive-photos" on storage.objects
         }
       } else if (!navPath.product) {
         const isScCtx = isServiceCenterClientName(navPath.client);
-        const isFacDivCtx = isNonScFacilityClient(navPath.client);
-        levelBadge.textContent = isScCtx ? 'ขั้นตอนที่ 3 / 5' : 'ขั้นตอนที่ 3 / 4';
-        if (isScCtx) {
+        const isDirectFac = isDirectProductCustomerFacClient(navPath.client);
+        const isFacDivCtx = isNonScFacilityClient(navPath.client) && !isDirectFac;
+        levelBadge.textContent = isDirectFac ? 'ขั้นตอนที่ 2 / 4' : ((isScCtx || isFacDivCtx) ? 'ขั้นตอนที่ 3 / 5' : 'ขั้นตอนที่ 3 / 4');
+        if (isDirectFac) {
+          levelHeading.textContent = `เลือก Product — ${navPath.client}`;
+          addLabel.textContent = 'เพิ่ม Product ใหม่';
+        } else if (isScCtx) {
           levelHeading.textContent = `เลือก Product — ศูนย์บริการภาค ${navPath.dept}`;
           addLabel.textContent = 'เพิ่ม Product ใหม่';
         } else if (isFacDivCtx) {
-          levelHeading.textContent = `เลือก Team — Division ${navPath.dept}`;
-          addLabel.textContent = 'เพิ่ม Team ใหม่';
+          // Inside a Teams folder (Tanee Teams ...) the next level is Product
+          levelHeading.textContent = isFireSecurityClientName(navPath.client)
+            ? `เลือก Product — Teams ${navPath.dept}`
+            : `เลือก Product — ${navPath.dept}`;
+          addLabel.textContent = 'เพิ่ม Product ใหม่';
         } else {
           levelHeading.textContent = `เลือก Product — สังกัด ${navPath.dept}`;
           addLabel.textContent = 'เพิ่ม Product ใหม่';
         }
       } else if ((isNonScFacilityClient(navPath.client) || isServiceCenterClientName(navPath.client)) && !navPath.facCustomer) {
         const isScCtx = isServiceCenterClientName(navPath.client);
-        levelBadge.textContent = isScCtx ? 'ขั้นตอนที่ 4 / 5' : 'ขั้นตอนที่ 4 / 5';
-        levelHeading.textContent = isScCtx
-          ? `เลือก Customer — ${navPath.product} (${navPath.dept})`
+        const isDirectFac = isDirectProductCustomerFacClient(navPath.client);
+        levelBadge.textContent = isDirectFac ? 'ขั้นตอนที่ 3 / 4' : 'ขั้นตอนที่ 4 / 5';
+        levelHeading.textContent = isDirectFac
+          ? `เลือก Customer — ${navPath.product} (${navPath.client})`
           : `เลือก Customer — ${navPath.product} (${navPath.dept})`;
         addLabel.textContent = 'เพิ่มอัลบั้ม Customer';
       } else {
+        const isDirectFac = isDirectProductCustomerFacClient(navPath.client);
         const isFacDivCtx = isNonScFacilityClient(navPath.client) || isServiceCenterClientName(navPath.client);
-        levelBadge.textContent = isFacDivCtx ? 'ขั้นตอนที่ 5 / 5' : 'ขั้นตอนที่ 4 / 4';
+        levelBadge.textContent = isDirectFac ? 'ขั้นตอนที่ 4 / 4' : (isFacDivCtx ? 'ขั้นตอนที่ 5 / 5' : 'ขั้นตอนที่ 4 / 4');
         levelHeading.textContent = isFacDivCtx
           ? `เลือกวัน/เดือน/ปีพ.ศ. — ${navPath.facCustomer} (${navPath.product})`
           : `เลือกวัน/เดือน/ปีพ.ศ. — ${navPath.product}`;
@@ -3673,6 +3684,21 @@ create policy "Public Access workdrive-photos" on storage.objects
 
 
     const DEFAULT_FAC_TEAMS = ['Tanee Teams', 'Kitsana Teams', 'Taywin Teams'];
+
+    // Fire & Security Service: Division (this folder) -> Teams -> Product -> Customer -> วันที่
+    function isFireSecurityClientName(name) {
+      return /fire\s*&\s*security/i.test(String(name || ''));
+    }
+
+    function isDirectProductCustomerFacClient(name) {
+      const s = String(name || '').trim().toLowerCase();
+      if (!s) return false;
+      if (isServiceCenterClientName(s)) return false;
+      if (/fire\s*&\s*security/i.test(s)) return false;
+      if (/air\s*conditioning|ups\s*services?/i.test(s)) return true;
+      const t = typeOfClient(name);
+      return t === 'facility';
+    }
 
     function isServiceCenterClientName(name) {
       const s = String(name || '').trim().toLowerCase();
@@ -3750,11 +3776,11 @@ create policy "Public Access workdrive-photos" on storage.objects
         if (prodWrap) prodWrap.classList.add('hidden');
         if (prodInp) prodInp.required = false;
         if (divWrap) divWrap.classList.remove('hidden');
-        if (divInp) divInp.required = true;
+        if (divInp) divInp.required = false;
         if (teamWrap) teamWrap.classList.remove('hidden');
-        if (teamInp) teamInp.required = true;
+        if (teamInp) teamInp.required = false;
         if (custWrap) custWrap.classList.remove('hidden');
-        if (custInp) custInp.required = true;
+        if (custInp) custInp.required = false;
       } else {
         if (deptFieldWrap) deptFieldWrap.classList.remove('hidden');
         if (deptSel) deptSel.required = true;
@@ -4117,7 +4143,7 @@ create policy "Public Access workdrive-photos" on storage.objects
                 </span>
                 <div class="absolute top-3 right-3 flex items-center gap-1">
                   <span class="px-2.5 py-1 rounded-full bg-white/95 text-slate-700 text-[11px] font-medium shadow-2xs">
-                    ${item.depts.size} สังกัด
+                    ${isDirectProductCustomerFacClient(item.name) ? item.products.size + ' Product' : item.depts.size + ' สังกัด'}
                   </span>
                   <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('client', '${safeJsName}')"
                     class="p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-600 hover:text-amber-700 shadow-2xs transition cursor-pointer" title="แก้ไขชื่อลูกค้า / รูปหน้าปก">
@@ -4133,7 +4159,7 @@ create policy "Public Access workdrive-photos" on storage.objects
                 <div>
                   <h3 class="font-bold text-base text-slate-900 group-hover:text-[#EB2D2D] transition line-clamp-1">${escapeHtml(item.name)}</h3>
                   <p class="text-xs text-slate-500 mt-1 line-clamp-1">
-                    สังกัด: ${Array.from(item.depts).join(', ')}
+                    ${isDirectProductCustomerFacClient(item.name) ? 'Product: ' + Array.from(item.products).join(', ') : 'สังกัด: ' + Array.from(item.depts).join(', ')}
                   </p>
                 </div>
                 <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
@@ -4141,7 +4167,7 @@ create policy "Public Access workdrive-photos" on storage.objects
                     <i data-lucide="images" class="w-3.5 h-3.5 text-[#EB2D2D]"></i>
                     ${item.photoCount} รูป (${item.dateAlbums.length} วัน)
                   </span>
-                  <span class="text-[#EB2D2D] font-medium flex items-center gap-0.5">เปิดดูสังกัด <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></span>
+                  <span class="text-[#EB2D2D] font-medium flex items-center gap-0.5">${isDirectProductCustomerFacClient(item.name) ? 'เปิดดู Product' : 'เปิดดูสังกัด'} <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></span>
                 </div>
               </div>
             </div>
@@ -4191,7 +4217,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         const isFireSecRd = isFacDivCtx && /fire\s*&\s*security/i.test(String(navPath.client || ''));
         const subUnitLabel = isScCtx ? 'ศูนย์บริการภาค' : (isFacDivCtx ? (isFireSecRd ? 'Teams' : 'Division') : 'สังกัด');
         const subBadgeText = isScCtx ? 'ศูนย์บริการภาค (REGIONAL SERVICE CENTER)' : (isFacDivCtx ? (isFireSecRd ? 'TEAMS' : 'DIVISION') : 'สังกัด (DEPARTMENT)');
-        const childGroupLabel = isFacDivCtx ? 'Team' : 'Product';
+        const childGroupLabel = 'Product';   // inside Teams / Division / ศูนย์บริการภาค / สังกัด the next level is always Product
 
         const clientAlbums = albums.filter(a => !a.isSystemLogContainer && a.client === navPath.client);
         const deptMap = new Map();
@@ -4304,11 +4330,13 @@ create policy "Public Access workdrive-photos" on storage.objects
       }
 
       if (!navPath.product) {
-        const isFacTeamCtx = isNonScFacilityClient(navPath.client);
-        const grpLabel = isFacTeamCtx ? 'Team' : 'Product';
-        const deptAlbums = albums.filter(a => !a.isSystemLogContainer && a.client === navPath.client && (isFacTeamCtx ? (getFacDivisionOfAlbum(a) === navPath.dept || a.dept === navPath.dept) : a.dept === navPath.dept));
+        const isDirectFac = isDirectProductCustomerFacClient(navPath.client);
+        const isFacTeamCtx = isNonScFacilityClient(navPath.client) && !isDirectFac;
+        const grpLabel = 'Product';
+        const deptAlbums = albums.filter(a => !a.isSystemLogContainer && a.client === navPath.client && (isDirectFac ? true : (isFacTeamCtx ? (getFacDivisionOfAlbum(a) === navPath.dept || a.dept === navPath.dept) : a.dept === navPath.dept)));
         const prodMap = new Map();
-        if (isFacTeamCtx && deptAlbums.length === 0) {
+        // (Team names are not Products: no default Tanee/Taywin/Kitsana folders at the Product level)
+        if (false && isFacTeamCtx && deptAlbums.length === 0) {
           DEFAULT_FAC_TEAMS.forEach(tName => {
             const folderCov = getFolderCoverEntry('product', tName);
             prodMap.set(tName, {
@@ -4321,7 +4349,7 @@ create policy "Public Access workdrive-photos" on storage.objects
           });
         }
         deptAlbums.forEach(a => {
-          const pName = isFacTeamCtx ? getFacTeamOfAlbum(a) : (a.product || 'ไม่ระบุ Product');
+          const pName = isDirectFac ? (a.product || 'ไม่ระบุ Product') : (isFacTeamCtx ? getFacTeamOfAlbum(a) : (a.product || 'ไม่ระบุ Product'));
           if (!prodMap.has(pName)) {
             const folderCov = getFolderCoverEntry('product', pName);
             prodMap.set(pName, {
@@ -4347,7 +4375,7 @@ create policy "Public Access workdrive-photos" on storage.objects
 
         countText.textContent = `${items.length} ${grpLabel}`;
         if (items.length === 0) {
-          renderEmptyState('ยังไม่มีโฟลเดอร์ Product ในสังกัดนี้', 'กดปุ่ม "+ เพิ่ม Product ใหม่" เพื่อสร้างโฟลเดอร์');
+          renderEmptyState(isFacTeamCtx ? 'ยังไม่มีโฟลเดอร์ Product ใน Teams นี้' : (isServiceCenterClientName(navPath.client) ? 'ยังไม่มีโฟลเดอร์ Product ในศูนย์บริการภาคนี้' : 'ยังไม่มีโฟลเดอร์ Product ในสังกัดนี้'), 'กดปุ่ม "+ เพิ่ม Product ใหม่" เพื่อสร้างโฟลเดอร์');
           return;
         }
 
@@ -4394,7 +4422,7 @@ create policy "Public Access workdrive-photos" on storage.objects
                       class="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-[#EB2D2D] font-medium flex items-center gap-1 cursor-pointer transition">
                       <i data-lucide="trash-2" class="w-3 h-3"></i> ลบ Product
                     </button>
-                    <span class="text-[#EB2D2D] font-medium flex items-center gap-0.5">เลือกวันที่ <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></span>
+                    <span class="text-[#EB2D2D] font-medium flex items-center gap-0.5">${(isNonScFacilityClient(navPath.client) || isServiceCenterClientName(navPath.client)) ? 'เลือก Customer' : 'เลือกวันที่'} <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></span>
                   </div>
                 </div>
               </div>
@@ -4437,13 +4465,18 @@ create policy "Public Access workdrive-photos" on storage.objects
         return;
       }
 
-      const isFacDateCtx = isNonScFacilityClient(navPath.client);
-      if ((isFacDateCtx || isServiceCenterClientName(navPath.client)) && !navPath.facCustomer) {
+      const isDirectFacCtx = isDirectProductCustomerFacClient(navPath.client);
+      const isFacDateCtx = isNonScFacilityClient(navPath.client) && !isDirectFacCtx;
+      if ((isDirectFacCtx || isFacDateCtx || isServiceCenterClientName(navPath.client)) && !navPath.facCustomer) {
         const isScCustCtx = isServiceCenterClientName(navPath.client);
         const teamAlbs = albums.filter(a =>
           !a.isSystemLogContainer &&
           a.client === navPath.client &&
-          (isScCustCtx ? (getScCenterOfAlbum(a) === navPath.dept && (a.product || '') === navPath.product) : (getFacDivisionOfAlbum(a) === navPath.dept && getFacTeamOfAlbum(a) === navPath.product))
+          (isDirectFacCtx
+            ? ((a.product || 'ไม่ระบุ Product') === navPath.product)
+            : (isScCustCtx
+                ? (getScCenterOfAlbum(a) === navPath.dept && (a.product || '') === navPath.product)
+                : (getFacDivisionOfAlbum(a) === navPath.dept && getFacTeamOfAlbum(a) === navPath.product)))
         );
         const custMap = new Map();
         teamAlbs.forEach(a => {
@@ -4469,7 +4502,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         }
         countText.textContent = `${custItems.length} Customer`;
         if (custItems.length === 0) {
-          renderEmptyState('ยังไม่มีอัลบั้ม Customer ใน Team นี้', 'กดปุ่ม "+ เพิ่มอัลบั้ม Customer" เพื่อสร้างอัลบั้มลูกค้าก่อน');
+          renderEmptyState('ยังไม่มีอัลบั้ม Customer ใน Product นี้', 'กดปุ่ม "+ เพิ่มอัลบั้ม Customer" เพื่อสร้างอัลบั้มลูกค้าก่อน');
           return;
         }
 
@@ -4513,8 +4546,16 @@ create policy "Public Access workdrive-photos" on storage.objects
 
       let dateAlbums = albums.filter(a =>
         !a.isSystemLogContainer &&
+        !a.isFolderPlaceholder &&
+        a.thaiDate &&
         a.client === navPath.client &&
-        (isServiceCenterClientName(navPath.client) ? (getScCenterOfAlbum(a) === navPath.dept && a.product === navPath.product && (!navPath.facCustomer || getScCustomerOfAlbum(a) === navPath.facCustomer)) : (isFacDateCtx ? (getFacDivisionOfAlbum(a) === navPath.dept && getFacTeamOfAlbum(a) === navPath.product && (!navPath.facCustomer || getFacCustomerOfAlbum(a) === navPath.facCustomer)) : (a.dept === navPath.dept && a.product === navPath.product)))
+        (isDirectFacCtx
+          ? ((a.product || 'ไม่ระบุ Product') === navPath.product && (!navPath.facCustomer || getFacCustomerOfAlbum(a) === navPath.facCustomer))
+          : (isServiceCenterClientName(navPath.client)
+              ? (getScCenterOfAlbum(a) === navPath.dept && a.product === navPath.product && (!navPath.facCustomer || getScCustomerOfAlbum(a) === navPath.facCustomer))
+              : (isFacDateCtx
+                  ? (getFacDivisionOfAlbum(a) === navPath.dept && getFacTeamOfAlbum(a) === navPath.product && (!navPath.facCustomer || getFacCustomerOfAlbum(a) === navPath.facCustomer))
+                  : (a.dept === navPath.dept && a.product === navPath.product))))
       );
 
       if (query) {
@@ -5007,7 +5048,7 @@ function openNewAlbumModal() {
 
       clientInp.value = navPath.client || '';
       setNewAlbumType(navPath.client ? (typeOfClient(navPath.client) || currentAlbumType) : currentAlbumType);
-      if (navPath.dept) {
+      if (navPath.dept && navPath.dept !== '__DIRECT_FAC__') {
         deptSel.value = navPath.dept;
       }
       prodInp.value = navPath.product || '';
@@ -5068,8 +5109,8 @@ function openNewAlbumModal() {
     }
 
     async function createAlbum(e) {
-      e.preventDefault();
-      const submitBtn = e.target ? e.target.querySelector('button[type="submit"]') : null;
+      if (e && e.preventDefault) e.preventDefault();
+      const submitBtn = e && e.target ? e.target.querySelector('button[type="submit"]') : null;
       if (submitBtn) submitBtn.disabled = true;
 
       try {
@@ -5079,14 +5120,15 @@ function openNewAlbumModal() {
         const fsTeamVal = (document.getElementById('album-fs-team-input') ? document.getElementById('album-fs-team-input').value : '').trim();
         const scRegionVal = (document.getElementById('album-album-sc-center') ? document.getElementById('album-album-sc-center').value : '').trim();
         const custFieldVal = (document.getElementById('album-fac-customer') ? document.getElementById('album-fac-customer').value : '').trim();
-        const rawClientInp = document.getElementById('album-client').value.trim();
-        const prodFieldVal = document.getElementById('album-product').value.trim();
-        const thaiDate = document.getElementById('album-thai-date').value.trim();
-        const note = document.getElementById('album-note').value.trim();
+        const rawClientInp = (document.getElementById('album-client') ? document.getElementById('album-client').value : '').trim();
+        const prodFieldVal = (document.getElementById('album-product') ? document.getElementById('album-product').value : '').trim();
+        const rawThaiDate = (document.getElementById('album-thai-date') ? document.getElementById('album-thai-date').value : '').trim();
+        const thaiDate = rawThaiDate || getTodayIsoAndThai().thai;
+        const note = (document.getElementById('album-note') ? document.getElementById('album-note').value : '').trim();
 
         let client = rawClientInp;
-        let dept = document.getElementById('album-dept').value || 'ทั่วไป';
-        let product = prodFieldVal;
+        let dept = (document.getElementById('album-dept') ? document.getElementById('album-dept').value : '') || 'ทั่วไป';
+        let product = prodFieldVal || 'ทั่วไป';
         let isSc = false;
         let scCenter = '';
         let scSite = '';
@@ -5098,52 +5140,29 @@ function openNewAlbumModal() {
         if (albumType === 'facility') {
           if (branch === 'Fire & Security Service') {
             client = rawClientInp || 'Fire & Security Service';
-            if (!fsTeamVal) {
-              alert('กรุณาเลือกหรือกรอกชื่อ Teams ใน Fire & Security Service ครับ');
-              return;
-            }
-            dept = fsTeamVal;
-            product = prodFieldVal;
-            facCustomer = custFieldVal;
-            if (!product || !facCustomer) {
-              alert('กรุณากรอก Product และ Customer ให้ครบถ้วนครับ');
-              return;
-            }
+            dept = fsTeamVal || 'Tanee Teams';
+            product = prodFieldVal || 'Fire & Security';
+            facCustomer = custFieldVal || 'ลูกค้าทั่วไป';
           } else if (branch === 'Service Center') {
             client = rawClientInp || 'Service Center';
-            if (!scRegionVal) {
-              alert('กรุณาเลือกศูนย์บริการภาคครับ');
-              return;
-            }
             isSc = true;
-            scCenter = scRegionVal;
-            dept = scRegionVal;
-            product = prodFieldVal;
-            facCustomer = custFieldVal;
-            scSite = custFieldVal;
-            if (!product || !facCustomer) {
-              alert('กรุณากรอก Product และ Customer ให้ครบถ้วนครับ');
-              return;
-            }
+            scCenter = scRegionVal || 'กรุงเทพ';
+            dept = scCenter;
+            product = prodFieldVal || 'Service Center';
+            facCustomer = custFieldVal || 'ลูกค้าทั่วไป';
+            scSite = facCustomer;
           } else {
             client = rawClientInp || branch;
             dept = branch;
-            product = prodFieldVal;
-            facCustomer = custFieldVal;
-            if (!product || !facCustomer) {
-              alert('กรุณากรอก Product และ Customer ให้ครบถ้วนครับ');
-              return;
-            }
+            product = prodFieldVal || branch;
+            facCustomer = custFieldVal || 'ลูกค้าทั่วไป';
           }
         } else {
-          if (!client || !product) {
-            alert('กรุณากรอก Customer และ Product ให้ครบถ้วนครับ');
-            return;
-          }
-          dept = document.getElementById('album-dept').value || 'Customer';
+          client = rawClientInp || 'ลูกค้าทั่วไป';
+          dept = (document.getElementById('album-dept') ? document.getElementById('album-dept').value : '') || 'Customer';
+          product = prodFieldVal || 'ทั่วไป';
         }
 
-        if (!thaiDate) return;
         if (isSc && scCenter) {
           const centers = getServiceCentersList();
           if (!centers.includes(scCenter)) {
@@ -5152,28 +5171,28 @@ function openNewAlbumModal() {
           }
         }
 
-        // Group (Customer / Facility Services): an existing folder name always keeps its own group
+        // Group (Customer / Facility Services): an existing folder name keeps its own group
         let resolvedAlbumType = albumType;
         const existingClientType = typeOfClient(client);
         if (existingClientType && existingClientType !== resolvedAlbumType) {
           resolvedAlbumType = existingClientType;
-          alert(`ชื่อ "${client}" มีอยู่ในกลุ่ม ${typeLabel(existingClientType)} แล้ว ระบบจะเพิ่มอัลบั้มไว้ในกลุ่มเดิมให้ครับ`);
         }
 
         // Save Product name to suggestions list if not already present
         const prodList = getProducts();
-        if (!prodList.some(p => String(p || '').toLowerCase() === product.toLowerCase())) {
+        if (product && !prodList.some(p => String(p || '').toLowerCase() === product.toLowerCase())) {
           prodList.unshift(product);
           saveProducts(prodList);
         }
 
-        navPath = { client, dept, product, facCustomer: isFacDivTeam ? facCustomer : null };
+        navPath = { client, dept: isDirectProductCustomerFacClient(client) ? '__DIRECT_FAC__' : dept, product, facCustomer: facCustomer || null };
 
         const existing = albums.find(a =>
           a && !a.isSystemLogContainer &&
           String(a.client || '').toLowerCase() === client.toLowerCase() &&
           a.dept === dept &&
           String(a.product || '').toLowerCase() === product.toLowerCase() &&
+          String(a.facCustomer || '') === String(facCustomer || '') &&
           a.thaiDate === thaiDate
         );
 
@@ -5203,7 +5222,7 @@ function openNewAlbumModal() {
           product,
           facDivision: isFacDivTeam ? facDivision : '',
           facTeam: isFacDivTeam ? facTeam : '',
-          facCustomer: isFacDivTeam ? facCustomer : '',
+          facCustomer: facCustomer,
           thaiDate,
           note,
           isServiceCenter: isSc,
@@ -5241,7 +5260,13 @@ function openNewAlbumModal() {
       const album = albums.find(a => a.id === id);
       if (!album) return;
 
-      navPath = { client: album.client, dept: album.dept, product: album.product, facCustomer: isNonScFacilityAlbum(album) ? getFacCustomerOfAlbum(album) : null };
+      const isDirectFacAlb = isDirectProductCustomerFacClient(album.client);
+      navPath = {
+        client: album.client,
+        dept: isDirectFacAlb ? '__DIRECT_FAC__' : album.dept,
+        product: album.product,
+        facCustomer: isNonScFacilityAlbum(album) ? getFacCustomerOfAlbum(album) : null
+      };
       setCurrentAlbumType(getAlbumType(album));
 
       document.getElementById('dashboard-view').classList.add('hidden');
@@ -5257,10 +5282,12 @@ function openNewAlbumModal() {
         <button onclick="navigateToLevel('client')" class="font-semibold text-[#EB2D2D] hover:underline cursor-pointer truncate max-w-[160px]">
           ${escapeHtml(album.client)}
         </button>
-        <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-400"></i>
-        <button onclick="navigateToLevel('dept')" class="font-semibold text-[#EB2D2D] hover:underline cursor-pointer">
-          ${escapeHtml(dispDiv)}
-        </button>
+        ${isDirectFacAlb ? '' : `
+          <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-400"></i>
+          <button onclick="navigateToLevel('dept')" class="font-semibold text-[#EB2D2D] hover:underline cursor-pointer">
+            ${escapeHtml(dispDiv)}
+          </button>
+        `}
         <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-slate-400"></i>
         <button onclick="navigateToLevel('product')" class="font-semibold text-[#EB2D2D] hover:underline cursor-pointer truncate max-w-[180px]">
           ${escapeHtml(dispTeamOrProd)}
@@ -6356,6 +6383,18 @@ function openNewAlbumModal() {
       const editCustInp = document.getElementById('edit-album-fac-customer');
       if (editCustInp) editCustInp.value = isFacEdit ? getFacCustomerOfAlbum(album) : '';
       syncFacModalFields('edit', isFacEdit);
+      {
+        // Fire & Security Service albums: field 2 = Teams, field 3 = Product
+        const fsEdit = isFacEdit && isFireSecurityClientName(album.client);
+        const divLbl = document.getElementById('edit-fac-div-label');
+        const teamLbl = document.getElementById('edit-fac-team-label');
+        const divInp2 = document.getElementById('edit-album-fac-division');
+        const teamInp2 = document.getElementById('edit-album-fac-team');
+        if (divLbl) divLbl.textContent = fsEdit ? '2. Teams *' : '2. Division *';
+        if (teamLbl) teamLbl.textContent = fsEdit ? '3. Product *' : '3. Team *';
+        if (divInp2) divInp2.setAttribute('list', fsEdit ? 'fs-team-suggestions' : 'fac-division-suggestions');
+        if (teamInp2) teamInp2.setAttribute('list', fsEdit ? 'product-suggestions' : 'fac-team-suggestions');
+      }
       document.getElementById('edit-album-thai-date').value = album.thaiDate;
       document.getElementById('edit-album-date-picker').value = thaiDateToIso(album.thaiDate);
       document.getElementById('edit-album-note').value = album.note || '';
@@ -6513,9 +6552,9 @@ function openNewAlbumModal() {
       if (type === 'album') {
         const alb = albums.find(a => a.id === targetId);
         if (!alb) return;
-        titleEl.textContent = 'ยืนยันการลบอัลบั้ม';
-        headingEl.textContent = `ลบอัลบั้มวันที่ ${alb.thaiDate} (${alb.client})?`;
-        descEl.textContent = `รูปภาพทั้งหมด ${alb.photos.length} รูปภายในอัลบั้มนี้จะถูกลบออกจากระบบและ Cloud อย่างถาวร`;
+        titleEl.textContent = 'ยืนยันการลบอัลบั้มนี้เท่านั้น';
+        headingEl.textContent = `ลบอัลบั้มวันที่ ${alb.thaiDate} (${alb.client} • ${alb.product})?`;
+        descEl.textContent = `จะลบเฉพาะอัลบั้มนี้ (${alb.photos.length} รูป) เท่านั้น อัลบั้มอื่นและโฟลเดอร์หลักจะไม่ถูกลบ`;
       } else if (type === 'client') {
         const matched = albums.filter(a => a.client === targetId);
         const totalPics = matched.reduce((s, a) => s + a.photos.length, 0);
@@ -6529,11 +6568,22 @@ function openNewAlbumModal() {
         headingEl.textContent = `ลบโฟลเดอร์สังกัด "${targetId}" ใน ${navPath.client}?`;
         descEl.textContent = `ระบบจะลบอัลบั้มย่อยทั้งหมด ${matched.length} อัลบั้ม และรูปภาพรวม ${totalPics} รูป ภายใต้สังกัดนี้`;
       } else if (type === 'product') {
-        const matched = albums.filter(a => a.client === navPath.client && a.dept === navPath.dept && a.product === targetId);
+        const isDirectFacDel = isDirectProductCustomerFacClient(navPath.client);
+        const isFacDelCtx = isNonScFacilityClient(navPath.client) && !isDirectFacDel;
+        const matched = albums.filter(a =>
+          !a.isSystemLogContainer &&
+          a.client === navPath.client &&
+          (isDirectFacDel
+            ? ((a.product || 'ไม่ระบุ Product') === targetId)
+            : (isFacDelCtx
+                ? ((getFacDivisionOfAlbum(a) === navPath.dept || a.dept === navPath.dept) && (getFacTeamOfAlbum(a) === targetId || a.product === targetId))
+                : (a.dept === navPath.dept && a.product === targetId)))
+        );
+        const realCount = matched.filter(a => !a.isFolderPlaceholder && a.thaiDate).length;
         const totalPics = matched.reduce((s, a) => s + a.photos.length, 0);
         titleEl.textContent = 'ยืนยันการลบโฟลเดอร์ Product';
         headingEl.textContent = `ลบโฟลเดอร์ "${targetId}"?`;
-        descEl.textContent = `ระบบจะลบอัลบั้มวันที่ทั้งหมด ${matched.length} อัลบั้ม และรูปภาพรวม ${totalPics} รูป ภายใต้ Product นี้`;
+        descEl.textContent = `ระบบจะลบอัลบั้มวันที่ทั้งหมด ${realCount} อัลบั้ม และรูปภาพรวม ${totalPics} รูป ภายใต้ Product นี้`;
       } else if (type === 'selected-photos') {
         const count = selectedPhotoIds.size;
         if (count === 0) return;
@@ -6549,6 +6599,8 @@ function openNewAlbumModal() {
         descEl.textContent = 'รูปภาพนี้จะถูกลบออกจากอัลบั้มและพื้นที่ Cloud อย่างถาวร';
       }
 
+      const confirmBtnEl = document.getElementById('delete-modal-confirm-btn');
+      if (confirmBtnEl) confirmBtnEl.disabled = false;
       document.getElementById('delete-confirm-modal').classList.remove('hidden');
       lucide.createIcons();
     }
@@ -6744,7 +6796,37 @@ function openNewAlbumModal() {
           const targetAlb = albums.find(a => a.id === targetId);
           if (targetAlb) {
             await removeCloudPhotosForAlbums([targetAlb]);
-            albums = albums.filter(a => a.id !== targetId);
+            const remainingAlbums = albums.filter(a => a.id !== targetId);
+            // Keep the outer/parent folder (client/dept/product) intact if no other album shares it
+            const hasSiblingInGroup = remainingAlbums.some(a =>
+              !a.isSystemLogContainer &&
+              a.client === targetAlb.client &&
+              a.dept === targetAlb.dept &&
+              a.product === targetAlb.product
+            );
+            if (!hasSiblingInGroup) {
+              remainingAlbums.unshift({
+                id: 'fld-' + Date.now(),
+                type: getAlbumType(targetAlb),
+                client: targetAlb.client,
+                dept: targetAlb.dept,
+                product: targetAlb.product,
+                facDivision: targetAlb.facDivision || '',
+                facTeam: targetAlb.facTeam || '',
+                facCustomer: targetAlb.facCustomer || '',
+                thaiDate: '',
+                note: '',
+                isServiceCenter: !!targetAlb.isServiceCenter,
+                serviceCenter: targetAlb.serviceCenter || '',
+                siteName: targetAlb.siteName || '',
+                scCustomer: targetAlb.scCustomer || '',
+                coverUrl: '',
+                coverPosition: '50% 50%',
+                isFolderPlaceholder: true,
+                photos: []
+              });
+            }
+            albums = remainingAlbums;
             recordActivityLog('delete_album', {
               albumTitle: `${targetAlb.client} • ${targetAlb.dept} • ${targetAlb.product} (${targetAlb.thaiDate})`,
               photoCount: targetAlb.photos.length,
@@ -6752,12 +6834,11 @@ function openNewAlbumModal() {
             });
             saveAlbums();
           }
-          closeDeleteConfirmModal();
           if (activeAlbumId === targetId) {
-            navigateToLevel('product');
-          } else {
-            showFolderDashboard();
+            activeAlbumId = null;
           }
+          closeDeleteConfirmModal();
+          showFolderDashboard();
         } else if (type === 'client') {
           const toDelete = albums.filter(a => a.client === targetId);
           const totalPics = toDelete.reduce((s, a) => s + a.photos.length, 0);
@@ -6785,22 +6866,45 @@ function openNewAlbumModal() {
           closeDeleteConfirmModal();
           showFolderDashboard();
         } else if (type === 'product') {
-          const isFacDelCtx = isNonScFacilityClient(navPath.client);
+          const isDirectFacDel = isDirectProductCustomerFacClient(navPath.client);
+          const isFacDelCtx = isNonScFacilityClient(navPath.client) && !isDirectFacDel;
           const toDelete = albums.filter(a =>
             !a.isSystemLogContainer &&
             a.client === navPath.client &&
-            (isFacDelCtx ? (getFacDivisionOfAlbum(a) === navPath.dept || a.dept === navPath.dept) : a.dept === navPath.dept) &&
-            (isFacDelCtx ? (getFacTeamOfAlbum(a) === targetId || a.product === targetId) : a.product === targetId)
+            (isDirectFacDel
+              ? ((a.product || 'ไม่ระบุ Product') === targetId)
+              : (isFacDelCtx
+                  ? ((getFacDivisionOfAlbum(a) === navPath.dept || a.dept === navPath.dept) && (getFacTeamOfAlbum(a) === targetId || a.product === targetId))
+                  : (a.dept === navPath.dept && a.product === targetId)))
           );
+          const toDeleteIds = new Set(toDelete.map(a => a.id));
+          const remainingAlbums = albums.filter(a => !toDeleteIds.has(a.id));
+          // Keep the parent Facility Services / Customer card alive if no other product remains under it
+          const hasSiblingClient = remainingAlbums.some(a => !a.isSystemLogContainer && a.client === navPath.client);
+          if (!hasSiblingClient && navPath.client) {
+            remainingAlbums.unshift({
+              id: 'fld-' + Date.now(),
+              type: currentAlbumType || 'facility',
+              client: navPath.client,
+              dept: navPath.client,
+              product: '',
+              thaiDate: '',
+              note: '',
+              coverUrl: '',
+              coverPosition: '50% 50%',
+              isFolderPlaceholder: true,
+              photos: []
+            });
+          }
+          albums = remainingAlbums;
           const totalPics = toDelete.reduce((s, a) => s + a.photos.length, 0);
           await removeCloudPhotosForAlbums(toDelete);
-          albums = albums.filter(a => !(a.client === navPath.client && a.dept === navPath.dept && a.product === targetId));
-          const stillUsedElsewhere = albums.some(a => a.product === targetId);
+          const stillUsedElsewhere = albums.some(a => !a.isSystemLogContainer && !a.isFolderPlaceholder && a.product === targetId);
           if (!stillUsedElsewhere) {
             saveProducts(getProducts().filter(p => p !== targetId));
           }
           recordActivityLog('delete_folder', {
-            albumTitle: `${navPath.client} > ${navPath.dept} > ${targetId}`,
+            albumTitle: isDirectFacDel ? `${navPath.client} > ${targetId}` : `${navPath.client} > ${navPath.dept} > ${targetId}`,
             photoCount: totalPics,
             detail: `ลบโฟลเดอร์ Product "${targetId}" (${toDelete.length} อัลบั้ม, ${totalPics} รูป)`
           });
@@ -7703,13 +7807,13 @@ function openNewAlbumModal() {
         </div>
 
         <div id="edit-fac-div-wrap" class="hidden">
-          <label class="block text-xs font-semibold text-slate-600 mb-1">2. Division *</label>
+          <label id="edit-fac-div-label" class="block text-xs font-semibold text-slate-600 mb-1">2. Division *</label>
           <input id="edit-album-fac-division" type="text" list="fac-division-suggestions"
             class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-[#EB2D2D] outline-none" />
         </div>
 
         <div id="edit-fac-team-wrap" class="hidden">
-          <label class="block text-xs font-semibold text-slate-600 mb-1">3. Team *</label>
+          <label id="edit-fac-team-label" class="block text-xs font-semibold text-slate-600 mb-1">3. Team *</label>
           <input id="edit-album-fac-team" type="text" list="fac-team-suggestions"
             class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-[#EB2D2D] outline-none" />
         </div>
