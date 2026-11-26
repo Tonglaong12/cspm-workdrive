@@ -282,20 +282,21 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #fff;
+      color: #7DD3FC;
       background: rgba(27, 33, 44, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.18);
+      border: 1px solid rgba(125, 211, 252, 0.28);
       box-shadow: 0 6px 18px rgba(15, 23, 42, 0.35);
       -webkit-backdrop-filter: blur(6px);
       backdrop-filter: blur(6px);
       cursor: pointer;
       pointer-events: auto;
       -webkit-tap-highlight-color: transparent;
-      transition: opacity 0.2s ease, transform 0.2s ease, background-color 0.15s ease;
+      transition: opacity 0.2s ease, transform 0.2s ease, background-color 0.15s ease, color 0.15s ease;
     }
-    .scroll-fab-btn:active { transform: scale(0.92); background: #EB2D2D; }
+    .scroll-fab-btn:active { transform: scale(0.92); background: #EB2D2D; color: #E0F2FE; }
     .scroll-fab-btn.is-hidden { opacity: 0; transform: scale(0.8); pointer-events: none; }
-    .scroll-fab-btn svg { width: 1.35rem; height: 1.35rem; }
+    .scroll-fab-btn svg,
+    .scroll-fab-btn i { width: 1.35rem; height: 1.35rem; stroke: #7DD3FC; color: #7DD3FC; }
 
     /* ==================== TACTILE RAISED HOVER & CLICK FEEDBACK ==================== */
     button:not(:disabled),
