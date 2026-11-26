@@ -753,6 +753,27 @@
                   </div>
                   <i data-lucide="chevron-right" class="w-4 h-4 text-emerald-700 shrink-0"></i>
                 </button>
+
+                <!-- 3) Admin Only: Show / Hide "ติดตั้งเป็นแอป" Banner -->
+                <div id="admin-install-banner-setting" class="hidden p-3 rounded-xl bg-amber-50/80 border border-amber-200/90 space-y-2">
+                  <div class="flex items-center justify-between gap-2">
+                    <p class="font-bold text-amber-950 flex items-center gap-1.5">
+                      <i data-lucide="smartphone" class="w-3.5 h-3.5 text-[#EB2D2D]"></i>
+                      <span>3) แถบ "ติดตั้งเป็นแอป"</span>
+                    </p>
+                    <span id="admin-install-banner-status" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">เปิดอยู่</span>
+                  </div>
+                  <div class="grid grid-cols-2 gap-1.5 p-1 bg-white rounded-xl border border-amber-200/70">
+                    <button id="install-banner-btn-on" type="button" onclick="setInstallBannerEnabled(true)"
+                      class="py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white shadow-2xs flex items-center justify-center gap-1 transition cursor-pointer">
+                      <i data-lucide="eye" class="w-3.5 h-3.5"></i> เปิดโชว์
+                    </button>
+                    <button id="install-banner-btn-off" type="button" onclick="setInstallBannerEnabled(false)"
+                      class="py-1.5 px-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1 transition cursor-pointer">
+                      <i data-lucide="eye-off" class="w-3.5 h-3.5"></i> ปิดซ่อน
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -3137,6 +3158,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         if (adminBadge) adminBadge.classList.add('hidden');
       }
 
+      applyInstallBannerVisibility();
       goHome();
       startPresenceTracking();
     }
@@ -3630,7 +3652,7 @@ create policy "Public Access workdrive-photos" on storage.objects
       } else if (!navPath.dept) {
         const isScCtx = isServiceCenterClientName(navPath.client);
         const isFacDivCtx = isNonScFacilityClient(navPath.client);
-        levelBadge.textContent = (isScCtx || isFacDivCtx) ? 'ขั้นตอนที่ 2 / 5' : 'ขั้นตอนที่ 2 / 4';
+        levelBadge.textContent = 'ขั้นตอนที่ 2 / 4';
         if (isScCtx) {
           levelHeading.textContent = `เลือกศูนย์บริการภาค — ${navPath.client}`;
           addLabel.textContent = 'เพิ่มศูนย์บริการภาคใน Service Center';
@@ -3646,7 +3668,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         const isScCtx = isServiceCenterClientName(navPath.client);
         const isDirectFac = isDirectProductCustomerFacClient(navPath.client);
         const isFacDivCtx = isNonScFacilityClient(navPath.client) && !isDirectFac;
-        levelBadge.textContent = isDirectFac ? 'ขั้นตอนที่ 2 / 4' : ((isScCtx || isFacDivCtx) ? 'ขั้นตอนที่ 3 / 5' : 'ขั้นตอนที่ 3 / 4');
+        levelBadge.textContent = isDirectFac ? 'ขั้นตอนที่ 2 / 4' : (isScCtx ? 'ขั้นตอนที่ 3 / 5' : 'ขั้นตอนที่ 3 / 4');
         if (isDirectFac) {
           levelHeading.textContent = `เลือก Product — ${navPath.client}`;
           addLabel.textContent = 'เพิ่ม Product ใหม่';
@@ -3654,11 +3676,8 @@ create policy "Public Access workdrive-photos" on storage.objects
           levelHeading.textContent = `เลือก Product — ศูนย์บริการภาค ${navPath.dept}`;
           addLabel.textContent = 'เพิ่ม Product ใหม่';
         } else if (isFacDivCtx) {
-          // Inside a Teams folder (Tanee Teams ...) the next level is Product
-          levelHeading.textContent = isFireSecurityClientName(navPath.client)
-            ? `เลือก Product — Teams ${navPath.dept}`
-            : `เลือก Product — ${navPath.dept}`;
-          addLabel.textContent = 'เพิ่ม Product ใหม่';
+          levelHeading.textContent = `เลือก Team — Division ${navPath.dept}`;
+          addLabel.textContent = 'เพิ่ม Team ใหม่';
         } else {
           levelHeading.textContent = `เลือก Product — สังกัด ${navPath.dept}`;
           addLabel.textContent = 'เพิ่ม Product ใหม่';
@@ -3684,11 +3703,6 @@ create policy "Public Access workdrive-photos" on storage.objects
 
 
     const DEFAULT_FAC_TEAMS = ['Tanee Teams', 'Kitsana Teams', 'Taywin Teams'];
-
-    // Fire & Security Service: Division (this folder) -> Teams -> Product -> Customer -> วันที่
-    function isFireSecurityClientName(name) {
-      return /fire\s*&\s*security/i.test(String(name || ''));
-    }
 
     function isDirectProductCustomerFacClient(name) {
       const s = String(name || '').trim().toLowerCase();
@@ -4217,7 +4231,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         const isFireSecRd = isFacDivCtx && /fire\s*&\s*security/i.test(String(navPath.client || ''));
         const subUnitLabel = isScCtx ? 'ศูนย์บริการภาค' : (isFacDivCtx ? (isFireSecRd ? 'Teams' : 'Division') : 'สังกัด');
         const subBadgeText = isScCtx ? 'ศูนย์บริการภาค (REGIONAL SERVICE CENTER)' : (isFacDivCtx ? (isFireSecRd ? 'TEAMS' : 'DIVISION') : 'สังกัด (DEPARTMENT)');
-        const childGroupLabel = 'Product';   // inside Teams / Division / ศูนย์บริการภาค / สังกัด the next level is always Product
+        const childGroupLabel = isFacDivCtx ? 'Team' : 'Product';
 
         const clientAlbums = albums.filter(a => !a.isSystemLogContainer && a.client === navPath.client);
         const deptMap = new Map();
@@ -4332,11 +4346,10 @@ create policy "Public Access workdrive-photos" on storage.objects
       if (!navPath.product) {
         const isDirectFac = isDirectProductCustomerFacClient(navPath.client);
         const isFacTeamCtx = isNonScFacilityClient(navPath.client) && !isDirectFac;
-        const grpLabel = 'Product';
+        const grpLabel = isFacTeamCtx ? 'Team' : 'Product';
         const deptAlbums = albums.filter(a => !a.isSystemLogContainer && a.client === navPath.client && (isDirectFac ? true : (isFacTeamCtx ? (getFacDivisionOfAlbum(a) === navPath.dept || a.dept === navPath.dept) : a.dept === navPath.dept)));
         const prodMap = new Map();
-        // (Team names are not Products: no default Tanee/Taywin/Kitsana folders at the Product level)
-        if (false && isFacTeamCtx && deptAlbums.length === 0) {
+        if (isFacTeamCtx && deptAlbums.length === 0) {
           DEFAULT_FAC_TEAMS.forEach(tName => {
             const folderCov = getFolderCoverEntry('product', tName);
             prodMap.set(tName, {
@@ -4349,6 +4362,7 @@ create policy "Public Access workdrive-photos" on storage.objects
           });
         }
         deptAlbums.forEach(a => {
+          if (a.isFolderPlaceholder && !a.product) return;
           const pName = isDirectFac ? (a.product || 'ไม่ระบุ Product') : (isFacTeamCtx ? getFacTeamOfAlbum(a) : (a.product || 'ไม่ระบุ Product'));
           if (!prodMap.has(pName)) {
             const folderCov = getFolderCoverEntry('product', pName);
@@ -4375,7 +4389,7 @@ create policy "Public Access workdrive-photos" on storage.objects
 
         countText.textContent = `${items.length} ${grpLabel}`;
         if (items.length === 0) {
-          renderEmptyState(isFacTeamCtx ? 'ยังไม่มีโฟลเดอร์ Product ใน Teams นี้' : (isServiceCenterClientName(navPath.client) ? 'ยังไม่มีโฟลเดอร์ Product ในศูนย์บริการภาคนี้' : 'ยังไม่มีโฟลเดอร์ Product ในสังกัดนี้'), 'กดปุ่ม "+ เพิ่ม Product ใหม่" เพื่อสร้างโฟลเดอร์');
+          renderEmptyState('ยังไม่มีโฟลเดอร์ Product ในสังกัดนี้', 'กดปุ่ม "+ เพิ่ม Product ใหม่" เพื่อสร้างโฟลเดอร์');
           return;
         }
 
@@ -4471,6 +4485,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         const isScCustCtx = isServiceCenterClientName(navPath.client);
         const teamAlbs = albums.filter(a =>
           !a.isSystemLogContainer &&
+          !(a.isFolderPlaceholder && !a.thaiDate) &&
           a.client === navPath.client &&
           (isDirectFacCtx
             ? ((a.product || 'ไม่ระบุ Product') === navPath.product)
@@ -4502,13 +4517,13 @@ create policy "Public Access workdrive-photos" on storage.objects
         }
         countText.textContent = `${custItems.length} Customer`;
         if (custItems.length === 0) {
-          renderEmptyState('ยังไม่มีอัลบั้ม Customer ใน Product นี้', 'กดปุ่ม "+ เพิ่มอัลบั้ม Customer" เพื่อสร้างอัลบั้มลูกค้าก่อน');
+          renderEmptyState('ยังไม่มีอัลบั้ม Customer ใน Team นี้', 'กดปุ่ม "+ เพิ่มอัลบั้ม Customer" เพื่อสร้างอัลบั้มลูกค้าก่อน');
           return;
         }
 
         container.className = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5';
         container.innerHTML = custItems.map(item => {
-          const safeJsName = escapeHtml(item.name).replace(/'/g, "\'");
+          const safeJsName = escapeHtml(item.name).replace(/'/g, "\\'");
           return `
             <div data-ord-item="${escapeHtml(item.name)}" onclick="enterFacCustomer('${safeJsName}')"
               class="group bg-white rounded-2xl border border-slate-200/90 overflow-hidden shadow-2xs hover:shadow-md hover:border-[#EB2D2D]/40 transition cursor-pointer flex flex-col">
@@ -4522,9 +4537,19 @@ create policy "Public Access workdrive-photos" on storage.objects
                 <span class="absolute top-3 left-3 px-2.5 py-1 rounded-lg bg-[#EB2D2D] text-white text-[11px] font-semibold">
                   Customer
                 </span>
-                <span class="absolute top-3 right-3 px-2.5 py-1 rounded-full bg-white/95 text-slate-700 text-[11px] font-medium shadow-2xs">
-                  ${item.dateAlbums.length} วัน
-                </span>
+                <div class="absolute top-3 right-3 flex items-center gap-1">
+                  <span class="px-2.5 py-1 rounded-full bg-white/95 text-slate-700 text-[11px] font-medium shadow-2xs">
+                    ${item.dateAlbums.length} วัน
+                  </span>
+                  <button type="button" onclick="event.stopPropagation(); openRenameFolderModal('facCustomer', '${safeJsName}')"
+                    class="p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-600 hover:text-amber-700 shadow-2xs transition cursor-pointer" title="แก้ไขชื่อ Customer / รูปหน้าปก">
+                    <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                  </button>
+                  <button type="button" onclick="event.stopPropagation(); openDeleteConfirmModal('facCustomer', '${safeJsName}')"
+                    class="p-1.5 rounded-full bg-white/95 hover:bg-red-50 text-slate-600 hover:text-[#EB2D2D] shadow-2xs transition cursor-pointer" title="ลบอัลบั้ม Customer นี้">
+                    <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                  </button>
+                </div>
               </div>
               <div class="p-4 flex-1 flex flex-col justify-between">
                 <div>
@@ -4533,7 +4558,13 @@ create policy "Public Access workdrive-photos" on storage.objects
                 </div>
                 <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-400">
                   <span class="font-medium text-slate-600">${item.photoCount} รูป</span>
-                  <span class="text-[#EB2D2D] font-medium flex items-center gap-0.5">เลือกวันที่ <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></span>
+                  <div class="flex items-center gap-2">
+                    <button type="button" onclick="event.stopPropagation(); openDeleteConfirmModal('facCustomer', '${safeJsName}')"
+                      class="px-2 py-1 rounded-lg bg-red-50 hover:bg-red-100 text-[#EB2D2D] font-medium flex items-center gap-1 cursor-pointer transition">
+                      <i data-lucide="trash-2" class="w-3 h-3"></i> ลบอัลบั้ม
+                    </button>
+                    <span class="text-[#EB2D2D] font-medium flex items-center gap-0.5">เลือกวันที่ <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i></span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -4707,6 +4738,7 @@ create policy "Public Access workdrive-photos" on storage.objects
       if (level === 'client') return `client::${nameVal}`;
       if (level === 'dept') return `dept::${navPath.client || ''}::${nameVal}`;
       if (level === 'product') return `product::${navPath.client || ''}::${navPath.dept || ''}::${nameVal}`;
+      if (level === 'facCustomer') return `facCustomer::${navPath.client || ''}::${navPath.dept || ''}::${navPath.product || ''}::${nameVal}`;
       return '';
     }
 
@@ -6226,8 +6258,33 @@ function openNewAlbumModal() {
         const facCtx = isNonScFacilityClient(navPath.client);
         return albums.filter(a => !a.isSystemLogContainer && a.client === navPath.client && (facCtx ? getFacDivisionOfAlbum(a) === val : a.dept === val));
       } else if (level === 'product') {
-        const facCtx = isNonScFacilityClient(navPath.client);
-        return albums.filter(a => !a.isSystemLogContainer && a.client === navPath.client && (facCtx ? (getFacDivisionOfAlbum(a) === navPath.dept && getFacTeamOfAlbum(a) === val) : (a.dept === navPath.dept && a.product === val)));
+        const isDirectFac = isDirectProductCustomerFacClient(navPath.client);
+        const facCtx = isNonScFacilityClient(navPath.client) && !isDirectFac;
+        return albums.filter(a => {
+          if (!a || a.isSystemLogContainer || a.client !== navPath.client) return false;
+          if (isDirectFac) {
+            return (a.product || 'ไม่ระบุ Product') === val;
+          }
+          if (facCtx) {
+            return (getFacDivisionOfAlbum(a) === navPath.dept || a.dept === navPath.dept) &&
+                   ((getFacTeamOfAlbum(a) || a.product || 'ไม่ระบุ Product') === val);
+          }
+          return a.dept === navPath.dept && ((a.product || 'ไม่ระบุ Product') === val);
+        });
+      } else if (level === 'facCustomer') {
+        const isDirectFac = isDirectProductCustomerFacClient(navPath.client);
+        const isScCustCtx = isServiceCenterClientName(navPath.client);
+        return albums.filter(a => {
+          if (!a || a.isSystemLogContainer || a.client !== navPath.client) return false;
+          const prodMatch = isDirectFac
+            ? ((a.product || 'ไม่ระบุ Product') === navPath.product)
+            : (isScCustCtx
+                ? (getScCenterOfAlbum(a) === navPath.dept && (a.product || '') === navPath.product)
+                : ((getFacDivisionOfAlbum(a) === navPath.dept || a.dept === navPath.dept) && (getFacTeamOfAlbum(a) === navPath.product || a.product === navPath.product)));
+          if (!prodMatch) return false;
+          const cName = isScCustCtx ? getScCustomerOfAlbum(a) : getFacCustomerOfAlbum(a);
+          return cName === val;
+        });
       }
       return [];
     }
@@ -6247,6 +6304,9 @@ function openNewAlbumModal() {
       } else if (level === 'product') {
         titleEl.textContent = 'แก้ไขชื่อ Product และรูปหน้าปก';
         labelEl.textContent = 'ชื่อ Product ใหม่ *';
+      } else if (level === 'facCustomer') {
+        titleEl.textContent = 'แก้ไขชื่อ Customer และรูปหน้าปก';
+        labelEl.textContent = 'ชื่อ Customer ใหม่ *';
       }
 
       inputEl.value = oldValue;
@@ -6319,8 +6379,17 @@ function openNewAlbumModal() {
         if (newVal !== oldValue) {
           matched.forEach(a => {
             if (level === 'client') a.client = newVal;
-            else if (level === 'dept') a.dept = newVal;
-            else if (level === 'product') a.product = newVal;
+            else if (level === 'dept') {
+              a.dept = newVal;
+              if (a.facDivision) a.facDivision = newVal;
+            } else if (level === 'product') {
+              a.product = newVal;
+              if (a.facTeam) a.facTeam = newVal;
+            } else if (level === 'facCustomer') {
+              a.facCustomer = newVal;
+              if (a.scCustomer) a.scCustomer = newVal;
+              if (a.siteName) a.siteName = newVal;
+            }
           });
 
           if (level === 'client' && navPath.client === oldValue) {
@@ -6383,18 +6452,6 @@ function openNewAlbumModal() {
       const editCustInp = document.getElementById('edit-album-fac-customer');
       if (editCustInp) editCustInp.value = isFacEdit ? getFacCustomerOfAlbum(album) : '';
       syncFacModalFields('edit', isFacEdit);
-      {
-        // Fire & Security Service albums: field 2 = Teams, field 3 = Product
-        const fsEdit = isFacEdit && isFireSecurityClientName(album.client);
-        const divLbl = document.getElementById('edit-fac-div-label');
-        const teamLbl = document.getElementById('edit-fac-team-label');
-        const divInp2 = document.getElementById('edit-album-fac-division');
-        const teamInp2 = document.getElementById('edit-album-fac-team');
-        if (divLbl) divLbl.textContent = fsEdit ? '2. Teams *' : '2. Division *';
-        if (teamLbl) teamLbl.textContent = fsEdit ? '3. Product *' : '3. Team *';
-        if (divInp2) divInp2.setAttribute('list', fsEdit ? 'fs-team-suggestions' : 'fac-division-suggestions');
-        if (teamInp2) teamInp2.setAttribute('list', fsEdit ? 'product-suggestions' : 'fac-team-suggestions');
-      }
       document.getElementById('edit-album-thai-date').value = album.thaiDate;
       document.getElementById('edit-album-date-picker').value = thaiDateToIso(album.thaiDate);
       document.getElementById('edit-album-note').value = album.note || '';
@@ -6475,6 +6532,65 @@ function openNewAlbumModal() {
     }
 
     // ==================== IPHONE FULL-SCREEN PWA SETUP (ICON & MANIFEST) ====================
+    const INSTALL_BANNER_ENABLED_KEY = 'cspm_workdrive_show_install_banner_v1';
+
+    function isInstallBannerEnabled() {
+      try {
+        const raw = localStorage.getItem(INSTALL_BANNER_ENABLED_KEY);
+        if (raw === null) return true;
+        return raw === '1' || raw === 'true';
+      } catch (e) {
+        return true;
+      }
+    }
+
+    function applyInstallBannerVisibility() {
+      const enabled = isInstallBannerEnabled();
+      const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
+      const p1 = document.getElementById('install-pill-login');
+      const p2 = document.getElementById('install-pill-app');
+      if (p1) {
+        if (enabled && !isStandalone) p1.classList.remove('hidden');
+        else p1.classList.add('hidden');
+      }
+      if (p2) {
+        if (enabled && !isStandalone) p2.classList.remove('hidden');
+        else p2.classList.add('hidden');
+      }
+
+      const secBox = document.getElementById('admin-install-banner-setting');
+      const statusBadge = document.getElementById('admin-install-banner-status');
+      const btnOn = document.getElementById('install-banner-btn-on');
+      const btnOff = document.getElementById('install-banner-btn-off');
+      if (secBox) {
+        if (isAdminUser()) secBox.classList.remove('hidden');
+        else secBox.classList.add('hidden');
+      }
+      if (statusBadge) {
+        statusBadge.textContent = enabled ? 'เปิดอยู่' : 'ปิดอยู่';
+        statusBadge.className = enabled
+          ? 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800'
+          : 'px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-200 text-slate-700';
+      }
+      if (btnOn && btnOff) {
+        btnOn.className = enabled
+          ? 'py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-emerald-600 text-white shadow-2xs flex items-center justify-center gap-1 transition cursor-pointer'
+          : 'py-1.5 px-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1 transition cursor-pointer';
+        btnOff.className = !enabled
+          ? 'py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-[#EB2D2D] text-white shadow-2xs flex items-center justify-center gap-1 transition cursor-pointer'
+          : 'py-1.5 px-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1 transition cursor-pointer';
+      }
+    }
+
+    function setInstallBannerEnabled(enabled) {
+      if (!isAdminUser()) return;
+      try {
+        localStorage.setItem(INSTALL_BANNER_ENABLED_KEY, enabled ? '1' : '0');
+      } catch (e) {}
+      applyInstallBannerVisibility();
+      lucide.createIcons();
+    }
+
     function setupIphoneFullScreenApp() {
       // Icon + manifest are static files: apple-touch-icon.png, icon-192.png, manifest.webmanifest
 
@@ -6485,14 +6601,7 @@ function openNewAlbumModal() {
         });
       }
 
-      // Hide install pill only if already running in full-screen standalone mode
-      const isStandalone = window.navigator.standalone === true || window.matchMedia('(display-mode: standalone)').matches;
-      if (isStandalone) {
-        const p1 = document.getElementById('install-pill-login');
-        const p2 = document.getElementById('install-pill-app');
-        if (p1) p1.classList.add('hidden');
-        if (p2) p2.classList.add('hidden');
-      }
+      applyInstallBannerVisibility();
 
       // Auto-select Android tab if user is on Android device
       const ua = window.navigator.userAgent || '';
@@ -6584,6 +6693,13 @@ function openNewAlbumModal() {
         titleEl.textContent = 'ยืนยันการลบโฟลเดอร์ Product';
         headingEl.textContent = `ลบโฟลเดอร์ "${targetId}"?`;
         descEl.textContent = `ระบบจะลบอัลบั้มวันที่ทั้งหมด ${realCount} อัลบั้ม และรูปภาพรวม ${totalPics} รูป ภายใต้ Product นี้`;
+      } else if (type === 'facCustomer') {
+        const matched = getMatchingFolderAlbums('facCustomer', targetId);
+        const realCount = matched.filter(a => !a.isFolderPlaceholder && a.thaiDate).length;
+        const totalPics = matched.reduce((s, a) => s + a.photos.length, 0);
+        titleEl.textContent = 'ยืนยันการลบอัลบั้ม Customer';
+        headingEl.textContent = `ลบอัลบั้มลูกค้า "${targetId}"?`;
+        descEl.textContent = `ระบบจะลบอัลบั้มวันที่ทั้งหมด ${realCount} อัลบั้ม และรูปภาพรวม ${totalPics} รูป ภายใต้ลูกค้ารายนี้ (โฟลเดอร์ Product และหมวดหลักจะไม่ถูกลบ)`;
       } else if (type === 'selected-photos') {
         const count = selectedPhotoIds.size;
         if (count === 0) return;
@@ -6791,7 +6907,7 @@ function openNewAlbumModal() {
       btn.disabled = true;
 
       try {
-        captureTimeSnapshot(`ก่อนทำรายการลบ (${type}) โดย ${currentUser ? currentUser.name : 'user'}`);
+        try { captureTimeSnapshot(`ก่อนทำรายการลบ (${type}) โดย ${currentUser ? currentUser.name : 'user'}`); } catch (snapErr) { console.warn('Snapshot skipped:', snapErr); }
         if (type === 'album') {
           const targetAlb = albums.find(a => a.id === targetId);
           if (targetAlb) {
@@ -6907,6 +7023,45 @@ function openNewAlbumModal() {
             albumTitle: isDirectFacDel ? `${navPath.client} > ${targetId}` : `${navPath.client} > ${navPath.dept} > ${targetId}`,
             photoCount: totalPics,
             detail: `ลบโฟลเดอร์ Product "${targetId}" (${toDelete.length} อัลบั้ม, ${totalPics} รูป)`
+          });
+          saveAlbums();
+          closeDeleteConfirmModal();
+          showFolderDashboard();
+        } else if (type === 'facCustomer') {
+          const toDelete = getMatchingFolderAlbums('facCustomer', targetId);
+          const toDeleteIds = new Set(toDelete.map(a => a.id));
+          const remainingAlbums = albums.filter(a => !toDeleteIds.has(a.id));
+          // Keep parent Product folder alive if no other album remains under this Product
+          const isDirectFacDel = isDirectProductCustomerFacClient(navPath.client);
+          const hasSiblingProduct = remainingAlbums.some(a =>
+            !a.isSystemLogContainer &&
+            a.client === navPath.client &&
+            (isDirectFacDel
+              ? ((a.product || 'ไม่ระบุ Product') === navPath.product)
+              : (a.dept === navPath.dept && (a.product || 'ไม่ระบุ Product') === navPath.product))
+          );
+          if (!hasSiblingProduct && navPath.client && navPath.product) {
+            remainingAlbums.unshift({
+              id: 'fld-' + Date.now(),
+              type: currentAlbumType || 'facility',
+              client: navPath.client,
+              dept: isDirectFacDel ? navPath.client : (navPath.dept || navPath.client),
+              product: navPath.product,
+              thaiDate: '',
+              note: '',
+              coverUrl: '',
+              coverPosition: '50% 50%',
+              isFolderPlaceholder: true,
+              photos: []
+            });
+          }
+          albums = remainingAlbums;
+          const totalPics = toDelete.reduce((s, a) => s + a.photos.length, 0);
+          await removeCloudPhotosForAlbums(toDelete);
+          recordActivityLog('delete_folder', {
+            albumTitle: `${navPath.client} > ${navPath.product} > ${targetId}`,
+            photoCount: totalPics,
+            detail: `ลบอัลบั้ม Customer "${targetId}" (${toDelete.length} อัลบั้ม, ${totalPics} รูป)`
           });
           saveAlbums();
           closeDeleteConfirmModal();
@@ -7807,13 +7962,13 @@ function openNewAlbumModal() {
         </div>
 
         <div id="edit-fac-div-wrap" class="hidden">
-          <label id="edit-fac-div-label" class="block text-xs font-semibold text-slate-600 mb-1">2. Division *</label>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">2. Division *</label>
           <input id="edit-album-fac-division" type="text" list="fac-division-suggestions"
             class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-[#EB2D2D] outline-none" />
         </div>
 
         <div id="edit-fac-team-wrap" class="hidden">
-          <label id="edit-fac-team-label" class="block text-xs font-semibold text-slate-600 mb-1">3. Team *</label>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">3. Team *</label>
           <input id="edit-album-fac-team" type="text" list="fac-team-suggestions"
             class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-[#EB2D2D] outline-none" />
         </div>
