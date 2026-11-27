@@ -3074,6 +3074,8 @@ create policy "Public Access workdrive-photos" on storage.objects
         albums = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         updateStats();
         renderCurrentView();
+        checkSystemUpdateNoticeForUser();
+        renderAdminUpdateResponses();
       }
     });
 
