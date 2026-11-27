@@ -7286,6 +7286,26 @@ function openNewAlbumModal() {
       return container;
     }
 
+    function buildTrashAlbumMeta(alb) {
+      if (!alb || !alb.id) return null;
+      return {
+        id: alb.id,
+        type: getAlbumType(alb),
+        client: alb.client || '',
+        dept: alb.dept || '',
+        product: alb.product || '',
+        facDivision: alb.facDivision || '',
+        facTeam: alb.facTeam || '',
+        facCustomer: alb.facCustomer || '',
+        thaiDate: alb.thaiDate || '',
+        note: alb.note || '',
+        isServiceCenter: !!alb.isServiceCenter,
+        serviceCenter: alb.serviceCenter || '',
+        siteName: alb.siteName || '',
+        scCustomer: alb.scCustomer || ''
+      };
+    }
+
     async function removeCloudPhotosForAlbums(targetAlbums, permanent = false) {
       const paths = [];
       targetAlbums.forEach(alb => {
@@ -7295,20 +7315,38 @@ function openNewAlbumModal() {
       });
 
       if (!permanent) {
-        if (paths.length > 0) {
-          const trash = getTrashContainer();
-          const existingSet = new Set(trash.items.map(it => it.storagePath));
-          paths.forEach(sp => {
-            if (!existingSet.has(sp)) {
-              trash.items.push({
-                storagePath: sp,
-                deletedBy: currentUser ? currentUser.name : 'unknown',
-                deletedAt: getThaiNowFormatted(),
-                createdAtMs: Date.now()
-              });
-              existingSet.add(sp);
-            }
+        const trash = getTrashContainer();
+        const existingSet = new Set(trash.items.map(it => it.storagePath || it.photoId));
+        targetAlbums.forEach(alb => {
+          const fallbackAlb = (alb && alb.id) ? alb : (activeAlbumId ? albums.find(a => a && a.id === activeAlbumId) : null);
+          const meta = buildTrashAlbumMeta(fallbackAlb);
+          const albLabel = fallbackAlb ? formatFullAlbumSyncLabel(fallbackAlb) : 'ไม่ระบุอัลบั้ม';
+          (alb.photos || []).forEach(p => {
+            if (!p) return;
+            const key = p.storagePath || p.id;
+            if (!key || existingSet.has(key)) return;
+            trash.items.unshift({
+              id: 'tr-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+              photoId: p.id || ('ph-' + Date.now()),
+              storagePath: p.storagePath || '',
+              dataUrl: p.dataUrl || '',
+              caption: p.caption || 'ภาพถ่ายหน้างาน',
+              takenBy: p.takenBy || '-',
+              timestamp: p.timestamp || '-',
+              sizeBytes: p.sizeBytes || 0,
+              albumId: meta ? meta.id : '',
+              albumLabel: albLabel,
+              albumMeta: meta,
+              deletedBy: currentUser ? currentUser.name : 'unknown',
+              deletedDept: currentUser ? (currentUser.dept || '-') : '-',
+              deletedAt: getThaiNowFormatted(),
+              createdAtMs: Date.now()
+            });
+            existingSet.add(key);
           });
+        });
+        if (trash.items.length > 400) {
+          trash.items = trash.items.slice(0, 400);
         }
         return;
       }
@@ -7421,32 +7459,10 @@ function openNewAlbumModal() {
 
     function updateTrashCountBadge() {
       const badge = document.getElementById('admin-trash-count-badge');
-      if (!badge) return;
-      const activePaths = new Set();
-      albums.filter(a => !a.isSystemLogContainer).forEach(alb => {
-        (alb.photos || []).forEach(p => {
-          if (p && p.storagePath) activePaths.add(p.storagePath);
-        });
-      });
-      const trash = albums.find(a => a.id === '__cspm_trash__');
-      const snapContainer = albums.find(a => a.id === '__cspm_snapshots__');
-      const orphanSet = new Set();
-      if (trash && Array.isArray(trash.items)) {
-        trash.items.forEach(it => {
-          if (it && it.storagePath && !activePaths.has(it.storagePath)) orphanSet.add(it.storagePath);
-        });
-      }
-      if (snapContainer && Array.isArray(snapContainer.snapshots)) {
-        snapContainer.snapshots.forEach(s => {
-          (s.albumsData || []).forEach(alb => {
-            (alb.photos || []).forEach(p => {
-              if (p && p.storagePath && !activePaths.has(p.storagePath)) orphanSet.add(p.storagePath);
-            });
-          });
-        });
-      }
-      const cnt = orphanSet.size;
-      badge.textContent = cnt > 0 ? `${cnt} ไฟล์` : 'ว่าง';
+      const tabPill = document.getElementById('admin-tab-trash-pill');
+      const cnt = getDeletedTrashItems().length;
+      if (badge) badge.textContent = cnt > 0 ? `${cnt} ไฟล์` : 'ว่าง';
+      if (tabPill) tabPill.textContent = String(cnt);
     }
 
     async function executeConfirmedDelete() {
@@ -7861,24 +7877,298 @@ function openNewAlbumModal() {
 
     function switchAdminModalTab(tab) {
       const statusPanel = document.getElementById('admin-panel-status');
+      const trashPanel = document.getElementById('admin-panel-trash');
       const logsPanel = document.getElementById('admin-panel-logs');
       const tabStatus = document.getElementById('admin-tab-status');
+      const tabTrash = document.getElementById('admin-tab-trash');
       const tabLogs = document.getElementById('admin-tab-logs');
 
-      if (tab === 'logs') {
-        statusPanel.classList.add('hidden');
+      const activeCls = 'py-2 px-2.5 rounded-lg text-xs font-semibold bg-[#1B212C] text-white shadow-2xs transition cursor-pointer flex items-center justify-center gap-1.5';
+      const inactiveCls = 'py-2 px-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center justify-center gap-1.5';
+
+      statusPanel.classList.add('hidden');
+      if (trashPanel) trashPanel.classList.add('hidden');
+      logsPanel.classList.add('hidden');
+      tabStatus.className = inactiveCls;
+      if (tabTrash) tabTrash.className = inactiveCls;
+      tabLogs.className = inactiveCls;
+
+      if (tab === 'trash' && trashPanel) {
+        trashPanel.classList.remove('hidden');
+        if (tabTrash) tabTrash.className = activeCls;
+        renderAdminTrashList();
+      } else if (tab === 'logs') {
         logsPanel.classList.remove('hidden');
-        tabLogs.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold bg-[#1B212C] text-white shadow-2xs transition cursor-pointer flex items-center justify-center gap-1.5';
-        tabStatus.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center justify-center gap-1.5';
+        tabLogs.className = activeCls;
         renderAdminLogsList();
       } else {
-        logsPanel.classList.add('hidden');
         statusPanel.classList.remove('hidden');
-        tabStatus.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold bg-[#1B212C] text-white shadow-2xs transition cursor-pointer flex items-center justify-center gap-1.5';
-        tabLogs.className = 'flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center justify-center gap-1.5';
+        tabStatus.className = activeCls;
         renderAdminAlbumStatusList();
       }
       lucide.createIcons();
+    }
+
+    function getDeletedTrashItems() {
+      const activeIds = new Set();
+      const activePaths = new Set();
+      albums.filter(a => !a.isSystemLogContainer).forEach(alb => {
+        (alb.photos || []).forEach(p => {
+          if (p && p.id) activeIds.add(p.id);
+          if (p && p.storagePath) activePaths.add(p.storagePath);
+        });
+      });
+
+      const resultMap = new Map();
+      const trash = albums.find(a => a.id === '__cspm_trash__');
+      if (trash && Array.isArray(trash.items)) {
+        trash.items.forEach(it => {
+          if (!it) return;
+          if (it.storagePath && activePaths.has(it.storagePath)) return;
+          if (it.photoId && activeIds.has(it.photoId)) return;
+          const k = it.storagePath || it.photoId;
+          if (!k || resultMap.has(k)) return;
+          let resolvedUrl = it.dataUrl || '';
+          if (!resolvedUrl && it.storagePath && isCloudConnected && supabaseClient) {
+            try {
+              const { data } = supabaseClient.storage.from(PHOTO_BUCKET).getPublicUrl(it.storagePath);
+              if (data && data.publicUrl) resolvedUrl = data.publicUrl;
+            } catch (e) {}
+          }
+          resultMap.set(k, {
+            ...it,
+            dataUrl: resolvedUrl,
+            albumLabel: it.albumLabel || (it.albumMeta ? formatFullAlbumSyncLabel(it.albumMeta) : 'ไม่ระบุอัลบั้ม')
+          });
+        });
+      }
+
+      // Also scan snapshots for any deleted photos that happened before rich trash metadata was saved
+      const snapContainer = albums.find(a => a.id === '__cspm_snapshots__');
+      if (snapContainer && Array.isArray(snapContainer.snapshots)) {
+        snapContainer.snapshots.forEach(s => {
+          (s.albumsData || []).forEach(alb => {
+            if (!alb || alb.isSystemLogContainer) return;
+            const meta = buildTrashAlbumMeta(alb);
+            const albLabel = formatFullAlbumSyncLabel(alb);
+            (alb.photos || []).forEach(p => {
+              if (!p) return;
+              if (p.storagePath && activePaths.has(p.storagePath)) return;
+              if (p.id && activeIds.has(p.id)) return;
+              const k = p.storagePath || p.id;
+              if (!k || resultMap.has(k)) return;
+              resultMap.set(k, {
+                id: 'tr-snap-' + k,
+                photoId: p.id || ('ph-' + Date.now()),
+                storagePath: p.storagePath || '',
+                dataUrl: p.dataUrl || '',
+                caption: p.caption || 'ภาพถ่ายหน้างาน',
+                takenBy: p.takenBy || '-',
+                timestamp: p.timestamp || '-',
+                sizeBytes: p.sizeBytes || 0,
+                albumId: alb.id || '',
+                albumLabel: albLabel,
+                albumMeta: meta,
+                deletedBy: s.username || '-',
+                deletedDept: '-',
+                deletedAt: s.thaiTimestamp || '-',
+                createdAtMs: s.createdAtMs || 0
+              });
+            });
+          });
+        });
+      }
+
+      return Array.from(resultMap.values()).sort((a, b) => (b.createdAtMs || 0) - (a.createdAtMs || 0));
+    }
+
+    function renderAdminTrashList() {
+      if (!isAdminUser()) return;
+      const items = getDeletedTrashItems();
+      const albSel = document.getElementById('admin-trash-album-filter');
+      const query = (document.getElementById('admin-trash-search').value || '').trim().toLowerCase();
+      const listEl = document.getElementById('admin-trash-list');
+      if (!listEl) return;
+
+      if (albSel) {
+        const prevVal = albSel.value || 'ALL';
+        const uniqueAlbs = Array.from(new Set(items.map(it => it.albumLabel).filter(Boolean)));
+        albSel.innerHTML = `<option value="ALL">ทุกอัลบั้ม (${items.length} รูป)</option>` +
+          uniqueAlbs.map(lbl => {
+            const c = items.filter(it => it.albumLabel === lbl).length;
+            return `<option value="${escapeHtml(lbl)}">${escapeHtml(lbl)} (${c} รูป)</option>`;
+          }).join('');
+        if (uniqueAlbs.includes(prevVal)) albSel.value = prevVal;
+      }
+
+      const selectedAlb = albSel ? albSel.value : 'ALL';
+      const filtered = items.filter(it => {
+        if (selectedAlb !== 'ALL' && it.albumLabel !== selectedAlb) return false;
+        if (query) {
+          const hay = `${it.caption} ${it.albumLabel} ${it.deletedBy} ${it.takenBy} ${it.deletedAt}`.toLowerCase();
+          if (!hay.includes(query)) return false;
+        }
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `
+          <div class="text-center py-10 text-slate-400">
+            <i data-lucide="trash-2" class="w-8 h-8 mx-auto mb-2 opacity-60"></i>
+            <p class="text-xs font-medium">ไม่มีรูปภาพในถังขยะที่รอการกู้คืน</p>
+          </div>`;
+        lucide.createIcons();
+        return;
+      }
+
+      listEl.innerHTML = filtered.map(it => {
+        const safeKey = escapeHtml(it.storagePath || it.photoId).replace(/'/g, "\'");
+        return `
+          <div class="p-3 bg-white hover:bg-slate-50 rounded-xl border border-slate-200/90 flex items-center justify-between gap-3 transition">
+            <div class="flex items-center gap-3 min-w-0 flex-1">
+              <div class="w-16 h-16 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden shrink-0 flex items-center justify-center">
+                ${it.dataUrl
+                  ? `<img src="${escapeHtml(it.dataUrl)}" class="w-full h-full object-cover" onerror="this.style.display='none'" />`
+                  : `<i data-lucide="image" class="w-6 h-6 text-slate-400"></i>`}
+              </div>
+              <div class="min-w-0 flex-1 space-y-0.5">
+                <p class="text-xs font-bold text-slate-900 truncate">${escapeHtml(it.caption || 'ภาพถ่ายหน้างาน')}</p>
+                <p class="text-[11px] font-semibold text-[#EB2D2D] break-words">อัลบั้ม: ${escapeHtml(it.albumLabel)}</p>
+                <p class="text-[10px] text-slate-500">
+                  ลบโดย: <strong>${escapeHtml(it.deletedBy)}</strong> • เมื่อ ${escapeHtml(it.deletedAt)} • ผู้ถ่าย: ${escapeHtml(it.takenBy)}
+                </p>
+              </div>
+            </div>
+            <button type="button" onclick="restoreSingleTrashPhoto('${safeKey}')"
+              class="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 font-bold text-xs flex items-center gap-1.5 shrink-0 cursor-pointer transition">
+              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+              <span>กู้คืนรูปนี้</span>
+            </button>
+          </div>
+        `;
+      }).join('');
+      lucide.createIcons();
+    }
+
+    function restoreTrashItemsIntoAlbums(itemsToRestore) {
+      if (!Array.isArray(itemsToRestore) || itemsToRestore.length === 0) return 0;
+      let restoredCount = 0;
+
+      itemsToRestore.forEach(it => {
+        if (!it || !it.dataUrl) return;
+        let targetAlb = it.albumId ? albums.find(a => a && !a.isSystemLogContainer && a.id === it.albumId) : null;
+        if (!targetAlb && it.albumMeta) {
+          targetAlb = albums.find(a =>
+            a && !a.isSystemLogContainer &&
+            a.client === it.albumMeta.client &&
+            a.dept === it.albumMeta.dept &&
+            a.product === it.albumMeta.product &&
+            a.thaiDate === it.albumMeta.thaiDate
+          );
+        }
+        if (!targetAlb) {
+          const m = it.albumMeta || {};
+          const newAlbId = it.albumId || ('alb-restored-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4));
+          targetAlb = {
+            id: newAlbId,
+            type: m.type || 'facility',
+            client: m.client || 'อัลบั้มกู้คืนจากถังขยะ',
+            dept: m.dept || 'ทั่วไป',
+            product: m.product || 'ทั่วไป',
+            facDivision: m.facDivision || '',
+            facTeam: m.facTeam || '',
+            facCustomer: m.facCustomer || '',
+            thaiDate: m.thaiDate || getTodayIsoAndThai().thai,
+            note: m.note || 'กู้คืนอัลบั้มจากถังขยะ',
+            isServiceCenter: !!m.isServiceCenter,
+            serviceCenter: m.serviceCenter || '',
+            siteName: m.siteName || '',
+            scCustomer: m.scCustomer || '',
+            coverUrl: '',
+            coverPosition: '50% 50%',
+            photos: []
+          };
+          albums.unshift(targetAlb);
+        }
+
+        targetAlb.isFolderPlaceholder = false;
+        if (!Array.isArray(targetAlb.photos)) targetAlb.photos = [];
+        const alreadyExists = targetAlb.photos.some(p =>
+          (it.storagePath && p.storagePath === it.storagePath) ||
+          (it.photoId && p.id === it.photoId)
+        );
+        if (!alreadyExists) {
+          targetAlb.photos.unshift({
+            id: it.photoId || ('ph-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5)),
+            dataUrl: it.dataUrl,
+            storagePath: it.storagePath || '',
+            sizeBytes: it.sizeBytes || 0,
+            caption: it.caption || 'ภาพถ่ายกู้คืน',
+            takenBy: it.takenBy || (currentUser ? currentUser.name : 'unknown'),
+            timestamp: it.timestamp || getThaiNowFormatted()
+          });
+          restoredCount++;
+        }
+      });
+
+      const restoredKeys = new Set(itemsToRestore.map(it => it.storagePath || it.photoId));
+      const trash = albums.find(a => a && a.id === '__cspm_trash__');
+      if (trash && Array.isArray(trash.items)) {
+        trash.items = trash.items.filter(it => !restoredKeys.has(it.storagePath || it.photoId));
+      }
+      return restoredCount;
+    }
+
+    function restoreSingleTrashPhoto(itemKey) {
+      if (!isAdminUser()) return;
+      const items = getDeletedTrashItems();
+      const target = items.find(it => (it.storagePath || it.photoId) === itemKey);
+      if (!target) {
+        alert('ไม่พบข้อมูลรูปภาพนี้ในถังขยะ');
+        return;
+      }
+      if (!confirm(`ต้องการกู้คืนรูป "${target.caption}" กลับไปยังอัลบั้ม:
+"${target.albumLabel}" ใช่หรือไม่?`)) return;
+
+      const count = restoreTrashItemsIntoAlbums([target]);
+      if (count > 0) {
+        recordActivityLog('add_photos', {
+          albumTitle: target.albumLabel,
+          photoCount: 1,
+          detail: `แอดมินกู้คืนรูปภาพ "${target.caption}" กลับเข้าอัลบั้ม ${target.albumLabel}`
+        });
+        saveAlbums();
+        updateStats();
+        updateTrashCountBadge();
+        renderAdminTrashList();
+        if (activeAlbumId) renderPhotos();
+        else renderCurrentLevelFolders();
+        alert(`กู้คืนรูปภาพ "${target.caption}" กลับเข้าอัลบั้มเรียบร้อยแล้วครับ`);
+      }
+    }
+
+    function restoreAllTrashPhotos() {
+      if (!isAdminUser()) return;
+      const items = getDeletedTrashItems();
+      if (items.length === 0) {
+        alert('ไม่มีรูปภาพในถังขยะสำหรับกู้คืน');
+        return;
+      }
+      if (!confirm(`ยืนยันการกู้คืนรูปภาพทั้งหมด ${items.length} รูป กลับไปยังอัลบั้มเดิมใช่หรือไม่?`)) return;
+
+      const count = restoreTrashItemsIntoAlbums(items);
+      recordActivityLog('add_photos', {
+        albumTitle: `กู้คืนรูปจากถังขยะทั้งหมด (${count} รูป)`,
+        photoCount: count,
+        detail: `แอดมินกู้คืนรูปภาพจากถังขยะจำนวน ${count} รูป กลับเข้าอัลบั้มต้นทาง`
+      });
+      saveAlbums();
+      updateStats();
+      updateTrashCountBadge();
+      renderAdminTrashList();
+      if (activeAlbumId) renderPhotos();
+      else renderCurrentLevelFolders();
+      alert(`กู้คืนรูปภาพทั้งหมด ${count} รูป กลับเข้าอัลบั้มเรียบร้อยแล้วครับ`);
     }
 
     function renderAdminAlbumStatusList() {
@@ -7958,7 +8248,9 @@ function openNewAlbumModal() {
       switchAdminModalTab(defaultTab);
       if (isCloudConnected && navigator.onLine) {
         await syncFromCloud(false, false);
+        updateTrashCountBadge();
         renderAdminAlbumStatusList();
+        renderAdminTrashList();
         renderAdminLogsList();
       }
     }
@@ -8852,14 +9144,22 @@ function openNewAlbumModal() {
 
       <div class="p-6 space-y-4 max-h-[84vh] overflow-y-auto text-xs">
         <!-- Main Admin View Switcher Tabs -->
-        <div class="flex items-center gap-2 p-1 bg-[#F5F7FA] rounded-xl border border-slate-200">
+        <div class="grid grid-cols-3 gap-1.5 p-1 bg-[#F5F7FA] rounded-xl border border-slate-200">
           <button id="admin-tab-status" type="button" onclick="switchAdminModalTab('status')"
-            class="flex-1 py-2 px-3 rounded-lg text-xs font-semibold bg-[#1B212C] text-white shadow-2xs transition cursor-pointer flex items-center justify-center gap-1.5">
-            <i data-lucide="folder-check" class="w-3.5 h-3.5 text-amber-400"></i> เช็กสถานะอัลบั้มที่โหลดแล้ว
+            class="py-2 px-2.5 rounded-lg text-xs font-semibold bg-[#1B212C] text-white shadow-2xs transition cursor-pointer flex items-center justify-center gap-1.5">
+            <i data-lucide="folder-check" class="w-3.5 h-3.5 text-amber-400 shrink-0"></i>
+            <span class="truncate">สถานะโหลดอัลบั้ม</span>
+          </button>
+          <button id="admin-tab-trash" type="button" onclick="switchAdminModalTab('trash')"
+            class="py-2 px-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center justify-center gap-1.5">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5 text-[#EB2D2D] shrink-0"></i>
+            <span class="truncate">รูปที่ถูกลบ / กู้คืน</span>
+            <span id="admin-tab-trash-pill" class="px-1.5 py-0.2 rounded-full bg-red-100 text-[#EB2D2D] text-[10px] font-bold">0</span>
           </button>
           <button id="admin-tab-logs" type="button" onclick="switchAdminModalTab('logs')"
-            class="flex-1 py-2 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center justify-center gap-1.5">
-            <i data-lucide="history" class="w-3.5 h-3.5 text-[#EB2D2D]"></i> ประวัติการเพิ่ม / ลบ / โหลดทั้งหมด
+            class="py-2 px-2.5 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition cursor-pointer flex items-center justify-center gap-1.5">
+            <i data-lucide="history" class="w-3.5 h-3.5 text-[#EB2D2D] shrink-0"></i>
+            <span class="truncate">ประวัติทีมทั้งหมด</span>
           </button>
         </div>
 
@@ -8909,6 +9209,43 @@ function openNewAlbumModal() {
           </div>
 
           <div id="admin-alb-status-list" class="max-h-80 overflow-y-auto space-y-2 p-2.5 rounded-xl bg-[#F5F7FA] border border-slate-200/80">
+            <!-- Rendered dynamically -->
+          </div>
+        </div>
+
+        <!-- ==================== TAB TRASH: DELETED PHOTOS & ALBUM RECOVERY ==================== -->
+        <div id="admin-panel-trash" class="hidden space-y-4">
+          <div class="p-3.5 rounded-xl bg-amber-50/90 border border-amber-200 text-amber-950 flex flex-wrap items-center justify-between gap-2">
+            <div class="space-y-0.5">
+              <p class="font-bold text-xs flex items-center gap-1.5">
+                <i data-lucide="rotate-ccw" class="w-4 h-4 text-[#EB2D2D]"></i>
+                <span>รายการรูปภาพที่ถูกลบ (ตรวจสอบอัลบั้มต้นทางและกู้คืนรูปได้ก่อนล้างถังขยะถาวร)</span>
+              </p>
+              <p class="text-[11px] text-amber-800">แสดงภาพตัวอย่าง ชื่อรูป อัลบั้มที่ถูกลบ ผู้ลบ และเวลาที่ลบ พร้อมปุ่มกู้คืนกลับเข้าอัลบั้ม</p>
+            </div>
+            <button type="button" onclick="restoreAllTrashPhotos()"
+              class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-2xs cursor-pointer flex items-center gap-1.5 shrink-0">
+              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+              <span>กู้คืนรูปทั้งหมด</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 mb-1">กรองตามอัลบั้มที่ถูกลบ</label>
+              <select id="admin-trash-album-filter" onchange="renderAdminTrashList()"
+                class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-medium focus:border-[#EB2D2D] outline-none">
+                <option value="ALL">ทุกอัลบั้มที่ถูกลบ</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-[11px] font-semibold text-slate-500 mb-1">ค้นหาชื่อรูป / ชื่อลูกค้า / ผู้ลบ</label>
+              <input id="admin-trash-search" type="text" oninput="renderAdminTrashList()" placeholder="พิมพ์คำอธิบายภาพ, ลูกค้า, วันที่, ผู้ลบ..."
+                class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs focus:border-[#EB2D2D] outline-none" />
+            </div>
+          </div>
+
+          <div id="admin-trash-list" class="max-h-80 overflow-y-auto space-y-2 p-2.5 rounded-xl bg-[#F5F7FA] border border-slate-200/80">
             <!-- Rendered dynamically -->
           </div>
         </div>
