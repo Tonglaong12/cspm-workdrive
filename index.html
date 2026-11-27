@@ -231,29 +231,6 @@
     .cspm-marquee:hover .cspm-marquee-track { animation-play-state: paused; }
 
 
-    /* ===== Admin System Update Scrolling Marquee ===== */
-    .cspm-update-marquee {
-      overflow: hidden;
-      position: relative;
-      width: 100%;
-    }
-    .cspm-update-marquee-track {
-      display: flex;
-      width: max-content;
-      animation: cspm-update-scroll 16s linear infinite;
-    }
-    .cspm-update-marquee:hover .cspm-update-marquee-track {
-      animation-play-state: paused;
-    }
-    .cspm-update-marquee-item {
-      flex-shrink: 0;
-      padding-right: 3rem;
-      white-space: nowrap;
-    }
-    @keyframes cspm-update-scroll {
-      from { transform: translateX(0); }
-      to   { transform: translateX(-50%); }
-    }
 
     /* ===== Hello! welcome screen after login ===== */
     #welcome-splash {
@@ -672,13 +649,6 @@
             </div>
           </div>
 
-          <!-- Admin System Update Broadcast Button (Visible ONLY for sarunchana.h) -->
-          <button id="admin-update-nav-btn" type="button" onclick="openAdminUpdateModal()"
-            class="hidden px-3 py-2 rounded-xl bg-amber-300 hover:bg-amber-400 text-amber-950 border border-amber-400 text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer transition"
-            title="ส่งหน้าต่างแจ้งเตือนอัปเดตระบบพร้อมข้อความเลื่อน และดูสถานะคนกด Hold / กากบาท (เฉพาะ Admin)">
-            <i data-lucide="megaphone" class="w-4 h-4 text-amber-950"></i>
-            <span class="hidden sm:inline">แจ้งอัปเดต</span>
-          </button>
           <!-- Admin Activity Status Button (Visible ONLY for sarunchana.h) -->
           <button id="admin-logs-nav-btn" type="button" onclick="openAdminLogsModal()"
             class="hidden px-3 py-2 rounded-xl bg-[#1B212C] hover:bg-slate-800 text-white border border-amber-400/50 text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer transition"
@@ -1794,37 +1764,6 @@ create policy "Public Access workdrive-photos" on storage.objects
         });
         return { id: '__cspm_app_settings__', isSystemLogContainer: true, photos: [], settings: mergedSet };
       }
-      if ((l && l.id === '__cspm_system_update__') || (r && r.id === '__cspm_system_update__')) {
-        const rUp = (r && r.notice && typeof r.notice === 'object') ? r.notice : null;
-        const lUp = (l && l.notice && typeof l.notice === 'object') ? l.notice : null;
-        const bUp = (b && b.notice && typeof b.notice === 'object') ? b.notice : null;
-        const pick = (a, z) => {
-          if (!a) return z;
-          if (!z) return a;
-          const ta = a.updatedAtMs || 0;
-          const tz = z.updatedAtMs || 0;
-          return ta >= tz ? a : z;
-        };
-        let chosen = pick(lUp, rUp);
-        if (bUp && chosen && chosen.id === bUp.id && (bUp.updatedAtMs || 0) > (chosen.updatedAtMs || 0)) {
-          chosen = bUp;
-        }
-        if (chosen) {
-          const mergedResp = {
-            ...(rUp && rUp.responses ? rUp.responses : {}),
-            ...(lUp && lUp.responses ? lUp.responses : {})
-          };
-          Object.keys(mergedResp).forEach(k => {
-            const rv = rUp && rUp.responses ? rUp.responses[k] : null;
-            const lv = lUp && lUp.responses ? lUp.responses[k] : null;
-            if (rv && lv) {
-              mergedResp[k] = (lv.timeMs || 0) >= (rv.timeMs || 0) ? lv : rv;
-            }
-          });
-          chosen = { ...chosen, responses: mergedResp };
-        }
-        return { id: '__cspm_system_update__', isSystemLogContainer: true, photos: [], notice: chosen };
-      }
       const out = mergeObjectFields({ ...l, photos: undefined }, b ? { ...b, photos: undefined } : null, { ...r, photos: undefined });
       out.photos = mergeKeyedList(l.photos || [], b ? (b.photos || []) : [], r.photos || [], p => p.id, mergeObjectFields);
       return out;
@@ -1935,9 +1874,18 @@ create policy "Public Access workdrive-photos" on storage.objects
             remaining++;
           }
         }
+        const albFullName = formatFullAlbumSyncLabel(album);
         for (const p of (album.photos || [])) {
           if (!isInlinePhoto(p)) continue;
-          updateCloudBannerUI('กำลังส่งรูปที่ถ่ายตอนออฟไลน์ขึ้นทีม...', `รูปที่ ${done + remaining + 1} จาก ${total}`, 'bg-sky-500');
+          const curIdx = done + remaining + 1;
+          const pctNow = Math.min(85, 35 + Math.round((curIdx / Math.max(total, 1)) * 50));
+          setLiveCloudSyncProgress(albFullName, pctNow, null, false, {
+            action: `อัปโหลดรูปภาพ (${curIdx}/${total} รูป)`,
+            remainingCount: Math.max(1, total - done),
+            totalCount: total,
+            doneCount: done
+          });
+          updateCloudBannerUI('กำลังส่งรูปที่ถ่ายตอนออฟไลน์ขึ้นทีม...', `${albFullName} • รูปที่ ${curIdx} จาก ${total}`, 'bg-sky-500');
           const up = await uploadPhotoBlobToStorage(album.id, p);
           if (up && up.dataUrl && !up.dataUrl.startsWith('data:')) {
             delete p.pendingUpload;
@@ -1953,7 +1901,7 @@ create policy "Public Access workdrive-photos" on storage.objects
 
     // State that goes to the cloud: photos/covers still waiting for upload stay on this device only
     function cloudStateForPush() {
-      const albumsCopy = albums.map(a => {
+      const albumsCopy = albums.filter(a => a && a.id !== '__cspm_system_update__').map(a => {
         if (a && a.id === '__cspm_folder_covers__') {
           const cleanCovers = {};
           const src = (a.covers && typeof a.covers === 'object') ? a.covers : {};
@@ -2027,8 +1975,6 @@ create policy "Public Access workdrive-photos" on storage.objects
         renderBreadcrumbAndHeaders();
         renderCurrentLevelFolders();
       }
-      checkSystemUpdateNoticeForUser();
-      renderAdminUpdateResponses();
     }
 
     function adoptRemote(remote) {
@@ -2435,6 +2381,7 @@ create policy "Public Access workdrive-photos" on storage.objects
     }
 
     async function init() {
+      try { localStorage.removeItem('cspm_workdrive_system_update_v1'); } catch (e) {}
       renderDepartmentDropdowns();
       applyRememberedCredentials();
       const savedUser = localStorage.getItem(USER_KEY) || sessionStorage.getItem(USER_KEY);
@@ -3016,19 +2963,58 @@ create policy "Public Access workdrive-photos" on storage.objects
       return rem > 0 ? `อีกประมาณ ${m} นาที ${rem} วิ` : `อีกประมาณ ${m} นาที`;
     }
 
+    let lastEditedAlbumSummary = null; // { label, action, updatedAtMs }
+
+    function formatFullAlbumSyncLabel(alb) {
+      if (!alb || alb.isSystemLogContainer) return '';
+      const isSc = isServiceCenterClientName(alb.client) || alb.isServiceCenter;
+      const isFac = !isSc && isNonScFacilityAlbum(alb);
+      const cust = isSc ? getScCustomerOfAlbum(alb) : (isFac ? getFacCustomerOfAlbum(alb) : (alb.client || '-'));
+      const branchOrDept = isFac ? `${alb.client} • ${getFacDivisionOfAlbum(alb)}` : (alb.dept || '-');
+      const prod = isFac ? getFacTeamOfAlbum(alb) : (alb.product || '-');
+      const dateStr = alb.thaiDate ? ` (${alb.thaiDate})` : '';
+      return `${cust} • ${branchOrDept} • ${prod}${dateStr}`;
+    }
+
+    function setLastEditedAlbumContext(label, action = 'อัปเดตอัลบั้ม') {
+      if (!label) return;
+      lastEditedAlbumSummary = {
+        label: String(label).trim(),
+        action: String(action || 'อัปเดตอัลบั้ม').trim(),
+        updatedAtMs: Date.now()
+      };
+    }
+
     function getActiveAlbumLabelForSync(targetAlbumId = null) {
       const id = targetAlbumId || activeAlbumId;
       if (id) {
         const alb = albums.find(a => a && a.id === id);
-        if (alb) {
-          const cust = isServiceCenterClientName(alb.client) ? getScCustomerOfAlbum(alb) : alb.client;
-          return `${cust} • ${alb.dept || '-'} • ${alb.product || '-'} (${alb.thaiDate || '-'})`;
-        }
+        if (alb) return formatFullAlbumSyncLabel(alb);
+      }
+      // Check if any album currently has pending/inline photos waiting to upload
+      const pendingAlb = (albums || []).find(a =>
+        a && !a.isSystemLogContainer &&
+        ((a.coverUrl && a.coverUrl.startsWith('data:')) ||
+         (a.photos || []).some(p => isInlinePhoto(p) || (p && p.pendingUpload === true)))
+      );
+      if (pendingAlb) {
+        return formatFullAlbumSyncLabel(pendingAlb);
+      }
+      if (lastEditedAlbumSummary && (Date.now() - lastEditedAlbumSummary.updatedAtMs) < 120000) {
+        return lastEditedAlbumSummary.label;
       }
       if (navPath && navPath.client) {
-        return `${navPath.client}${navPath.product ? ' • ' + navPath.product : ''}`;
+        const parts = [navPath.client];
+        if (navPath.dept && navPath.dept !== '__DIRECT_FAC__') parts.push(navPath.dept);
+        if (navPath.product) parts.push(navPath.product);
+        if (navPath.facCustomer) parts.push(navPath.facCustomer);
+        return parts.join(' • ');
       }
-      return 'ข้อมูลอัลบั้มทั้งหมดของทีม';
+      const recentLogs = getAllActivityLogsWithFallback();
+      if (recentLogs.length > 0 && recentLogs[0].albumTitle && recentLogs[0].albumTitle !== '-') {
+        return recentLogs[0].albumTitle;
+      }
+      return 'อัลบั้มงานในระบบ';
     }
 
     function setLiveCloudSyncProgress(albumName, pct, startedAtMs = null, forceSend = false, extra = {}) {
@@ -3041,9 +3027,13 @@ create policy "Public Access workdrive-photos" on storage.objects
         clampedPct,
         startMs
       );
+      const resolvedAlbum = (albumName && albumName !== '-') ? albumName : getActiveAlbumLabelForSync();
+      const resolvedAction = extra.action || (lastEditedAlbumSummary && (now - lastEditedAlbumSummary.updatedAtMs) < 120000 ? lastEditedAlbumSummary.action : 'อัปเดตข้อมูลขึ้น Cloud');
 
       activeCloudSyncStatus = {
-        albumName: albumName || getActiveAlbumLabelForSync(),
+        album: resolvedAlbum,
+        albumName: resolvedAlbum,
+        action: resolvedAction,
         pct: clampedPct,
         etaSec: Math.round(etaSec),
         startedAtMs: startMs,
@@ -3166,7 +3156,8 @@ create policy "Public Access workdrive-photos" on storage.objects
             activeSyncItems.push({
               user: u.name,
               dept: u.dept || '-',
-              album: u.syncMeta.album || '-',
+              album: u.syncMeta.album || u.syncMeta.albumName || stripSyncMetaFromActivity(u.activity) || 'อัลบั้มงาน',
+              action: u.syncMeta.action || 'กำลังอัปเดตอัลบั้ม',
               pct: Math.max(1, Math.min(100, Math.round(u.syncMeta.pct))),
               etaSec: u.syncMeta.etaSec
             });
@@ -3216,9 +3207,10 @@ create policy "Public Access workdrive-photos" on storage.objects
             htmlRows += `
               <div class="p-2.5 rounded-xl bg-white border border-sky-200/80 space-y-1">
                 <div class="flex items-center justify-between gap-2 text-xs">
-                  <span class="font-bold text-slate-900 truncate">${escapeHtml(item.user)} (${escapeHtml(item.dept)}) กำลังซิงก์: ${escapeHtml(item.album)}</span>
+                  <span class="font-bold text-slate-900 truncate">${escapeHtml(item.user)} (${escapeHtml(item.dept)}) • ${escapeHtml(item.action || 'กำลังอัปเดตอัลบั้ม')}</span>
                   <span class="font-mono font-bold text-sky-700 shrink-0">${item.pct}% • ${escapeHtml(formatEtaThai(item.etaSec))}</span>
                 </div>
+                <p class="text-[11px] font-semibold text-sky-900 break-words">อัลบั้ม: ${escapeHtml(item.album)}</p>
                 <div class="w-full h-1.5 rounded-full bg-sky-100 overflow-hidden">
                   <div class="h-full bg-sky-600 transition-all duration-300" style="width: ${item.pct}%"></div>
                 </div>
@@ -3246,8 +3238,11 @@ create policy "Public Access workdrive-photos" on storage.objects
     function buildPresenceActivityString(baseActivity) {
       const cleanBase = stripSyncMetaFromActivity(baseActivity);
       if (!activeCloudSyncStatus) return cleanBase;
+      const albText = activeCloudSyncStatus.album || activeCloudSyncStatus.albumName || getActiveAlbumLabelForSync();
       const payload = JSON.stringify({
-        album: activeCloudSyncStatus.albumName,
+        album: albText,
+        albumName: albText,
+        action: activeCloudSyncStatus.action || 'อัปเดตอัลบั้ม',
         pct: activeCloudSyncStatus.pct,
         etaSec: activeCloudSyncStatus.etaSec,
         ts: activeCloudSyncStatus.updatedAtMs
@@ -3369,13 +3364,11 @@ create policy "Public Access workdrive-photos" on storage.objects
 
     function startPresenceTracking() {
       sendPresenceHeartbeat();
-      checkSystemUpdateNoticeForUser();
       if (presenceTimer) clearInterval(presenceTimer);
       presenceTimer = setInterval(() => {
         if (document.visibilityState === 'visible' && currentUser) {
           sendPresenceHeartbeat();
-          checkSystemUpdateNoticeForUser();
-        }
+            }
       }, 12000);
     }
 
@@ -3444,36 +3437,52 @@ create policy "Public Access workdrive-photos" on storage.objects
 
       const adminView = isAdminUser();
       const syncingUsers = adminView ? uniqueOnlineUsers.filter(u => u.syncMeta && typeof u.syncMeta.pct === 'number') : [];
+      const recentTeamLogs = adminView ? getAllActivityLogsWithFallback().slice(0, 4) : [];
       let syncSummaryHtml = '';
-      if (adminView && syncingUsers.length > 0) {
+      if (adminView && (syncingUsers.length > 0 || recentTeamLogs.length > 0)) {
         syncSummaryHtml = `
-          <div class="m-2 p-2.5 rounded-xl bg-sky-50 border border-sky-200 text-sky-950 space-y-1.5">
+          <div class="m-2 p-2.5 rounded-xl bg-sky-50 border border-sky-200 text-sky-950 space-y-2">
             <div class="flex items-center justify-between text-[11px] font-bold">
               <span class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full bg-sky-500 animate-ping"></span>
-                กำลังซิงก์ขึ้น Supabase Cloud (${syncingUsers.length} คน)
+                <span class="w-2 h-2 rounded-full ${syncingUsers.length > 0 ? 'bg-sky-500 animate-ping' : 'bg-emerald-500'}"></span>
+                ${syncingUsers.length > 0 ? `กำลังซิงก์ขึ้น Supabase Cloud (${syncingUsers.length} คน)` : 'รายการอัปเดตอัลบั้มล่าสุดของทีม'}
               </span>
               <span class="text-[10px] font-semibold text-sky-700">ADMIN MONITOR</span>
             </div>
             ${syncingUsers.map(u => {
               const sm = u.syncMeta;
               const pctVal = Math.max(1, Math.min(100, Math.round(sm.pct)));
+              const albName = sm.album || sm.albumName || stripSyncMetaFromActivity(u.activity) || 'อัลบั้มงาน';
+              const actDesc = sm.action || 'กำลังอัปเดตอัลบั้ม';
               return `
-                <div class="p-2 rounded-lg bg-white border border-sky-100 space-y-1">
+                <div class="p-2.5 rounded-lg bg-white border border-sky-200/80 space-y-1">
                   <div class="flex items-center justify-between gap-2 text-[11px]">
-                    <span class="font-bold text-slate-900 truncate">${escapeHtml(u.name)} → ${escapeHtml(sm.album || '-')}</span>
-                    <span class="font-mono font-bold text-sky-700 shrink-0">${pctVal}%</span>
+                    <span class="font-bold text-slate-900 truncate">${escapeHtml(u.name)} <span class="font-normal text-slate-500">(${escapeHtml(u.dept || '-')})</span></span>
+                    <span class="font-mono font-bold text-sky-700 shrink-0">${pctVal}% • ${escapeHtml(formatEtaThai(sm.etaSec))}</span>
                   </div>
+                  <p class="text-[11px] font-semibold text-sky-900 leading-snug break-words">อัลบั้ม: ${escapeHtml(albName)}</p>
+                  <p class="text-[10px] text-slate-600 truncate">รายการ: ${escapeHtml(actDesc)}</p>
                   <div class="w-full h-1.5 rounded-full bg-sky-100 overflow-hidden">
                     <div class="h-full bg-sky-500 transition-all duration-300" style="width: ${pctVal}%"></div>
-                  </div>
-                  <div class="text-[10px] text-slate-500 flex items-center justify-between">
-                    <span>อัลบั้ม: ${escapeHtml(sm.album || '-')}</span>
-                    <span class="font-semibold text-sky-700">${escapeHtml(formatEtaThai(sm.etaSec))}</span>
                   </div>
                 </div>
               `;
             }).join('')}
+            ${recentTeamLogs.length > 0 ? `
+              <div class="pt-1 border-t border-sky-200/70 space-y-1">
+                <p class="text-[10px] font-bold text-sky-800">อัปเดตอัลบั้มล่าสุด:</p>
+                ${recentTeamLogs.map(lg => `
+                  <div class="px-2 py-1.5 rounded-lg bg-white/90 border border-sky-100 text-[10px] leading-snug">
+                    <div class="flex items-center justify-between gap-1.5">
+                      <span class="font-bold text-slate-800 truncate">${escapeHtml(lg.username)} (${escapeHtml(lg.dept || '-')})</span>
+                      <span class="text-slate-400 shrink-0">${escapeHtml(lg.thaiTimestamp || '')}</span>
+                    </div>
+                    <p class="text-slate-700 font-medium break-words">อัลบั้ม: ${escapeHtml(lg.albumTitle || '-')}</p>
+                    <p class="text-slate-500 truncate">${escapeHtml(lg.detail || '')}</p>
+                  </div>
+                `).join('')}
+              </div>
+            ` : ''}
           </div>
         `;
       }
@@ -3483,12 +3492,15 @@ create policy "Public Access workdrive-photos" on storage.objects
         const initial = (s.name || 'U').charAt(0).toUpperCase();
         const sm = adminView && s.syncMeta && typeof s.syncMeta.pct === 'number' ? s.syncMeta : null;
         const pctVal = sm ? Math.max(1, Math.min(100, Math.round(sm.pct))) : 0;
+        const smAlb = sm ? (sm.album || sm.albumName || stripSyncMetaFromActivity(s.activity) || 'อัลบั้มงาน') : '';
+        const smAct = sm ? (sm.action || 'กำลังอัปเดตอัลบั้ม') : '';
         const syncDetailBlock = sm ? `
           <div class="mt-1.5 p-2 rounded-lg bg-sky-50/90 border border-sky-200/80 space-y-1">
             <div class="flex items-center justify-between gap-2 text-[10px] font-bold text-sky-900">
-              <span class="truncate">ซิงก์: ${escapeHtml(sm.album || '-')}</span>
+              <span class="truncate">${escapeHtml(smAct)}</span>
               <span class="font-mono shrink-0">${pctVal}% • ${escapeHtml(formatEtaThai(sm.etaSec))}</span>
             </div>
+            <p class="text-[10px] font-semibold text-slate-800 break-words">อัลบั้ม: ${escapeHtml(smAlb)}</p>
             <div class="w-full h-1.5 rounded-full bg-sky-200/70 overflow-hidden">
               <div class="h-full bg-sky-600 transition-all duration-300" style="width: ${pctVal}%"></div>
             </div>
@@ -3552,17 +3564,12 @@ create policy "Public Access workdrive-photos" on storage.objects
     }
 
     window.addEventListener('storage', (e) => {
-      if (e.key === SYSTEM_UPDATE_KEY && currentUser) {
-        checkSystemUpdateNoticeForUser();
-        renderAdminUpdateResponses();
-      } else if (e.key === PRESENCE_KEY && currentUser) {
+      if (e.key === PRESENCE_KEY && currentUser) {
         renderOnlineUsers();
       } else if (e.key === STORAGE_KEY && currentUser) {
         albums = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         updateStats();
         renderCurrentView();
-        checkSystemUpdateNoticeForUser();
-        renderAdminUpdateResponses();
       }
     });
 
@@ -3585,194 +3592,6 @@ create policy "Public Access workdrive-photos" on storage.objects
     });
 
     
-    // ==================== ADMIN SYSTEM UPDATE BROADCAST (SCROLLING + HOLD / X) ====================
-    const SYSTEM_UPDATE_KEY = 'cspm_workdrive_system_update_v1';
-    let lastSeenUpdateId = null;
-
-    function getSystemUpdateContainer() {
-      if (!Array.isArray(albums)) return null;
-      return albums.find(a => a && a.id === '__cspm_system_update__') || null;
-    }
-
-    function getOrCreateSystemUpdateContainer() {
-      let c = getSystemUpdateContainer();
-      if (!c) {
-        c = { id: '__cspm_system_update__', isSystemLogContainer: true, photos: [], notice: null };
-        albums.push(c);
-      }
-      return c;
-    }
-
-    function getSystemUpdateState() {
-      const c = getSystemUpdateContainer();
-      if (c && Object.prototype.hasOwnProperty.call(c, 'notice')) {
-        return c.notice || null;
-      }
-      try {
-        const raw = localStorage.getItem(SYSTEM_UPDATE_KEY);
-        return raw ? JSON.parse(raw) : null;
-      } catch (e) {
-        return null;
-      }
-    }
-
-    function saveSystemUpdateState(stateObj) {
-      try {
-        if (!stateObj) localStorage.removeItem(SYSTEM_UPDATE_KEY);
-        else localStorage.setItem(SYSTEM_UPDATE_KEY, JSON.stringify(stateObj));
-      } catch (e) {}
-      if (Array.isArray(albums)) {
-        const c = getOrCreateSystemUpdateContainer();
-        c.notice = stateObj || null;
-        saveAlbums();
-      }
-    }
-
-    function openAdminUpdateModal() {
-      if (!isAdminUser()) return;
-      const cur = getSystemUpdateState();
-      const inp = document.getElementById('admin-update-message-input');
-      if (inp) {
-        inp.value = (cur && cur.message) ? cur.message : 'แจ้งอัปเดตระบบ CSPM WorkDrive เร็วๆ นี้ หากใครยังทำงานอยู่ให้กด Hold ก่อนนะครับ';
-      }
-      renderAdminUpdateResponses();
-      document.getElementById('admin-update-compose-modal').classList.remove('hidden');
-      lucide.createIcons();
-    }
-
-    function closeAdminUpdateModal() {
-      document.getElementById('admin-update-compose-modal').classList.add('hidden');
-    }
-
-    async function publishSystemUpdateNotice() {
-      if (!isAdminUser()) return;
-      const inp = document.getElementById('admin-update-message-input');
-      const msg = (inp && inp.value || '').trim();
-      if (!msg) {
-        alert('กรุณาพิมพ์ข้อความแจ้งเตือนก่อนครับ');
-        return;
-      }
-      const nowMs = Date.now();
-      const nextState = {
-        id: 'upd-' + nowMs,
-        message: msg,
-        sentBy: currentUser ? currentUser.name : 'sarunchana.h',
-        sentAtThai: getThaiNowFormatted(),
-        updatedAtMs: nowMs,
-        active: true,
-        responses: {}
-      };
-      saveSystemUpdateState(nextState);
-      lastSeenUpdateId = null;
-      renderAdminUpdateResponses();
-      checkSystemUpdateNoticeForUser();
-      if (isCloudConnected && supabaseClient && navigator.onLine) {
-        await pushTeamStateToCloud();
-      }
-      alert('ส่งหน้าต่างแจ้งเตือนอัปเดตระบบเรียบร้อยแล้วครับ');
-    }
-
-    function clearActiveSystemUpdate() {
-      if (!isAdminUser()) return;
-      saveSystemUpdateState(null);
-      lastSeenUpdateId = null;
-      const noticeModal = document.getElementById('system-update-notice-modal');
-      if (noticeModal) noticeModal.classList.add('hidden');
-      renderAdminUpdateResponses();
-    }
-
-    function checkSystemUpdateNoticeForUser() {
-      if (!currentUser || isAdminUser()) return;
-      const st = getSystemUpdateState();
-      const modal = document.getElementById('system-update-notice-modal');
-      if (!modal) return;
-      if (!st || !st.active || !st.message) {
-        modal.classList.add('hidden');
-        return;
-      }
-      const uKey = (currentUser.name || '').trim().toLowerCase();
-      const myResp = st.responses && st.responses[uKey];
-      if (myResp && myResp.choice === 'dismissed' && st.id === lastSeenUpdateId) {
-        return;
-      }
-      const t1 = document.getElementById('update-marquee-text-1');
-      const t2 = document.getElementById('update-marquee-text-2');
-      if (t1) t1.textContent = st.message;
-      if (t2) t2.textContent = st.message;
-
-      const holdBox = document.getElementById('user-update-hold-status');
-      if (holdBox) {
-        if (myResp && myResp.choice === 'hold') {
-          holdBox.classList.remove('hidden');
-          holdBox.textContent = `คุณกด Hold ไว้เมื่อ ${myResp.timeThai} (ระบบแจ้งแอดมินแล้วว่าคุณกำลังทำงานอยู่)`;
-        } else {
-          holdBox.classList.add('hidden');
-        }
-      }
-      modal.classList.remove('hidden');
-      lucide.createIcons();
-    }
-
-    function respondSystemUpdate(choice) {
-      if (!currentUser) return;
-      const st = getSystemUpdateState();
-      const modal = document.getElementById('system-update-notice-modal');
-      if (st && st.active) {
-        if (!st.responses || typeof st.responses !== 'object') st.responses = {};
-        const uKey = (currentUser.name || '').trim().toLowerCase();
-        const nowMs = Date.now();
-        st.updatedAtMs = nowMs;
-        st.responses[uKey] = {
-          username: currentUser.name,
-          dept: currentUser.dept || '-',
-          activity: getCurrentActivityLabel(),
-          choice: choice,
-          timeThai: getThaiNowFormatted(),
-          timeMs: nowMs
-        };
-        saveSystemUpdateState(st);
-      }
-      if (choice === 'dismissed') {
-        lastSeenUpdateId = st ? st.id : null;
-        if (modal) modal.classList.add('hidden');
-      } else if (choice === 'hold') {
-        const holdBox = document.getElementById('user-update-hold-status');
-        if (holdBox) {
-          holdBox.classList.remove('hidden');
-          holdBox.textContent = `บันทึกสถานะ Hold เรียบร้อยแล้ว (${getThaiNowFormatted()}) — แอดมินจะเห็นว่าคุณกำลังทำงานอยู่ครับ`;
-        }
-      }
-    }
-
-    function renderAdminUpdateResponses() {
-      const listEl = document.getElementById('admin-update-responses-list');
-      if (!listEl) return;
-      const st = getSystemUpdateState();
-      if (!st || !st.active) {
-        listEl.innerHTML = `<p class="text-center text-slate-400 py-5">ยังไม่มีประกาศแจ้งเตือนอัปเดตที่เปิดใช้งานอยู่</p>`;
-        return;
-      }
-      const entries = Object.values(st.responses || {});
-      if (entries.length === 0) {
-        listEl.innerHTML = `<p class="text-center text-slate-400 py-5">รอผู้ใช้งานตอบกลับ (Hold หรือ กากบาท)...</p>`;
-        return;
-      }
-      listEl.innerHTML = entries.map(r => {
-        const isHold = r.choice === 'hold';
-        return `
-          <div class="p-2.5 bg-white rounded-lg flex items-center justify-between gap-2">
-            <div class="min-w-0">
-              <p class="font-bold text-slate-900 truncate">${escapeHtml(r.username)} <span class="font-normal text-slate-400">(${escapeHtml(r.dept)})</span></p>
-              <p class="text-[11px] text-slate-500 truncate">${escapeHtml(r.activity || '')} • ${escapeHtml(r.timeThai)}</p>
-            </div>
-            <span class="shrink-0 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${isHold ? 'bg-amber-100 text-amber-900 border border-amber-300' : 'bg-slate-100 text-slate-600'}">
-              ${isHold ? 'HOLD (ยังทำอยู่)' : 'ปิดแล้ว (×)'}
-            </span>
-          </div>
-        `;
-      }).join('');
-    }
-
     function isAdminUser() {
       if (!currentUser || !currentUser.name) return false;
       return currentUser.name.trim().toLowerCase() === 'sarunchana.h';
@@ -3786,15 +3605,12 @@ create policy "Public Access workdrive-photos" on storage.objects
       document.getElementById('user-avatar').textContent = currentUser.name.charAt(0).toUpperCase();
 
       const adminBtn = document.getElementById('admin-logs-nav-btn');
-      const adminUpdBtn = document.getElementById('admin-update-nav-btn');
       const adminBadge = document.getElementById('user-admin-badge');
       if (isAdminUser()) {
         if (adminBtn) adminBtn.classList.remove('hidden');
-        if (adminUpdBtn) adminUpdBtn.classList.remove('hidden');
         if (adminBadge) adminBadge.classList.remove('hidden');
       } else {
         if (adminBtn) adminBtn.classList.add('hidden');
-        if (adminUpdBtn) adminUpdBtn.classList.add('hidden');
         if (adminBadge) adminBadge.classList.add('hidden');
       }
 
@@ -6126,16 +5942,33 @@ function openNewAlbumModal() {
 
       const processedPhotos = [];
       const uploadStartMs = Date.now();
-      const albSyncLabel = getActiveAlbumLabelForSync(album.id);
-      setLiveCloudSyncProgress(albSyncLabel, 10, uploadStartMs, true);
-      for (let i = 0; i < pendingUploadItems.length; i++) {
+      const albSyncLabel = formatFullAlbumSyncLabel(album);
+      const totalUp = pendingUploadItems.length;
+      setLastEditedAlbumContext(albSyncLabel, `เพิ่มรูปภาพ ${totalUp} รูป`);
+      setLiveCloudSyncProgress(albSyncLabel, 10, uploadStartMs, true, {
+        action: `กำลังอัปโหลดรูปภาพ 0/${totalUp} รูป`,
+        remainingCount: totalUp,
+        totalCount: totalUp,
+        doneCount: 0
+      });
+      for (let i = 0; i < totalUp; i++) {
         const item = pendingUploadItems[i];
-        const stepPct = 10 + Math.round(((i + 0.5) / pendingUploadItems.length) * 55);
-        setLiveCloudSyncProgress(albSyncLabel, stepPct, uploadStartMs, true);
+        const stepPct = 10 + Math.round(((i + 0.5) / totalUp) * 55);
+        setLiveCloudSyncProgress(albSyncLabel, stepPct, uploadStartMs, true, {
+          action: `กำลังอัปโหลดรูปภาพ ${i + 1}/${totalUp} รูป`,
+          remainingCount: totalUp - i,
+          totalCount: totalUp,
+          doneCount: i
+        });
         const uploaded = await uploadPhotoBlobToStorage(album.id, item);
         processedPhotos.push(uploaded);
-        const donePct = 10 + Math.round(((i + 1) / pendingUploadItems.length) * 55);
-        setLiveCloudSyncProgress(albSyncLabel, donePct, uploadStartMs, true);
+        const donePct = 10 + Math.round(((i + 1) / totalUp) * 55);
+        setLiveCloudSyncProgress(albSyncLabel, donePct, uploadStartMs, true, {
+          action: `อัปโหลดแล้ว ${i + 1}/${totalUp} รูป`,
+          remainingCount: Math.max(1, totalUp - (i + 1)),
+          totalCount: totalUp,
+          doneCount: i + 1
+        });
       }
 
       album.photos.unshift(...processedPhotos);
@@ -7969,6 +7802,9 @@ function openNewAlbumModal() {
 
     function recordActivityLog(actionType, info = {}) {
       if (!currentUser) return;
+      if (info && info.albumTitle && info.albumTitle !== '-') {
+        setLastEditedAlbumContext(info.albumTitle, info.detail || actionType);
+      }
       const snapId = (actionType !== 'restore_snapshot')
         ? captureTimeSnapshot(info.detail || actionType)
         : null;
@@ -9267,137 +9103,6 @@ function openNewAlbumModal() {
 
 
 
-  <!-- ==================== MODAL: ADMIN SYSTEM UPDATE COMPOSER & HOLD MONITOR ==================== -->
-  <div id="admin-update-compose-modal" onclick="if(event.target === this) closeAdminUpdateModal()"
-    class="hidden fixed inset-0 z-[70] bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-xl w-full shadow-2xl overflow-hidden border border-slate-100">
-      <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <i data-lucide="megaphone" class="w-5 h-5 text-amber-400"></i>
-          <div>
-            <h3 class="font-semibold text-sm">แจ้งเตือนการอัปเดตระบบ (ข้อความเลื่อน)</h3>
-            <p class="text-[11px] text-slate-400">พิมพ์ข้อความแจ้งทีม และดูรายชื่อผู้ที่ยังทำงานอยู่ (กด Hold) หรือปิดแจ้งเตือนแล้ว (กากบาท)</p>
-          </div>
-        </div>
-        <button type="button" onclick="closeAdminUpdateModal()" class="text-slate-400 hover:text-white cursor-pointer">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
 
-      <div class="p-6 space-y-4 text-xs max-h-[82vh] overflow-y-auto">
-        <div>
-          <label class="block font-bold text-slate-800 mb-1.5">ข้อความแจ้งเตือนที่จะแสดงเป็นข้อความเลื่อน *</label>
-          <textarea id="admin-update-message-input" rows="3"
-            placeholder="เช่น แจ้งอัปเดตระบบ CSPM WorkDrive เร็วๆ นี้ หากใครยังทำงานอยู่ให้กด Hold ก่อนนะครับ"
-            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white focus:border-[#EB2D2D] outline-none text-xs leading-relaxed"></textarea>
-        </div>
-
-        <div class="flex flex-wrap items-center justify-between gap-2 pt-1">
-          <button type="button" onclick="clearActiveSystemUpdate()"
-            class="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer flex items-center gap-1.5">
-            <i data-lucide="bell-off" class="w-3.5 h-3.5"></i>
-            <span>ยกเลิกประกาศแจ้งเตือน</span>
-          </button>
-          <button type="button" onclick="publishSystemUpdateNotice()"
-            class="px-5 py-2 rounded-xl font-bold bg-[#EB2D2D] hover:bg-[#C8141B] text-white shadow-xs cursor-pointer flex items-center gap-1.5">
-            <i data-lucide="send" class="w-4 h-4"></i>
-            <span>ส่งแจ้งเตือนขึ้นหน้าจอทีม</span>
-          </button>
-        </div>
-
-        <div class="pt-3 border-t border-slate-100 space-y-2">
-          <div class="flex items-center justify-between">
-            <span class="font-bold text-slate-800 flex items-center gap-1.5">
-              <i data-lucide="users" class="w-4 h-4 text-[#EB2D2D]"></i>
-              <span>สถานะการตอบกลับของทีม (Hold / กากบาท)</span>
-            </span>
-            <button type="button" onclick="renderAdminUpdateResponses()" class="text-[11px] font-semibold text-[#EB2D2D] hover:underline cursor-pointer">
-              รีเฟรชรายชื่อ
-            </button>
-          </div>
-          <div id="admin-update-responses-list" class="max-h-52 overflow-y-auto divide-y divide-slate-100 rounded-xl border border-slate-200 bg-[#F8FAFC] p-1">
-            <!-- Rendered dynamically -->
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ==================== MODAL: USER SYSTEM UPDATE NOTICE WITH SCROLLING TEXT & HOLD / X ==================== -->
-  <div id="system-update-notice-modal"
-    class="hidden fixed inset-0 z-[75] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border-2 border-amber-400">
-      <div class="px-5 py-4 bg-[#1B212C] text-white flex items-center justify-between gap-3">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <div class="w-9 h-9 rounded-xl bg-amber-400/20 text-amber-300 flex items-center justify-center shrink-0">
-            <i data-lucide="megaphone" class="w-5 h-5"></i>
-          </div>
-          <div class="min-w-0">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-300 block">SYSTEM UPDATE NOTICE</span>
-            <h3 class="font-bold text-sm truncate">แจ้งเตือนการอัปเดตระบบ</h3>
-          </div>
-        </div>
-        <button type="button" onclick="respondSystemUpdate('dismissed')"
-          class="w-8 h-8 rounded-lg bg-white/10 hover:bg-[#EB2D2D] text-slate-200 hover:text-white flex items-center justify-center shrink-0 transition cursor-pointer"
-          title="ไม่ได้ทำงานอยู่ — ปิดหน้าต่าง (กากบาท)">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
-
-      <div class="p-5 space-y-4">
-        <!-- Scrolling Marquee Message Box -->
-        <div class="rounded-xl bg-amber-50 border border-amber-300 py-3 px-2 overflow-hidden">
-          <div class="cspm-update-marquee" role="marquee" aria-label="ข้อความแจ้งเตือนอัปเดตระบบ">
-            <div class="cspm-update-marquee-track text-sm font-bold text-amber-950">
-              <span id="update-marquee-text-1" class="cspm-update-marquee-item">กำลังอัปเดตระบบ...</span>
-              <span id="update-marquee-text-2" class="cspm-update-marquee-item" aria-hidden="true">กำลังอัปเดตระบบ...</span>
-            </div>
-          </div>
-        </div>
-
-        <p class="text-xs text-slate-600 leading-relaxed">
-          หากคุณยังทำงานอยู่ (เช่น กำลังอัปโหลดรูปหรือบันทึกข้อมูล) ให้กดปุ่ม <strong class="text-amber-900">Hold</strong> เพื่อแจ้งแอดมิน แต่หากไม่ได้ทำอยู่สามารถกดปุ่ม <strong class="text-slate-800">กากบาท (×)</strong> เพื่อปิดหน้าต่างได้ทันทีครับ
-        </p>
-
-        <div id="user-update-hold-status" class="hidden p-3 rounded-xl bg-amber-100/80 border border-amber-300 text-xs font-semibold text-amber-950">
-          <!-- Hold confirmation text -->
-        </div>
-
-        <div class="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100">
-          <button type="button" onclick="respondSystemUpdate('dismissed')"
-            class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer flex items-center gap-1.5">
-            <i data-lucide="x-circle" class="w-4 h-4"></i>
-            <span>ไม่ได้ทำอยู่ (ปิด ×)</span>
-          </button>
-          <button type="button" onclick="respondSystemUpdate('hold')"
-            class="px-5 py-2.5 rounded-xl text-xs font-bold bg-amber-400 hover:bg-amber-500 text-amber-950 shadow-xs cursor-pointer flex items-center gap-1.5">
-            <i data-lucide="pause-circle" class="w-4 h-4"></i>
-            <span>ยังทำงานอยู่ (Hold)</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ==================== FLOATING SCROLL BUTTONS (top / bottom) ==================== -->
-  <div id="scroll-fab" class="hidden" aria-label="เลื่อนหน้า">
-    <button type="button" id="scroll-top-btn" class="scroll-fab-btn is-hidden" onclick="scrollPageTo('top')" title="ขึ้นบนสุด" aria-label="เลื่อนขึ้นบนสุด">
-      <i data-lucide="chevrons-up"></i>
-    </button>
-    <button type="button" id="scroll-bottom-btn" class="scroll-fab-btn is-hidden" onclick="scrollPageTo('bottom')" title="ลงล่างสุด" aria-label="เลื่อนลงล่างสุด">
-      <i data-lucide="chevrons-down"></i>
-    </button>
-  </div>
-
-  <!-- ==================== HELLO! WELCOME SCREEN (shown after login) ==================== -->
-  <div id="welcome-splash" onclick="hideWelcomeSplash()"
-    class="hidden fixed inset-0 z-[100] flex flex-col items-center justify-center text-center cursor-pointer select-none">
-    <div class="w-full max-w-xl">
-      <div class="welcome-bar w-14 h-1.5 rounded-full bg-[#EB2D2D] mx-auto mb-7"></div>
-      <h1 class="welcome-hello font-extrabold text-white text-6xl sm:text-7xl tracking-tight">Hello!</h1>
-      <p id="welcome-name" class="welcome-name mt-4 text-2xl sm:text-4xl font-bold text-[#FF6B70] break-words"></p>
-      <p class="welcome-sub mt-8 text-sm text-slate-400">ยินดีต้อนรับสู่ CSPM WorkDrive</p>
-    </div>
-  </div>
 </body>
 </html>
