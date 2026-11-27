@@ -827,6 +827,9 @@
 
       <!-- ==================== VIEW 1: 4-LEVEL HIERARCHICAL FOLDER EXPLORER ==================== -->
       <div id="dashboard-view">
+        <!-- Admin Live Team Cloud Upload Monitor -->
+        <div id="admin-team-cloud-monitor" class="hidden"></div>
+
         <!-- Stats Banner -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mb-6">
           <div class="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center gap-3.5">
@@ -1012,6 +1015,9 @@
             </button>
           </div>
         </div>
+
+        <!-- Uploader Cloud Status Banner -->
+        <div id="album-upload-cloud-status" class="hidden"></div>
 
         <!-- Photos Grid -->
         <div id="photos-grid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"></div>
@@ -2961,7 +2967,292 @@ create policy "Public Access workdrive-photos" on storage.objects
     }
 
     
-    // ==================== LIVE CLOUD SYNC PROGRESS BROADCAST (FOR ADMIN) ====================
+    // ==================== LIVE CLOUD SYNC & UPLOAD STATUS (UPLOADER + ADMIN) ====================
+    let activeCloudSyncStatus = null; // { albumName, pct, etaSec, startedAtMs, updatedAtMs, totalCount, doneCount }
+    let lastSyncHeartbeatPushMs = 0;
+
+    function getAlbumCloudUploadSummary(album) {
+      if (!album || album.isSystemLogContainer) {
+        return { total: 0, onCloud: 0, localOnly: 0, allOnCloud: true };
+      }
+      const list = Array.isArray(album.photos) ? album.photos : [];
+      const total = list.length;
+      const localOnly = list.filter(p => isInlinePhoto(p) || (p && p.pendingUpload === true)).length;
+      const onCloud = Math.max(0, total - localOnly);
+      return {
+        total,
+        onCloud,
+        localOnly,
+        allOnCloud: total === 0 || (localOnly === 0 && !pendingSync)
+      };
+    }
+
+    function getAllAlbumsLocalPhotosCount() {
+      let localPhotos = 0;
+      let localBytes = 0;
+      (albums || []).forEach(a => {
+        if (!a || a.isSystemLogContainer) return;
+        (a.photos || []).forEach(p => {
+          if (isInlinePhoto(p) || (p && p.pendingUpload === true)) {
+            localPhotos++;
+            localBytes += Number(p.sizeBytes || 180000);
+          }
+        });
+      });
+      return { localPhotos, localBytes };
+    }
+
+    function estimateEtaSecondsForPending(pendingCount, totalBytes = 0, pct = null, startedAtMs = null) {
+      const now = Date.now();
+      if (typeof pct === 'number' && pct > 2 && pct < 100 && startedAtMs) {
+        const elapsedSec = Math.max(0.25, (now - startedAtMs) / 1000);
+        return Math.max(1, (elapsedSec * (100 - pct)) / pct);
+      }
+      if (!pendingCount || pendingCount <= 0) return 0;
+      // Estimate ~2.5s per photo + ~0.8s per 100KB (conservative mobile upload estimate)
+      const estSec = pendingCount * 2.5 + (totalBytes / 102400) * 0.8;
+      return Math.max(2, Math.round(estSec));
+    }
+
+    function formatEtaThai(etaSec) {
+      if (etaSec === 0) return 'เสร็จแล้ว';
+      if (typeof etaSec !== 'number' || !isFinite(etaSec) || etaSec < 0) return 'กำลังคำนวณเวลา...';
+      const s = Math.max(1, Math.round(etaSec));
+      const mins = Math.max(1, Math.ceil(s / 60));
+      if (s < 60) return `อีกประมาณ ~${s} วินาที (~${mins} นาที)`;
+      const m = Math.floor(s / 60);
+      const rem = s % 60;
+      return rem > 0 ? `อีกประมาณ ${m} นาที ${rem} วิ` : `อีกประมาณ ${m} นาที`;
+    }
+
+    function getActiveAlbumLabelForSync(targetAlbumId = null) {
+      const id = targetAlbumId || activeAlbumId;
+      if (id) {
+        const alb = albums.find(a => a && a.id === id);
+        if (alb) {
+          const cust = isServiceCenterClientName(alb.client) ? getScCustomerOfAlbum(alb) : alb.client;
+          return `${cust} • ${alb.dept || '-'} • ${alb.product || '-'} (${alb.thaiDate || '-'})`;
+        }
+      }
+      if (navPath && navPath.client) {
+        return `${navPath.client}${navPath.product ? ' • ' + navPath.product : ''}`;
+      }
+      return 'ข้อมูลอัลบั้มทั้งหมดของทีม';
+    }
+
+    function setLiveCloudSyncProgress(albumName, pct, startedAtMs = null, forceSend = false, extra = {}) {
+      const now = Date.now();
+      const clampedPct = Math.max(1, Math.min(99, Math.round(Number(pct) || 1)));
+      const startMs = startedAtMs || (activeCloudSyncStatus && activeCloudSyncStatus.startedAtMs) || now;
+      const etaSec = estimateEtaSecondsForPending(
+        extra.remainingCount || 1,
+        extra.remainingBytes || 0,
+        clampedPct,
+        startMs
+      );
+
+      activeCloudSyncStatus = {
+        albumName: albumName || getActiveAlbumLabelForSync(),
+        pct: clampedPct,
+        etaSec: Math.round(etaSec),
+        startedAtMs: startMs,
+        updatedAtMs: now,
+        totalCount: extra.totalCount || 0,
+        doneCount: extra.doneCount || 0
+      };
+
+      updateUploaderAndAdminCloudPanels();
+
+      if (forceSend || (now - lastSyncHeartbeatPushMs >= 1000)) {
+        lastSyncHeartbeatPushMs = now;
+        if (currentUser) sendPresenceHeartbeat();
+      }
+    }
+
+    function clearLiveCloudSyncProgress(forceSend = true) {
+      activeCloudSyncStatus = null;
+      lastSyncHeartbeatPushMs = 0;
+      updateUploaderAndAdminCloudPanels();
+      if (forceSend && currentUser) {
+        sendPresenceHeartbeat();
+      }
+    }
+
+    function updateUploaderAndAdminCloudPanels() {
+      // 1) Update Uploader status card inside Album Detail View
+      const albPanel = document.getElementById('album-upload-cloud-status');
+      if (albPanel && activeAlbumId) {
+        const alb = albums.find(a => a && a.id === activeAlbumId);
+        if (alb && alb.photos && alb.photos.length > 0) {
+          const sum = getAlbumCloudUploadSummary(alb);
+          const isSyncingHere = !!(activeCloudSyncStatus && isSyncingCloud);
+          albPanel.classList.remove('hidden');
+
+          if (isSyncingHere) {
+            const pctVal = activeCloudSyncStatus.pct;
+            const etaText = formatEtaThai(activeCloudSyncStatus.etaSec);
+            albPanel.className = 'mb-4 p-3.5 rounded-2xl bg-sky-50 border border-sky-200 text-sky-950 space-y-2';
+            albPanel.innerHTML = `
+              <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div class="flex items-center gap-2 font-bold">
+                  <span class="w-2.5 h-2.5 rounded-full bg-sky-500 animate-ping shrink-0"></span>
+                  <span>กำลังอัปโหลดขึ้น Supabase Cloud (${pctVal}%) — เครื่องอื่นจะเห็นเมื่อเสร็จ</span>
+                </div>
+                <span class="px-2.5 py-0.5 rounded-full bg-white border border-sky-200 font-mono font-bold text-sky-800">${etaText}</span>
+              </div>
+              <div class="w-full h-2 rounded-full bg-sky-200/70 overflow-hidden">
+                <div class="h-full bg-sky-600 transition-all duration-300" style="width: ${pctVal}%"></div>
+              </div>
+              <div class="flex items-center justify-between text-[11px] text-sky-800">
+                <span>อัลบั้ม: ${escapeHtml(activeCloudSyncStatus.albumName)}</span>
+                <span>ขึ้น Cloud แล้ว ${sum.onCloud}/${sum.total} รูป • รอส่ง ${sum.localOnly} รูป</span>
+              </div>
+            `;
+          } else if (sum.localOnly > 0 || pendingSync) {
+            const pendingBytes = (alb.photos || [])
+              .filter(p => isInlinePhoto(p) || (p && p.pendingUpload === true))
+              .reduce((acc, p) => acc + Number(p.sizeBytes || 180000), 0);
+            const estSec = estimateEtaSecondsForPending(Math.max(1, sum.localOnly), pendingBytes);
+            const etaText = formatEtaThai(estSec);
+            albPanel.className = 'mb-4 p-3.5 rounded-2xl bg-amber-50 border border-amber-300 text-amber-950 flex flex-wrap items-center justify-between gap-3 text-xs';
+            albPanel.innerHTML = `
+              <div class="space-y-0.5 min-w-0">
+                <p class="font-bold flex items-center gap-1.5">
+                  <span class="w-2.5 h-2.5 rounded-full bg-amber-500 shrink-0"></span>
+                  <span>ยังมีรูปในเครื่องนี้ที่ยังไม่ขึ้น Cloud (${sum.localOnly} จาก ${sum.total} รูป) — เครื่องอื่นยังไม่เห็นรูปที่ค้าง</span>
+                </p>
+                <p class="text-[11px] text-amber-900">
+                  คาดว่าจะอัปโหลดขึ้น Cloud เสร็จ: <strong>${escapeHtml(etaText)}</strong> • ขึ้น Cloud แล้ว ${sum.onCloud}/${sum.total} รูป
+                </p>
+              </div>
+              <button type="button" onclick="syncFromCloud(false, false)"
+                class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs shadow-2xs cursor-pointer shrink-0">
+                ส่งขึ้น Cloud ทันที
+              </button>
+            `;
+          } else {
+            albPanel.className = 'mb-4 p-3 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-emerald-950 flex flex-wrap items-center justify-between gap-2 text-xs';
+            albPanel.innerHTML = `
+              <div class="flex items-center gap-2 font-semibold">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                <span>อัปโหลดขึ้น Supabase Cloud ครบแล้ว (${sum.total}/${sum.total} รูป) — เครื่องอื่นที่รีเฟรชจะเห็นรูปทั้งหมด</span>
+              </div>
+              <span class="text-[11px] font-bold text-emerald-700">เสร็จแล้ว (0 นาที)</span>
+            `;
+          }
+        } else {
+          albPanel.classList.add('hidden');
+        }
+      }
+
+      // 2) Update Admin Live Team Cloud Upload Status Banner
+      const adminMon = document.getElementById('admin-team-cloud-monitor');
+      if (adminMon) {
+        if (!isAdminUser()) {
+          adminMon.classList.add('hidden');
+          return;
+        }
+        adminMon.classList.remove('hidden');
+
+        const now = Date.now();
+        let presenceMap = {};
+        try { presenceMap = JSON.parse(localStorage.getItem(PRESENCE_KEY) || '{}'); } catch (e) {}
+        const activeSessions = Object.values(presenceMap).filter(s => now - (s.lastSeen || 0) <= 20000);
+
+        // Deduplicate by username
+        const byUser = new Map();
+        activeSessions.forEach(s => {
+          const k = (s.name || '').trim().toLowerCase();
+          if (!k) return;
+          const prev = byUser.get(k);
+          if (!prev || s.sessionId === TAB_SESSION_ID || (s.lastSeen || 0) > (prev.lastSeen || 0)) {
+            byUser.set(k, s);
+          }
+        });
+
+        const activeSyncItems = [];
+        byUser.forEach(u => {
+          if (u.syncMeta && typeof u.syncMeta.pct === 'number') {
+            activeSyncItems.push({
+              user: u.name,
+              dept: u.dept || '-',
+              album: u.syncMeta.album || '-',
+              pct: Math.max(1, Math.min(100, Math.round(u.syncMeta.pct))),
+              etaSec: u.syncMeta.etaSec
+            });
+          }
+        });
+
+        // Also check albums with local-only / pending photos in current state
+        const pendingAlbums = (albums || []).filter(a => {
+          if (!a || a.isSystemLogContainer) return false;
+          const s = getAlbumCloudUploadSummary(a);
+          return s.localOnly > 0;
+        }).map(a => {
+          const s = getAlbumCloudUploadSummary(a);
+          const bytes = (a.photos || [])
+            .filter(p => isInlinePhoto(p) || (p && p.pendingUpload === true))
+            .reduce((sum, p) => sum + Number(p.sizeBytes || 180000), 0);
+          const cust = isServiceCenterClientName(a.client) ? getScCustomerOfAlbum(a) : a.client;
+          return {
+            albumLabel: `${cust} • ${a.dept || '-'} • ${a.product || '-'} (${a.thaiDate || '-'})`,
+            localOnly: s.localOnly,
+            total: s.total,
+            etaSec: estimateEtaSecondsForPending(s.localOnly, bytes)
+          };
+        });
+
+        if (activeSyncItems.length === 0 && pendingAlbums.length === 0) {
+          adminMon.className = 'mb-5 p-3.5 rounded-2xl bg-emerald-50/70 border border-emerald-200/90 text-emerald-950 flex flex-wrap items-center justify-between gap-2 text-xs';
+          adminMon.innerHTML = `
+            <div class="flex items-center gap-2 font-bold">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>
+              <span>สถานะ Cloud ของทีม (มุมมองแอดมิน): รูปภาพทุกอัลบั้มอัปโหลดขึ้น Supabase Cloud ครบแล้ว</span>
+            </div>
+            <span class="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">พร้อมแชร์ทั้งทีม • 0 นาที</span>
+          `;
+        } else {
+          adminMon.className = 'mb-5 p-4 rounded-2xl bg-sky-50 border border-sky-200 text-sky-950 space-y-2.5 text-xs';
+          let htmlRows = `
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex items-center gap-2 font-bold">
+                <span class="w-2.5 h-2.5 rounded-full bg-sky-500 animate-ping shrink-0"></span>
+                <span>สถานะการอัปโหลดขึ้น Supabase Cloud ของทีม (มุมมองแอดมิน)</span>
+              </div>
+              <span class="px-2 py-0.5 rounded bg-sky-200/80 text-sky-900 text-[10px] font-bold">ADMIN LIVE</span>
+            </div>
+          `;
+
+          activeSyncItems.forEach(item => {
+            htmlRows += `
+              <div class="p-2.5 rounded-xl bg-white border border-sky-200/80 space-y-1">
+                <div class="flex items-center justify-between gap-2 text-xs">
+                  <span class="font-bold text-slate-900 truncate">${escapeHtml(item.user)} (${escapeHtml(item.dept)}) กำลังซิงก์: ${escapeHtml(item.album)}</span>
+                  <span class="font-mono font-bold text-sky-700 shrink-0">${item.pct}% • ${escapeHtml(formatEtaThai(item.etaSec))}</span>
+                </div>
+                <div class="w-full h-1.5 rounded-full bg-sky-100 overflow-hidden">
+                  <div class="h-full bg-sky-600 transition-all duration-300" style="width: ${item.pct}%"></div>
+                </div>
+              </div>
+            `;
+          });
+
+          pendingAlbums.forEach(pa => {
+            htmlRows += `
+              <div class="p-2.5 rounded-xl bg-amber-50/90 border border-amber-200 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                <div class="min-w-0">
+                  <span class="font-bold text-amber-950">รอขึ้น Cloud: ${escapeHtml(pa.albumLabel)}</span>
+                  <span class="text-amber-800"> (ค้างในเครื่อง ${pa.localOnly}/${pa.total} รูป)</span>
+                </div>
+                <span class="font-bold text-amber-900 shrink-0">คาดว่าเสร็จ: ${escapeHtml(formatEtaThai(pa.etaSec))}</span>
+              </div>
+            `;
+          });
+
+          adminMon.innerHTML = htmlRows;
+        }
+      }
+    }
     let activeCloudSyncStatus = null; // { albumName, pct, etaSec, startedAtMs, updatedAtMs }
     let lastSyncHeartbeatPushMs = 0;
 
@@ -3318,6 +3609,7 @@ create policy "Public Access workdrive-photos" on storage.objects
       }
 
       listEl.innerHTML = rowsHtml;
+      updateUploaderAndAdminCloudPanels();
     }
 
     window.addEventListener('storage', (e) => {
@@ -3670,6 +3962,7 @@ create policy "Public Access workdrive-photos" on storage.objects
       if (statAlbumsEl) statAlbumsEl.textContent = realAlbums.length;
       document.getElementById('stat-photos').textContent = totalPhotos;
       document.getElementById('stat-storage').textContent = formatBytes(totalBytes);
+      updateUploaderAndAdminCloudPanels();
     }
 
     function formatBytes(bytes) {
@@ -5773,6 +6066,7 @@ function openNewAlbumModal() {
         <span><strong>จำนวนรูปภาพ:</strong> ${album.photos.length} รูป</span>${adminDlBadge}
       `;
       renderPhotos();
+      updateUploaderAndAdminCloudPanels();
       sendPresenceHeartbeat();
       lucide.createIcons();
     }
