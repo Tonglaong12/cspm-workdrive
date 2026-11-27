@@ -917,6 +917,12 @@
                 <span>แก้ไขชื่อ / วันที่ / หน้าปก</span>
               </button>
 
+              <button id="admin-move-album-detail-btn" type="button" onclick="openMoveAlbumModal(activeAlbumId)"
+                class="hidden px-3.5 py-2.5 bg-violet-50 hover:bg-violet-100 text-violet-800 border border-violet-200 text-sm font-semibold rounded-xl flex items-center gap-1.5 transition cursor-pointer" title="โยกย้ายอัลบั้มนี้ไปยังโครงสร้าง หมวด ลูกค้า สังกัด หรือ Product อื่น (เฉพาะ Admin)">
+                <i data-lucide="folder-symlink" class="w-4 h-4"></i>
+                <span>ย้ายอัลบั้ม</span>
+              </button>
+
               <button onclick="openExportModal('nas', activeAlbumId)"
                 class="px-3.5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl shadow-xs flex items-center gap-1.5 transition cursor-pointer" title="เลือกเดือนและอัลบั้มเพื่อบันทึกลง NAS ของบริษัทโดยตรง">
                 <i data-lucide="server" class="w-4 h-4"></i>
@@ -1246,18 +1252,35 @@
           <i data-lucide="image-plus" class="w-5 h-5 text-[#EB2D2D]"></i>
           ตรวจสอบภาพและใส่คำอธิบายก่อนบันทึก
         </h3>
-        <button onclick="closeUploadModal()" class="text-slate-400 hover:text-white cursor-pointer">
+        <button onclick="handleUploadModalCancelClick()" class="text-slate-400 hover:text-white cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
       <div class="p-6 space-y-4 max-h-[75vh] overflow-y-auto">
+        <!-- Live Supabase Cloud Upload Progress Box -->
+        <div id="upload-modal-progress-box" class="hidden p-4 rounded-2xl bg-sky-50 border border-sky-200 text-sky-950 space-y-2.5">
+          <div class="flex items-center justify-between gap-2 text-xs">
+            <div class="flex items-center gap-2 font-bold min-w-0">
+              <span class="w-2.5 h-2.5 rounded-full bg-sky-500 animate-ping shrink-0"></span>
+              <span id="upload-modal-progress-title" class="truncate">กำลังอัปโหลดขึ้น Supabase Cloud...</span>
+            </div>
+            <span id="upload-modal-progress-pct" class="px-2.5 py-0.5 rounded-full bg-white border border-sky-200 font-mono font-bold text-sky-800 shrink-0">0%</span>
+          </div>
+          <div class="w-full h-2.5 rounded-full bg-sky-200/70 overflow-hidden">
+            <div id="upload-modal-progress-bar" class="h-full bg-sky-600 transition-all duration-150" style="width: 0%"></div>
+          </div>
+          <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-sky-900">
+            <span id="upload-modal-progress-bytes" class="font-mono">0 KB / 0 KB</span>
+            <span id="upload-modal-progress-eta" class="font-semibold">กำลังคำนวณเวลา...</span>
+          </div>
+        </div>
         <div id="upload-preview-list" class="space-y-3"></div>
       </div>
-      <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between">
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
         <span id="upload-summary-text" class="text-xs text-slate-500">กำลังเตรียมไฟล์...</span>
         <div class="flex gap-2">
-          <button onclick="closeUploadModal()" class="px-4 py-2 rounded-xl text-sm text-slate-600 hover:bg-slate-200/70 cursor-pointer">ยกเลิก</button>
-          <button id="confirm-upload-btn" onclick="confirmSavePhotos()" class="px-5 py-2 rounded-xl text-sm font-medium btn-cspm-primary cursor-pointer">
+          <button id="upload-modal-cancel-btn" type="button" onclick="handleUploadModalCancelClick()" class="px-4 py-2 rounded-xl text-sm text-slate-600 hover:bg-slate-200/70 cursor-pointer transition">ยกเลิก</button>
+          <button id="confirm-upload-btn" type="button" onclick="confirmSavePhotos()" class="px-5 py-2 rounded-xl text-sm font-medium btn-cspm-primary cursor-pointer">
             บันทึกเข้าอัลบั้ม
           </button>
         </div>
@@ -1782,20 +1805,127 @@ create policy "Public Access workdrive-photos" on storage.objects
       return n;
     }
 
-    async function uploadPhotoBlobToStorage(albumId, photoObj) {
+    let isUploadingToCloud = false;
+    let uploadCancelRequested = false;
+    let activeUploadXhr = null;
+
+    function createUploadCancelledError() {
+      const err = new Error('Upload cancelled by user');
+      err.name = 'UploadCancelledError';
+      return err;
+    }
+
+    function isUploadCancelledError(err) {
+      return !!(err && (err.name === 'UploadCancelledError' || err.message === 'Upload cancelled by user'));
+    }
+
+    function formatSpeedThai(bytesPerSec) {
+      if (!bytesPerSec || !isFinite(bytesPerSec) || bytesPerSec <= 0) return '';
+      if (bytesPerSec >= 1024 * 1024) {
+        return `${(bytesPerSec / (1024 * 1024)).toFixed(1)} MB/s`;
+      }
+      return `${Math.max(1, Math.round(bytesPerSec / 1024))} KB/s`;
+    }
+
+    function cancelCloudUpload() {
+      if (!isUploadingToCloud && !isSyncingCloud) return;
+      uploadCancelRequested = true;
+      if (activeUploadXhr) {
+        try { activeUploadXhr.abort(); } catch (e) {}
+        activeUploadXhr = null;
+      }
+      const titleEl = document.getElementById('upload-modal-progress-title');
+      if (titleEl) titleEl.textContent = 'กำลังยกเลิกการอัปโหลด...';
+      const cancelBtn = document.getElementById('upload-modal-cancel-btn');
+      if (cancelBtn) cancelBtn.disabled = true;
+      if (activeCloudSyncStatus) {
+        activeCloudSyncStatus.action = 'กำลังยกเลิกการอัปโหลด...';
+        updateUploaderAndAdminCloudPanels();
+      }
+    }
+
+    function uploadBlobViaXhrWithProgress(filePath, blob, onProgress) {
+      return new Promise((resolve, reject) => {
+        if (uploadCancelRequested) {
+          reject(createUploadCancelledError());
+          return;
+        }
+        const cfg = getActiveCloudConfig();
+        if (!cfg || !cfg.url || !cfg.anonKey) {
+          reject(new Error('Missing Supabase config'));
+          return;
+        }
+        const encodedPath = filePath.split('/').map(encodeURIComponent).join('/');
+        const endpoint = `${cfg.url.replace(/\/+$/, '')}/storage/v1/object/${encodeURIComponent(PHOTO_BUCKET)}/${encodedPath}`;
+
+        const xhr = new XMLHttpRequest();
+        activeUploadXhr = xhr;
+        xhr.open('POST', endpoint, true);
+        xhr.timeout = 90000;
+        xhr.setRequestHeader('apikey', cfg.anonKey);
+        xhr.setRequestHeader('Authorization', `Bearer ${cfg.anonKey}`);
+        xhr.setRequestHeader('x-upsert', 'true');
+        xhr.setRequestHeader('Content-Type', blob.type || 'image/jpeg');
+
+        xhr.upload.onprogress = (evt) => {
+          if (typeof onProgress === 'function') {
+            const total = evt.lengthComputable ? evt.total : blob.size;
+            onProgress(Math.min(evt.loaded, total), total);
+          }
+        };
+
+        xhr.onload = () => {
+          if (activeUploadXhr === xhr) activeUploadXhr = null;
+          if (xhr.status >= 200 && xhr.status < 300) {
+            if (typeof onProgress === 'function') onProgress(blob.size, blob.size);
+            resolve();
+          } else {
+            reject(new Error(`HTTP ${xhr.status}: ${xhr.responseText || 'Upload failed'}`));
+          }
+        };
+
+        xhr.onerror = () => {
+          if (activeUploadXhr === xhr) activeUploadXhr = null;
+          reject(new Error('Network error during upload'));
+        };
+
+        xhr.ontimeout = () => {
+          if (activeUploadXhr === xhr) activeUploadXhr = null;
+          reject(new Error('Upload timeout'));
+        };
+
+        xhr.onabort = () => {
+          if (activeUploadXhr === xhr) activeUploadXhr = null;
+          reject(createUploadCancelledError());
+        };
+
+        xhr.send(blob);
+      });
+    }
+
+    async function uploadPhotoBlobToStorage(albumId, photoObj, onByteProgress = null) {
       if (!photoObj.dataUrl || !photoObj.dataUrl.startsWith('data:')) return photoObj;
       if (!isCloudConnected || !supabaseClient) return photoObj;
       // Offline: keep the photo on this device, it is sent to the team when the internet is back
       if (!navigator.onLine) return { ...photoObj, pendingUpload: true };
+      if (uploadCancelRequested) throw createUploadCancelledError();
 
       try {
         const blob = dataUrlToBlob(photoObj.dataUrl);
         const filePath = `${albumId}/${photoObj.id}.jpg`;
-        const { error: upErr } = await withTimeout(
-          supabaseClient.storage.from(PHOTO_BUCKET).upload(filePath, blob, { contentType: 'image/jpeg', upsert: true }),
-          90000, 'upload'
-        );
-        if (upErr) throw upErr;
+
+        try {
+          await uploadBlobViaXhrWithProgress(filePath, blob, onByteProgress);
+        } catch (xhrErr) {
+          if (isUploadCancelledError(xhrErr)) throw xhrErr;
+          // Fallback to supabase-js client if XHR failed for non-cancel reason
+          const { error: upErr } = await withTimeout(
+            supabaseClient.storage.from(PHOTO_BUCKET).upload(filePath, blob, { contentType: 'image/jpeg', upsert: true }),
+            90000, 'upload'
+          );
+          if (upErr) throw upErr;
+          if (typeof onByteProgress === 'function') onByteProgress(blob.size, blob.size);
+        }
 
         const { data: pubData } = supabaseClient.storage
           .from(PHOTO_BUCKET)
@@ -1808,9 +1938,57 @@ create policy "Public Access workdrive-photos" on storage.objects
           storagePath: filePath
         };
       } catch (err) {
+        if (isUploadCancelledError(err)) throw err;
         console.warn('Photo upload failed, will retry later:', err);
         return { ...photoObj, pendingUpload: true };
       }
+    }
+
+    function createUploadSpeedTracker(totalBytes) {
+      const startMs = Date.now();
+      let lastSampleMs = startMs;
+      let lastSampleBytes = 0;
+      let emaBps = 0;
+
+      return {
+        startMs,
+        update(transferredBytes, metaOverheadSec = 1.2) {
+          const now = Date.now();
+          const clampedTransferred = Math.max(0, Math.min(totalBytes, transferredBytes));
+          const elapsedSec = Math.max(0.15, (now - startMs) / 1000);
+          const dtSec = (now - lastSampleMs) / 1000;
+          const dBytes = clampedTransferred - lastSampleBytes;
+
+          if (dtSec >= 0.2 && dBytes > 0) {
+            const instBps = dBytes / dtSec;
+            emaBps = emaBps > 0 ? (emaBps * 0.65 + instBps * 0.35) : instBps;
+            lastSampleMs = now;
+            lastSampleBytes = clampedTransferred;
+          }
+
+          const avgBps = clampedTransferred / elapsedSec;
+          const speedBps = emaBps > 0 ? (emaBps * 0.6 + avgBps * 0.4) : avgBps;
+          const remainingBytes = Math.max(0, totalBytes - clampedTransferred);
+
+          let etaSec = null;
+          if (speedBps > 1024 && clampedTransferred >= 4096) {
+            etaSec = (remainingBytes / speedBps) + metaOverheadSec;
+          } else if (remainingBytes === 0) {
+            etaSec = metaOverheadSec;
+          }
+
+          const rawPct = totalBytes > 0 ? (clampedTransferred / totalBytes) * 94 : 94;
+          const pct = Math.max(1, Math.min(94, Math.round(rawPct)));
+
+          return {
+            pct,
+            transferredBytes: clampedTransferred,
+            totalBytes,
+            speedBps,
+            etaSec
+          };
+        }
+      };
     }
 
     async function uploadCoverDataUrlToStorage(albumId, coverDataUrl) {
@@ -1838,10 +2016,20 @@ create policy "Public Access workdrive-photos" on storage.objects
       const total = countPendingPhotos();
       let done = 0;
       let remaining = 0;
+      let totalPendingBytes = 0;
+      albums.forEach(a => (a.photos || []).forEach(p => {
+        if (isInlinePhoto(p)) {
+          totalPendingBytes += Number(p.sizeBytes || Math.round((p.dataUrl.length * 3) / 4));
+        }
+      }));
+      const tracker = createUploadSpeedTracker(Math.max(1, totalPendingBytes));
+      let bytesUploadedBefore = 0;
+
       const fcContainer = albums.find(a => a && a.id === '__cspm_folder_covers__');
       if (fcContainer && fcContainer.covers && typeof fcContainer.covers === 'object') {
         let fcChanged = false;
         for (const k of Object.keys(fcContainer.covers)) {
+          if (uploadCancelRequested) break;
           const entry = fcContainer.covers[k];
           if (entry && entry.url && entry.url.startsWith('data:')) {
             const upUrl = await uploadCoverDataUrlToStorage('fld_' + Date.now(), entry.url);
@@ -1857,38 +2045,78 @@ create policy "Public Access workdrive-photos" on storage.objects
           try { localStorage.setItem(FOLDER_COVERS_KEY, JSON.stringify(fcContainer.covers)); } catch (e) {}
         }
       }
-      for (const album of albums) {
-        if (album.coverUrl && album.coverUrl.startsWith('data:')) {
-          const uploadedCover = await uploadCoverDataUrlToStorage(album.id, album.coverUrl);
-          if (uploadedCover && !uploadedCover.startsWith('data:')) {
-            album.coverUrl = uploadedCover;
-          } else {
-            remaining++;
+
+      if (total > 0) isUploadingToCloud = true;
+      try {
+        for (const album of albums) {
+          if (uploadCancelRequested) break;
+          if (album.coverUrl && album.coverUrl.startsWith('data:')) {
+            const uploadedCover = await uploadCoverDataUrlToStorage(album.id, album.coverUrl);
+            if (uploadedCover && !uploadedCover.startsWith('data:')) {
+              album.coverUrl = uploadedCover;
+            } else {
+              remaining++;
+            }
+          }
+          const albFullName = formatFullAlbumSyncLabel(album);
+          for (const p of (album.photos || [])) {
+            if (!isInlinePhoto(p)) continue;
+            if (uploadCancelRequested) break;
+            const curIdx = done + remaining + 1;
+            const photoBytes = Number(p.sizeBytes || Math.round((p.dataUrl.length * 3) / 4));
+            let lastUiUpdateMs = 0;
+
+            const pushProgress = (loaded, fileTotal, forceUi = false) => {
+              const now = Date.now();
+              if (!forceUi && now - lastUiUpdateMs < 150) return;
+              lastUiUpdateMs = now;
+              const stat = tracker.update(bytesUploadedBefore + Math.min(loaded, photoBytes), 1.5);
+              setLiveCloudSyncProgress(albFullName, stat.pct, tracker.startMs, false, {
+                action: `กำลังอัปโหลดรูปภาพ (${curIdx}/${total} รูป)`,
+                remainingCount: Math.max(1, total - done),
+                totalCount: total,
+                doneCount: done,
+                transferredBytes: stat.transferredBytes,
+                totalBytes: stat.totalBytes,
+                speedBps: stat.speedBps,
+                exactEtaSec: stat.etaSec
+              });
+              updateCloudBannerUI(
+                `กำลังส่งรูปขึ้น Cloud (${stat.pct}%)...`,
+                `${albFullName} • รูปที่ ${curIdx}/${total} • ${formatBytes(stat.transferredBytes)}/${formatBytes(stat.totalBytes)}`,
+                'bg-sky-500'
+              );
+            };
+
+            pushProgress(0, photoBytes, true);
+            try {
+              const up = await uploadPhotoBlobToStorage(album.id, p, (loaded, fileTotal) => {
+                pushProgress(loaded, fileTotal, false);
+              });
+              if (up && up.dataUrl && !up.dataUrl.startsWith('data:')) {
+                delete p.pendingUpload;
+                Object.assign(p, up);
+                done++;
+                bytesUploadedBefore += photoBytes;
+                pushProgress(0, photoBytes, true);
+              } else {
+                remaining++;
+                bytesUploadedBefore += photoBytes;
+              }
+            } catch (err) {
+              if (isUploadCancelledError(err)) {
+                break;
+              }
+              remaining++;
+              bytesUploadedBefore += photoBytes;
+            }
           }
         }
-        const albFullName = formatFullAlbumSyncLabel(album);
-        for (const p of (album.photos || [])) {
-          if (!isInlinePhoto(p)) continue;
-          const curIdx = done + remaining + 1;
-          const pctNow = Math.min(85, 35 + Math.round((curIdx / Math.max(total, 1)) * 50));
-          setLiveCloudSyncProgress(albFullName, pctNow, null, false, {
-            action: `อัปโหลดรูปภาพ (${curIdx}/${total} รูป)`,
-            remainingCount: Math.max(1, total - done),
-            totalCount: total,
-            doneCount: done
-          });
-          updateCloudBannerUI('กำลังส่งรูปที่ถ่ายตอนออฟไลน์ขึ้นทีม...', `${albFullName} • รูปที่ ${curIdx} จาก ${total}`, 'bg-sky-500');
-          const up = await uploadPhotoBlobToStorage(album.id, p);
-          if (up && up.dataUrl && !up.dataUrl.startsWith('data:')) {
-            delete p.pendingUpload;
-            Object.assign(p, up);
-            done++;
-          } else {
-            remaining++;
-          }
-        }
+      } finally {
+        if (total > 0) isUploadingToCloud = false;
       }
-      return remaining;
+
+      return countPendingPhotos();
     }
 
     // State that goes to the cloud: photos/covers still waiting for upload stay on this device only
@@ -1999,14 +2227,41 @@ create policy "Public Access workdrive-photos" on storage.objects
     }
 
     async function finishPush(v0) {
+      uploadCancelRequested = false;
       const pushStartMs = (activeCloudSyncStatus && activeCloudSyncStatus.startedAtMs) || Date.now();
       const albLabel = (activeCloudSyncStatus && activeCloudSyncStatus.albumName) || getActiveAlbumLabelForSync();
-      setLiveCloudSyncProgress(albLabel, 35, pushStartMs, false);
+      const hadPendingPhotos = countPendingPhotos() > 0;
+      const prevPct = (activeCloudSyncStatus && typeof activeCloudSyncStatus.pct === 'number') ? activeCloudSyncStatus.pct : 0;
+
+      if (hadPendingPhotos) {
+        setLiveCloudSyncProgress(albLabel, Math.max(prevPct, 2), pushStartMs, false, {
+          action: 'เตรียมส่งรูปที่รอซิงก์ขึ้น Cloud...'
+        });
+      } else {
+        setLiveCloudSyncProgress(albLabel, Math.max(prevPct, 92), pushStartMs, false, {
+          action: 'กำลังบันทึกข้อมูลอัลบั้มขึ้น Cloud...',
+          exactEtaSec: 1.5
+        });
+      }
+
       const remaining = await flushPendingPhotos();
-      setLiveCloudSyncProgress(albLabel, 70, pushStartMs, false);
       persistAlbumsLocal();
+
+      if (uploadCancelRequested) {
+        uploadCancelRequested = false;
+        setPending(editVersion !== v0 || remaining > 0);
+        clearLiveCloudSyncProgress(true);
+        refreshSyncStatus();
+        alert('ยกเลิกการอัปโหลดเรียบร้อยแล้ว รูปที่ยังไม่ได้อัปโหลดจะยังเก็บอยู่ในเครื่อง สามารถกด "ส่งขึ้น Cloud ทันที" ได้ภายหลังครับ');
+        return;
+      }
+
       const state = cloudStateForPush();
-      setLiveCloudSyncProgress(albLabel, 88, pushStartMs, false);
+      const metaPct = Math.max((activeCloudSyncStatus && activeCloudSyncStatus.pct) || 95, 95);
+      setLiveCloudSyncProgress(albLabel, metaPct, pushStartMs, false, {
+        action: 'กำลังบันทึกข้อมูลอัลบั้มลงฐานข้อมูล Cloud...',
+        exactEtaSec: 1
+      });
       const { error } = await withTimeout(
         supabaseClient.from('workdrive_state').upsert({
           id: TEAM_ROW_ID,
@@ -2945,14 +3200,13 @@ create policy "Public Access workdrive-photos" on storage.objects
     }
 
     function formatEtaThai(etaSec) {
-      if (etaSec === 0) return 'เสร็จแล้ว (0 นาที)';
+      if (etaSec === 0) return 'เสร็จแล้ว';
       if (typeof etaSec !== 'number' || !isFinite(etaSec) || etaSec < 0) return 'กำลังคำนวณเวลา...';
       const s = Math.max(1, Math.round(etaSec));
-      const mins = Math.max(1, Math.ceil(s / 60));
-      if (s < 60) return `อีกประมาณ ~${s} วินาที (~${mins} นาที)`;
+      if (s < 60) return `เหลืออีกประมาณ ${s} วินาที`;
       const m = Math.floor(s / 60);
       const rem = s % 60;
-      return rem > 0 ? `อีกประมาณ ${m} นาที ${rem} วิ` : `อีกประมาณ ${m} นาที`;
+      return rem > 0 ? `เหลืออีกประมาณ ${m} นาที ${rem} วินาที` : `เหลืออีกประมาณ ${m} นาที`;
     }
 
     let lastEditedAlbumSummary = null; // { label, action, updatedAtMs }
@@ -3011,14 +3265,21 @@ create policy "Public Access workdrive-photos" on storage.objects
 
     function setLiveCloudSyncProgress(albumName, pct, startedAtMs = null, forceSend = false, extra = {}) {
       const now = Date.now();
-      const clampedPct = Math.max(1, Math.min(99, Math.round(Number(pct) || 1)));
+      const clampedPct = Math.max(1, Math.min(100, Math.round(Number(pct) || 1)));
       const startMs = startedAtMs || (activeCloudSyncStatus && activeCloudSyncStatus.startedAtMs) || now;
-      const etaSec = estimateEtaSecondsForPending(
-        extra.remainingCount || 1,
-        extra.remainingBytes || 0,
-        clampedPct,
-        startMs
-      );
+      let etaSec = null;
+      if (typeof extra.exactEtaSec === 'number' && isFinite(extra.exactEtaSec)) {
+        etaSec = Math.max(0, Math.round(extra.exactEtaSec));
+      } else if (extra.exactEtaSec === null) {
+        etaSec = null;
+      } else {
+        etaSec = Math.round(estimateEtaSecondsForPending(
+          extra.remainingCount || 1,
+          extra.remainingBytes || 0,
+          clampedPct,
+          startMs
+        ));
+      }
       const resolvedAlbum = (albumName && albumName !== '-') ? albumName : getActiveAlbumLabelForSync();
       const resolvedAction = extra.action || (lastEditedAlbumSummary && (now - lastEditedAlbumSummary.updatedAtMs) < 120000 ? lastEditedAlbumSummary.action : 'อัปเดตข้อมูลขึ้น Cloud');
 
@@ -3027,11 +3288,14 @@ create policy "Public Access workdrive-photos" on storage.objects
         albumName: resolvedAlbum,
         action: resolvedAction,
         pct: clampedPct,
-        etaSec: Math.round(etaSec),
+        etaSec: etaSec,
         startedAtMs: startMs,
         updatedAtMs: now,
-        totalCount: extra.totalCount || 0,
-        doneCount: extra.doneCount || 0
+        totalCount: extra.totalCount || (activeCloudSyncStatus && activeCloudSyncStatus.totalCount) || 0,
+        doneCount: typeof extra.doneCount === 'number' ? extra.doneCount : ((activeCloudSyncStatus && activeCloudSyncStatus.doneCount) || 0),
+        transferredBytes: typeof extra.transferredBytes === 'number' ? extra.transferredBytes : ((activeCloudSyncStatus && activeCloudSyncStatus.transferredBytes) || 0),
+        totalBytes: typeof extra.totalBytes === 'number' ? extra.totalBytes : ((activeCloudSyncStatus && activeCloudSyncStatus.totalBytes) || 0),
+        speedBps: typeof extra.speedBps === 'number' ? extra.speedBps : ((activeCloudSyncStatus && activeCloudSyncStatus.speedBps) || 0)
       };
 
       updateUploaderAndAdminCloudPanels();
@@ -3058,27 +3322,37 @@ create policy "Public Access workdrive-photos" on storage.objects
         const alb = albums.find(a => a && a.id === activeAlbumId);
         if (alb && alb.photos && alb.photos.length > 0) {
           const sum = getAlbumCloudUploadSummary(alb);
-          const isSyncingHere = !!(activeCloudSyncStatus && isSyncingCloud);
+          const isSyncingHere = !!(activeCloudSyncStatus && (isSyncingCloud || isUploadingToCloud));
           albPanel.classList.remove('hidden');
 
           if (isSyncingHere) {
             const pctVal = activeCloudSyncStatus.pct;
             const etaText = formatEtaThai(activeCloudSyncStatus.etaSec);
+            const speedText = formatSpeedThai(activeCloudSyncStatus.speedBps);
+            const bytesDetail = activeCloudSyncStatus.totalBytes > 0
+              ? `${formatBytes(activeCloudSyncStatus.transferredBytes)} / ${formatBytes(activeCloudSyncStatus.totalBytes)}${speedText ? ' • ' + speedText : ''}`
+              : `ขึ้น Cloud แล้ว ${sum.onCloud}/${sum.total} รูป • รอส่ง ${sum.localOnly} รูป`;
             albPanel.className = 'mb-4 p-3.5 rounded-2xl bg-sky-50 border border-sky-200 text-sky-950 space-y-2';
             albPanel.innerHTML = `
               <div class="flex flex-wrap items-center justify-between gap-2 text-xs">
                 <div class="flex items-center gap-2 font-bold">
                   <span class="w-2.5 h-2.5 rounded-full bg-sky-500 animate-ping shrink-0"></span>
-                  <span>กำลังอัปโหลดขึ้น Supabase Cloud (${pctVal}%) — เครื่องอื่นจะเห็นเมื่ออัปโหลดเสร็จ</span>
+                  <span>${escapeHtml(activeCloudSyncStatus.action || 'กำลังอัปโหลดขึ้น Supabase Cloud')} (${pctVal}%)</span>
                 </div>
-                <span class="px-2.5 py-0.5 rounded-full bg-white border border-sky-200 font-mono font-bold text-sky-800">${etaText}</span>
+                <div class="flex items-center gap-2">
+                  <span class="px-2.5 py-0.5 rounded-full bg-white border border-sky-200 font-mono font-bold text-sky-800">${escapeHtml(etaText)}</span>
+                  <button type="button" onclick="cancelCloudUpload()" ${uploadCancelRequested ? 'disabled' : ''}
+                    class="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-[#EB2D2D] text-[#EB2D2D] hover:text-white border border-red-200 text-[11px] font-bold transition cursor-pointer disabled:opacity-50">
+                    ${uploadCancelRequested ? 'กำลังยกเลิก...' : 'ยกเลิกการอัปโหลด'}
+                  </button>
+                </div>
               </div>
               <div class="w-full h-2 rounded-full bg-sky-200/70 overflow-hidden">
-                <div class="h-full bg-sky-600 transition-all duration-300" style="width: ${pctVal}%"></div>
+                <div class="h-full bg-sky-600 transition-all duration-150" style="width: ${pctVal}%"></div>
               </div>
-              <div class="flex items-center justify-between text-[11px] text-sky-800">
+              <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-sky-800">
                 <span>อัลบั้ม: ${escapeHtml(activeCloudSyncStatus.albumName)}</span>
-                <span>ขึ้น Cloud แล้ว ${sum.onCloud}/${sum.total} รูป • รอส่ง ${sum.localOnly} รูป</span>
+                <span class="font-mono">${escapeHtml(bytesDetail)}</span>
               </div>
             `;
           } else if (sum.localOnly > 0 || pendingSync) {
@@ -3598,12 +3872,15 @@ create policy "Public Access workdrive-photos" on storage.objects
 
       const adminBtn = document.getElementById('admin-logs-nav-btn');
       const adminBadge = document.getElementById('user-admin-badge');
+      const adminMoveAlbBtn = document.getElementById('admin-move-album-detail-btn');
       if (isAdminUser()) {
         if (adminBtn) adminBtn.classList.remove('hidden');
         if (adminBadge) adminBadge.classList.remove('hidden');
+        if (adminMoveAlbBtn) adminMoveAlbBtn.classList.remove('hidden');
       } else {
         if (adminBtn) adminBtn.classList.add('hidden');
         if (adminBadge) adminBadge.classList.add('hidden');
+        if (adminMoveAlbBtn) adminMoveAlbBtn.classList.add('hidden');
       }
 
       applyInstallBannerVisibility();
@@ -4523,6 +4800,10 @@ create policy "Public Access workdrive-photos" on storage.objects
                 </span>
                 <div class="absolute top-3 right-3 flex items-center gap-1">
                   <span class="px-2 py-0.5 rounded bg-amber-300/95 text-amber-950 text-[10px] font-bold">ลากเรียง</span>
+                  ${isAdminUser() ? `<button type="button" onclick="event.stopPropagation(); openMoveAlbumModal('${album.id}')"
+                    class="p-1.5 rounded-full bg-white/95 hover:bg-violet-50 text-slate-700 hover:text-violet-700 shadow-2xs transition cursor-pointer" title="ย้ายอัลบั้ม (Admin)">
+                    <i data-lucide="folder-symlink" class="w-3.5 h-3.5"></i>
+                  </button>` : ''}
                   <button type="button" onclick="event.stopPropagation(); openEditAlbumModal('${album.id}')"
                     class="p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-700 hover:text-amber-700 shadow-2xs transition cursor-pointer" title="แก้ไข">
                     <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
@@ -5080,6 +5361,10 @@ create policy "Public Access workdrive-photos" on storage.objects
                   <span class="px-2.5 py-1 rounded-full bg-[#1B212C]/90 text-white text-[11px] font-medium border border-white/10">
                     ${escapeHtml(album.dept)}
                   </span>
+                  ${isAdminUser() ? `<button type="button" onclick="event.stopPropagation(); openMoveAlbumModal('${album.id}')"
+                    class="p-1.5 rounded-full bg-white/95 hover:bg-violet-50 text-slate-700 hover:text-violet-700 shadow-2xs transition cursor-pointer" title="ย้ายอัลบั้ม (Admin)">
+                    <i data-lucide="folder-symlink" class="w-3.5 h-3.5"></i>
+                  </button>` : ''}
                   <button type="button" onclick="event.stopPropagation(); openEditAlbumModal('${album.id}')"
                     class="p-1.5 rounded-full bg-white/95 hover:bg-amber-50 text-slate-700 hover:text-amber-700 shadow-2xs transition cursor-pointer" title="แก้ไขวันที่ / ชื่อ / รูปหน้าปก">
                     <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
@@ -5129,6 +5414,10 @@ create policy "Public Access workdrive-photos" on storage.objects
             </div>
             <div class="flex items-center gap-2 shrink-0 text-xs">
               <span class="font-semibold text-slate-700 mr-1">${album.photos.length} รูป</span>
+              ${isAdminUser() ? `<button type="button" onclick="event.stopPropagation(); openMoveAlbumModal('${album.id}')"
+                class="p-1.5 rounded-lg hover:bg-violet-50 text-slate-400 hover:text-violet-700 transition cursor-pointer" title="ย้ายอัลบั้ม (Admin)">
+                <i data-lucide="folder-symlink" class="w-3.5 h-3.5"></i>
+              </button>` : ''}
               <button type="button" onclick="event.stopPropagation(); openEditAlbumModal('${album.id}')"
                 class="p-1.5 rounded-lg hover:bg-amber-50 text-slate-400 hover:text-amber-700 transition cursor-pointer" title="แก้ไขวันที่ / ชื่อ / รูปหน้าปก">
                 <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
@@ -5918,50 +6207,199 @@ function openNewAlbumModal() {
       document.getElementById('upload-summary-text').textContent = `จำนวน ${pendingUploadItems.length} รูป (รวม ${formatBytes(totalSize)})`;
     }
 
+    function updateUploadModalProgressUI(titleText, pct, transferredBytes, totalBytes, speedBps, etaSec) {
+      const box = document.getElementById('upload-modal-progress-box');
+      const titleEl = document.getElementById('upload-modal-progress-title');
+      const pctEl = document.getElementById('upload-modal-progress-pct');
+      const barEl = document.getElementById('upload-modal-progress-bar');
+      const bytesEl = document.getElementById('upload-modal-progress-bytes');
+      const etaEl = document.getElementById('upload-modal-progress-eta');
+      if (!box) return;
+      box.classList.remove('hidden');
+      const clamped = Math.max(0, Math.min(100, Math.round(Number(pct) || 0)));
+      if (titleEl && titleText) titleEl.textContent = titleText;
+      if (pctEl) pctEl.textContent = `${clamped}%`;
+      if (barEl) barEl.style.width = `${clamped}%`;
+      if (bytesEl) {
+        const speedStr = formatSpeedThai(speedBps);
+        bytesEl.textContent = `${formatBytes(transferredBytes || 0)} / ${formatBytes(totalBytes || 0)}${speedStr ? ' • ' + speedStr : ''}`;
+      }
+      if (etaEl) {
+        etaEl.textContent = formatEtaThai(etaSec);
+      }
+    }
+
+    function resetUploadModalProgressUI() {
+      const box = document.getElementById('upload-modal-progress-box');
+      if (box) box.classList.add('hidden');
+      const cancelBtn = document.getElementById('upload-modal-cancel-btn');
+      if (cancelBtn) {
+        cancelBtn.disabled = false;
+        cancelBtn.textContent = 'ยกเลิก';
+        cancelBtn.className = 'px-4 py-2 rounded-xl text-sm text-slate-600 hover:bg-slate-200/70 cursor-pointer transition';
+      }
+    }
+
+    function handleUploadModalCancelClick() {
+      if (isUploadingToCloud) {
+        cancelCloudUpload();
+      } else {
+        closeUploadModal();
+      }
+    }
+
     function closeUploadModal() {
+      if (isUploadingToCloud) {
+        cancelCloudUpload();
+        return;
+      }
+      resetUploadModalProgressUI();
       document.getElementById('upload-modal').classList.add('hidden');
       pendingUploadItems = [];
     }
 
     async function confirmSavePhotos() {
       const album = albums.find(a => a.id === activeAlbumId);
-      if (!album || pendingUploadItems.length === 0) return;
+      if (!album || pendingUploadItems.length === 0 || isUploadingToCloud) return;
 
       const btn = document.getElementById('confirm-upload-btn');
+      const cancelBtn = document.getElementById('upload-modal-cancel-btn');
       const prevBtnText = btn.textContent;
       btn.disabled = true;
-      btn.textContent = (isCloudConnected && navigator.onLine) ? 'กำลังอัปโหลดขึ้น Cloud...' : 'กำลังบันทึก...';
+      btn.textContent = (isCloudConnected && navigator.onLine) ? 'กำลังอัปโหลด...' : 'กำลังบันทึก...';
+
+      if (cancelBtn) {
+        cancelBtn.disabled = false;
+        cancelBtn.textContent = 'ยกเลิกการอัปโหลด';
+        cancelBtn.className = 'px-4 py-2 rounded-xl text-sm font-semibold bg-red-50 hover:bg-[#EB2D2D] text-[#EB2D2D] hover:text-white border border-red-200 cursor-pointer transition';
+      }
+
+      uploadCancelRequested = false;
+      isUploadingToCloud = true;
 
       const processedPhotos = [];
-      const uploadStartMs = Date.now();
+      const uploadedPathsThisBatch = [];
       const albSyncLabel = formatFullAlbumSyncLabel(album);
       const totalUp = pendingUploadItems.length;
+
+      // Measure real blob byte sizes for accurate % and ETA
+      const itemByteSizes = pendingUploadItems.map(item => {
+        if (item.dataUrl && item.dataUrl.startsWith('data:')) {
+          try { return dataUrlToBlob(item.dataUrl).size; } catch (e) {}
+        }
+        return Number(item.sizeBytes || 150000);
+      });
+      const totalBytes = itemByteSizes.reduce((s, b) => s + b, 0);
+      const tracker = createUploadSpeedTracker(Math.max(1, totalBytes));
+      let bytesUploadedBefore = 0;
+
       setLastEditedAlbumContext(albSyncLabel, `เพิ่มรูปภาพ ${totalUp} รูป`);
-      setLiveCloudSyncProgress(albSyncLabel, 10, uploadStartMs, true, {
+      updateUploadModalProgressUI(`กำลังเตรียมอัปโหลด 0/${totalUp} รูป...`, 1, 0, totalBytes, 0, null);
+      setLiveCloudSyncProgress(albSyncLabel, 1, tracker.startMs, true, {
         action: `กำลังอัปโหลดรูปภาพ 0/${totalUp} รูป`,
         remainingCount: totalUp,
         totalCount: totalUp,
-        doneCount: 0
+        doneCount: 0,
+        transferredBytes: 0,
+        totalBytes: totalBytes,
+        speedBps: 0,
+        exactEtaSec: null
       });
-      for (let i = 0; i < totalUp; i++) {
-        const item = pendingUploadItems[i];
-        const stepPct = 10 + Math.round(((i + 0.5) / totalUp) * 55);
-        setLiveCloudSyncProgress(albSyncLabel, stepPct, uploadStartMs, true, {
-          action: `กำลังอัปโหลดรูปภาพ ${i + 1}/${totalUp} รูป`,
-          remainingCount: totalUp - i,
-          totalCount: totalUp,
-          doneCount: i
-        });
-        const uploaded = await uploadPhotoBlobToStorage(album.id, item);
-        processedPhotos.push(uploaded);
-        const donePct = 10 + Math.round(((i + 1) / totalUp) * 55);
-        setLiveCloudSyncProgress(albSyncLabel, donePct, uploadStartMs, true, {
-          action: `อัปโหลดแล้ว ${i + 1}/${totalUp} รูป`,
-          remainingCount: Math.max(1, totalUp - (i + 1)),
-          totalCount: totalUp,
-          doneCount: i + 1
-        });
+
+      let wasCancelled = false;
+      try {
+        for (let i = 0; i < totalUp; i++) {
+          if (uploadCancelRequested) {
+            wasCancelled = true;
+            break;
+          }
+          const item = pendingUploadItems[i];
+          const thisItemBytes = itemByteSizes[i];
+          let lastUiMs = 0;
+
+          const reportStep = (loaded, fileTotal, forceUi = false) => {
+            const now = Date.now();
+            if (!forceUi && now - lastUiMs < 120) return;
+            lastUiMs = now;
+            const currentTransferred = bytesUploadedBefore + Math.min(loaded, thisItemBytes);
+            const stat = tracker.update(currentTransferred, 1.2);
+            const titleText = `กำลังอัปโหลดรูปที่ ${i + 1}/${totalUp} ขึ้น Supabase Cloud...`;
+            updateUploadModalProgressUI(titleText, stat.pct, stat.transferredBytes, stat.totalBytes, stat.speedBps, stat.etaSec);
+            setLiveCloudSyncProgress(albSyncLabel, stat.pct, tracker.startMs, false, {
+              action: `กำลังอัปโหลดรูปภาพ ${i + 1}/${totalUp} รูป`,
+              remainingCount: Math.max(1, totalUp - i),
+              totalCount: totalUp,
+              doneCount: i,
+              transferredBytes: stat.transferredBytes,
+              totalBytes: stat.totalBytes,
+              speedBps: stat.speedBps,
+              exactEtaSec: stat.etaSec
+            });
+          };
+
+          reportStep(0, thisItemBytes, true);
+          const uploaded = await uploadPhotoBlobToStorage(album.id, item, (loaded, fileTotal) => {
+            reportStep(loaded, fileTotal, false);
+          });
+          if (uploaded && uploaded.storagePath) {
+            uploadedPathsThisBatch.push(uploaded.storagePath);
+          }
+          processedPhotos.push(uploaded);
+          bytesUploadedBefore += thisItemBytes;
+
+          const doneStat = tracker.update(bytesUploadedBefore, 1.2);
+          updateUploadModalProgressUI(
+            `อัปโหลดแล้ว ${i + 1}/${totalUp} รูป`,
+            doneStat.pct,
+            doneStat.transferredBytes,
+            doneStat.totalBytes,
+            doneStat.speedBps,
+            doneStat.etaSec
+          );
+          setLiveCloudSyncProgress(albSyncLabel, doneStat.pct, tracker.startMs, true, {
+            action: `อัปโหลดแล้ว ${i + 1}/${totalUp} รูป`,
+            remainingCount: Math.max(1, totalUp - (i + 1)),
+            totalCount: totalUp,
+            doneCount: i + 1,
+            transferredBytes: doneStat.transferredBytes,
+            totalBytes: doneStat.totalBytes,
+            speedBps: doneStat.speedBps,
+            exactEtaSec: doneStat.etaSec
+          });
+        }
+      } catch (err) {
+        if (isUploadCancelledError(err)) {
+          wasCancelled = true;
+        } else {
+          console.error('Upload error:', err);
+        }
       }
+
+      if (wasCancelled || uploadCancelRequested) {
+        isUploadingToCloud = false;
+        uploadCancelRequested = false;
+        clearLiveCloudSyncProgress(true);
+        // Clean up any files already uploaded during this cancelled batch
+        if (uploadedPathsThisBatch.length > 0 && isCloudConnected && supabaseClient && navigator.onLine) {
+          supabaseClient.storage.from(PHOTO_BUCKET).remove(uploadedPathsThisBatch).catch(() => {});
+        }
+        btn.disabled = false;
+        btn.textContent = prevBtnText;
+        resetUploadModalProgressUI();
+        alert('ยกเลิกการอัปโหลดเรียบร้อยแล้วครับ ยังไม่ได้บันทึกรูปชุดนี้เข้าอัลบั้ม');
+        return;
+      }
+
+      // Final step: save album metadata & sync state to Supabase (95% -> 100%)
+      updateUploadModalProgressUI('กำลังบันทึกข้อมูลอัลบั้มลง Supabase Cloud...', 96, totalBytes, totalBytes, 0, 1);
+      setLiveCloudSyncProgress(albSyncLabel, 96, tracker.startMs, true, {
+        action: 'กำลังบันทึกข้อมูลอัลบั้มลง Supabase Cloud...',
+        totalCount: totalUp,
+        doneCount: totalUp,
+        transferredBytes: totalBytes,
+        totalBytes: totalBytes,
+        exactEtaSec: 1
+      });
 
       album.photos.unshift(...processedPhotos);
       const sampleNames = processedPhotos.slice(0, 3).map(p => p.caption || 'ภาพถ่าย').join(', ');
@@ -5974,19 +6412,31 @@ function openNewAlbumModal() {
         photoCount: processedPhotos.length,
         detail: `เพิ่มรูปภาพจำนวน ${processedPhotos.length} รูป (${sampleNames}${processedPhotos.length > 3 ? ' ...' : ''})`
       });
-      saveAlbums();
+
+      trackDeletedAlbums();
+      normalizeAlbumTypes();
+      editVersion++;
+      setPending(true);
+      persistAlbumsLocal();
+
       if (isCloudConnected && supabaseClient && navigator.onLine) {
         try {
-          setLiveCloudSyncProgress(albSyncLabel, 82, uploadStartMs, true);
           await pushTeamStateToCloud();
         } catch (syncErr) {
           console.warn('Immediate sync after photo save failed, queued for retry:', syncErr);
         }
       }
+
+      updateUploadModalProgressUI('อัปโหลดขึ้น Supabase Cloud เสร็จสมบูรณ์!', 100, totalBytes, totalBytes, 0, 0);
+      await new Promise(r => setTimeout(r, 300));
+
+      isUploadingToCloud = false;
+      uploadCancelRequested = false;
       clearLiveCloudSyncProgress(true);
 
       btn.disabled = false;
       btn.textContent = prevBtnText;
+      resetUploadModalProgressUI();
       closeUploadModal();
       openAlbum(album.id);
     }
@@ -6919,6 +7369,379 @@ function openNewAlbumModal() {
       } finally {
         if (submitBtn) submitBtn.disabled = false;
       }
+    }
+
+    // ==================== ADMIN MOVE ALBUM (sarunchana.h ONLY) ====================
+    let moveAlbumQuickDestMap = new Map();
+
+    function setMoveAlbumType(t) {
+      t = t === 'customer' ? 'customer' : 'facility';
+      document.getElementById('move-album-type').value = t;
+      document.getElementById('move-album-type-btn-facility').className = t === 'facility' ? TYPE_BTN_ON : TYPE_BTN_OFF;
+      document.getElementById('move-album-type-btn-customer').className = t === 'customer' ? TYPE_BTN_ON : TYPE_BTN_OFF;
+
+      const facWrap = document.getElementById('move-album-fac-wrap');
+      const custWrap = document.getElementById('move-album-cust-wrap');
+      const clientInp = document.getElementById('move-album-client');
+      const facCustInp = document.getElementById('move-album-fac-customer');
+
+      if (t === 'facility') {
+        if (facWrap) facWrap.classList.remove('hidden');
+        if (custWrap) custWrap.classList.add('hidden');
+        if (clientInp) clientInp.required = false;
+        if (facCustInp) facCustInp.required = true;
+        onMoveAlbumBranchChange();
+      } else {
+        if (facWrap) facWrap.classList.add('hidden');
+        if (custWrap) custWrap.classList.remove('hidden');
+        if (clientInp) clientInp.required = true;
+        if (facCustInp) facCustInp.required = false;
+      }
+      fillClientSuggestions(t);
+    }
+
+    function onMoveAlbumBranchChange() {
+      const branch = document.getElementById('move-album-fac-branch').value;
+      const fsBox = document.getElementById('move-album-fs-team-box');
+      const fsInp = document.getElementById('move-album-fs-team');
+      const scBox = document.getElementById('move-album-sc-region-box');
+
+      if (branch === 'Fire & Security Service') {
+        if (fsBox) fsBox.classList.remove('hidden');
+        if (fsInp) fsInp.required = true;
+        if (scBox) scBox.classList.add('hidden');
+      } else if (branch === 'Service Center') {
+        if (fsBox) fsBox.classList.add('hidden');
+        if (fsInp) fsInp.required = false;
+        if (scBox) scBox.classList.remove('hidden');
+      } else {
+        if (fsBox) fsBox.classList.add('hidden');
+        if (fsInp) fsInp.required = false;
+        if (scBox) scBox.classList.add('hidden');
+      }
+    }
+
+    function populateMoveAlbumQuickDestinations(currentAlbumId) {
+      const sel = document.getElementById('move-album-quick-dest');
+      if (!sel) return;
+      moveAlbumQuickDestMap.clear();
+      const options = [];
+
+      albums.filter(a => a && !a.isSystemLogContainer && a.id !== currentAlbumId).forEach(a => {
+        const t = getAlbumType(a);
+        const isSc = isServiceCenterClientName(a.client) || a.isServiceCenter;
+        let branch = a.client || '';
+        let sub = a.dept || '';
+        let prod = a.product || '';
+        let cust = '';
+
+        if (t === 'facility') {
+          if (isSc) {
+            branch = 'Service Center';
+            sub = getScCenterOfAlbum(a);
+            cust = getScCustomerOfAlbum(a);
+          } else if (/fire\s*&\s*security/i.test(branch)) {
+            branch = 'Fire & Security Service';
+            sub = getFacDivisionOfAlbum(a);
+            prod = getFacTeamOfAlbum(a);
+            cust = getFacCustomerOfAlbum(a);
+          } else if (/air\s*conditioning/i.test(branch)) {
+            branch = 'Air Conditioning Services';
+            cust = getFacCustomerOfAlbum(a);
+          } else if (/ups/i.test(branch)) {
+            branch = 'UPS Services';
+            cust = getFacCustomerOfAlbum(a);
+          } else {
+            branch = 'Fire & Security Service';
+            sub = getFacDivisionOfAlbum(a);
+            prod = getFacTeamOfAlbum(a);
+            cust = getFacCustomerOfAlbum(a);
+          }
+        }
+
+        const key = t === 'facility'
+          ? `fac|${branch}|${sub}|${prod}|${cust}`
+          : `cust|${a.client}|${a.dept}|${prod}`;
+
+        if (!moveAlbumQuickDestMap.has(key)) {
+          const display = t === 'facility'
+            ? `[Facility] ${branch}${sub && branch !== sub ? ' › ' + sub : ''} › ${prod} › ${cust}`
+            : `[Customer] ${a.client} › ${a.dept} › ${prod}`;
+          moveAlbumQuickDestMap.set(key, { type: t, branch, sub, prod, cust, client: a.client, dept: a.dept });
+          options.push({ key, display });
+        }
+      });
+
+      options.sort((a, b) => a.display.localeCompare(b.display, 'th'));
+      sel.innerHTML = `<option value="">-- เลือกเพื่อกรอกปลายทางอัตโนมัติ หรือกำหนดเองด้านล่าง --</option>` +
+        options.map(o => `<option value="${escapeHtml(o.key)}">${escapeHtml(o.display)}</option>`).join('');
+    }
+
+    function applyMoveAlbumQuickDestination() {
+      const sel = document.getElementById('move-album-quick-dest');
+      if (!sel || !sel.value) return;
+      const dest = moveAlbumQuickDestMap.get(sel.value);
+      if (!dest) return;
+
+      setMoveAlbumType(dest.type);
+      if (dest.type === 'facility') {
+        const branchSel = document.getElementById('move-album-fac-branch');
+        if (branchSel) branchSel.value = dest.branch;
+        onMoveAlbumBranchChange();
+        if (dest.branch === 'Fire & Security Service') {
+          document.getElementById('move-album-fs-team').value = dest.sub || '';
+        } else if (dest.branch === 'Service Center') {
+          populateScCenterSelect('move-album-sc-center', dest.sub || '');
+        }
+        document.getElementById('move-album-fac-customer').value = dest.cust || '';
+        document.getElementById('move-album-product').value = dest.prod || '';
+      } else {
+        document.getElementById('move-album-client').value = dest.client || '';
+        const deptSel = document.getElementById('move-album-dept');
+        if (deptSel && dest.dept) {
+          if (!Array.from(deptSel.options).some(o => o.value === dest.dept)) {
+            deptSel.innerHTML += `<option value="${escapeHtml(dest.dept)}">${escapeHtml(dest.dept)}</option>`;
+          }
+          deptSel.value = dest.dept;
+        }
+        document.getElementById('move-album-product').value = dest.prod || '';
+      }
+    }
+
+    function syncMoveAlbumThaiDateFromPicker() {
+      const iso = document.getElementById('move-album-date-picker').value;
+      if (iso) {
+        document.getElementById('move-album-thai-date').value = isoToThaiDate(iso);
+      }
+    }
+
+    function openMoveAlbumModal(albumId) {
+      if (!isAdminUser()) {
+        alert('เฉพาะบัญชีแอดมิน (sarunchana.h) เท่านั้นที่สามารถโยกย้ายอัลบั้มได้');
+        return;
+      }
+      const album = albums.find(a => a && !a.isSystemLogContainer && a.id === albumId);
+      if (!album) return;
+
+      renderProductSuggestions();
+      const depts = getDepartments();
+      const deptSel = document.getElementById('move-album-dept');
+      if (deptSel) {
+        deptSel.innerHTML = depts.map(d => `<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('');
+        if (album.dept && !depts.includes(album.dept)) {
+          deptSel.innerHTML += `<option value="${escapeHtml(album.dept)}">${escapeHtml(album.dept)}</option>`;
+        }
+      }
+
+      document.getElementById('move-album-id').value = album.id;
+      document.getElementById('move-album-source-label').textContent = formatFullAlbumSyncLabel(album);
+      document.getElementById('move-album-source-photos').textContent = `${(album.photos || []).length} รูป`;
+
+      populateMoveAlbumQuickDestinations(album.id);
+
+      const curType = getAlbumType(album);
+      const isSc = isServiceCenterClientName(album.client) || album.isServiceCenter;
+      populateScCenterSelect('move-album-sc-center', isSc ? getScCenterOfAlbum(album) : '');
+
+      setMoveAlbumType(curType);
+      if (curType === 'facility') {
+        const branchSel = document.getElementById('move-album-fac-branch');
+        const cStr = String(album.client || '');
+        if (isSc) {
+          branchSel.value = 'Service Center';
+          document.getElementById('move-album-fac-customer').value = getScCustomerOfAlbum(album);
+          document.getElementById('move-album-product').value = album.product || '';
+        } else if (/air\s*conditioning/i.test(cStr)) {
+          branchSel.value = 'Air Conditioning Services';
+          document.getElementById('move-album-fac-customer').value = getFacCustomerOfAlbum(album);
+          document.getElementById('move-album-product').value = album.product || '';
+        } else if (/ups/i.test(cStr)) {
+          branchSel.value = 'UPS Services';
+          document.getElementById('move-album-fac-customer').value = getFacCustomerOfAlbum(album);
+          document.getElementById('move-album-product').value = album.product || '';
+        } else {
+          branchSel.value = 'Fire & Security Service';
+          document.getElementById('move-album-fs-team').value = getFacDivisionOfAlbum(album);
+          document.getElementById('move-album-fac-customer').value = getFacCustomerOfAlbum(album);
+          document.getElementById('move-album-product').value = getFacTeamOfAlbum(album) || album.product || '';
+        }
+        onMoveAlbumBranchChange();
+      } else {
+        document.getElementById('move-album-client').value = album.client || '';
+        if (deptSel && album.dept) deptSel.value = album.dept;
+        document.getElementById('move-album-product').value = album.product || '';
+      }
+
+      document.getElementById('move-album-thai-date').value = album.thaiDate || getTodayIsoAndThai().thai;
+      document.getElementById('move-album-date-picker').value = thaiDateToIso(album.thaiDate);
+
+      document.getElementById('move-album-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeMoveAlbumModal() {
+      const modal = document.getElementById('move-album-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function submitMoveAlbum(e) {
+      e.preventDefault();
+      if (!isAdminUser()) {
+        alert('เฉพาะบัญชีแอดมิน (sarunchana.h) เท่านั้นที่สามารถโยกย้ายอัลบั้มได้');
+        return;
+      }
+
+      const id = document.getElementById('move-album-id').value;
+      const album = albums.find(a => a && !a.isSystemLogContainer && a.id === id);
+      if (!album) return;
+
+      const oldLabel = formatFullAlbumSyncLabel(album);
+      const nextType = document.getElementById('move-album-type').value === 'customer' ? 'customer' : 'facility';
+      const nextProduct = (document.getElementById('move-album-product').value || '').trim();
+      const nextThaiDate = (document.getElementById('move-album-thai-date').value || '').trim();
+
+      if (!nextProduct || !nextThaiDate) {
+        alert('กรุณากรอกชื่อ Product และวัน/เดือน/ปีพ.ศ. ให้ครบถ้วน');
+        return;
+      }
+
+      let nextClient = '';
+      let nextDept = '';
+      let nextIsSc = false;
+      let nextScCenter = '';
+      let nextFacCustomer = '';
+
+      if (nextType === 'facility') {
+        const branch = document.getElementById('move-album-fac-branch').value;
+        nextFacCustomer = (document.getElementById('move-album-fac-customer').value || '').trim();
+        if (!nextFacCustomer) {
+          alert('กรุณากรอกชื่อลูกค้า (Customer) ปลายทาง');
+          return;
+        }
+        nextClient = branch;
+        if (branch === 'Fire & Security Service') {
+          nextDept = (document.getElementById('move-album-fs-team').value || '').trim() || 'Tanee Teams';
+        } else if (branch === 'Service Center') {
+          nextIsSc = true;
+          nextScCenter = (document.getElementById('move-album-sc-center').value || '').trim() || 'กรุงเทพ';
+          nextDept = nextScCenter;
+        } else {
+          nextDept = branch;
+        }
+      } else {
+        nextClient = (document.getElementById('move-album-client').value || '').trim();
+        nextDept = (document.getElementById('move-album-dept').value || '').trim();
+        if (!nextClient || !nextDept) {
+          alert('กรุณากรอกชื่อลูกค้าและสังกัดปลายทางให้ครบถ้วน');
+          return;
+        }
+      }
+
+      // Check if another album already exists at the exact same destination + date
+      const duplicateTarget = albums.find(a =>
+        a && !a.isSystemLogContainer && a.id !== album.id &&
+        getAlbumType(a) === nextType &&
+        String(a.client || '').toLowerCase() === nextClient.toLowerCase() &&
+        String(a.dept || '').toLowerCase() === nextDept.toLowerCase() &&
+        String(a.product || '').toLowerCase() === nextProduct.toLowerCase() &&
+        String(a.facCustomer || '').toLowerCase() === nextFacCustomer.toLowerCase() &&
+        String(a.thaiDate || '') === nextThaiDate
+      );
+
+      let finalOpenAlbumId = album.id;
+
+      if (duplicateTarget) {
+        const mergeConfirmed = confirm(
+          `พบอัลบั้มปลายทางวันที่ ${nextThaiDate} อยู่แล้ว (${(duplicateTarget.photos || []).length} รูป)\n\n` +
+          `ต้องการ "รวมรูปภาพทั้งหมด ${(album.photos || []).length} รูป" เข้าไปในอัลบั้มปลายทางที่มีอยู่แล้วใช่หรือไม่?`
+        );
+        if (!mergeConfirmed) return;
+
+        if (!Array.isArray(duplicateTarget.photos)) duplicateTarget.photos = [];
+        const existingPhotoIds = new Set(duplicateTarget.photos.map(p => p.id));
+        const photosToMerge = (album.photos || []).filter(p => p && !existingPhotoIds.has(p.id));
+        duplicateTarget.photos.unshift(...photosToMerge);
+        if (!duplicateTarget.coverUrl && album.coverUrl) {
+          duplicateTarget.coverUrl = album.coverUrl;
+          duplicateTarget.coverPosition = album.coverPosition || '50% 50%';
+        }
+        if (album.note && !duplicateTarget.note) {
+          duplicateTarget.note = album.note;
+        }
+        albums = albums.filter(a => a.id !== album.id);
+        finalOpenAlbumId = duplicateTarget.id;
+
+        const newLabel = formatFullAlbumSyncLabel(duplicateTarget);
+        setLastEditedAlbumContext(newLabel, 'ย้ายและรวมอัลบั้ม');
+        recordActivityLog('move_album', {
+          albumTitle: newLabel,
+          client: duplicateTarget.client,
+          dept: duplicateTarget.dept,
+          product: duplicateTarget.product,
+          thaiDate: duplicateTarget.thaiDate,
+          photoCount: photosToMerge.length,
+          detail: `แอดมิน ${currentUser.name} ย้ายและรวมอัลบั้ม (${photosToMerge.length} รูป) จาก "${oldLabel}" → "${newLabel}"`
+        });
+      } else {
+        // Save new product suggestion if needed
+        const prodList = getProducts();
+        if (nextProduct && !prodList.some(p => p.toLowerCase() === nextProduct.toLowerCase())) {
+          prodList.unshift(nextProduct);
+          saveProducts(prodList);
+        }
+
+        album.type = nextType;
+        album.client = nextClient;
+        album.dept = nextDept;
+        album.product = nextProduct;
+        album.facDivision = '';
+        album.facTeam = '';
+        album.facCustomer = nextFacCustomer;
+        album.isServiceCenter = nextIsSc;
+        album.serviceCenter = nextIsSc ? nextScCenter : '';
+        album.siteName = nextIsSc ? nextFacCustomer : '';
+        album.scCustomer = nextIsSc ? nextFacCustomer : '';
+        album.thaiDate = nextThaiDate;
+
+        const newLabel = formatFullAlbumSyncLabel(album);
+        setLastEditedAlbumContext(newLabel, 'ย้ายอัลบั้ม');
+        recordActivityLog('move_album', {
+          albumTitle: newLabel,
+          client: album.client,
+          dept: album.dept,
+          product: album.product,
+          thaiDate: album.thaiDate,
+          photoCount: (album.photos || []).length,
+          detail: `แอดมิน ${currentUser.name} โยกย้ายอัลบั้มจาก "${oldLabel}" → "${newLabel}"`
+        });
+      }
+
+      saveAlbums();
+      closeMoveAlbumModal();
+
+      // Navigate smoothly to the moved album's new location
+      const movedAlbum = albums.find(a => a.id === finalOpenAlbumId);
+      if (movedAlbum) {
+        isServiceCenterFlow = false;
+        setCurrentAlbumType(getAlbumType(movedAlbum));
+        if (activeAlbumId) {
+          openAlbum(movedAlbum.id);
+        } else {
+          const isDirectFac = isDirectProductCustomerFacClient(movedAlbum.client);
+          navPath = {
+            client: movedAlbum.client,
+            dept: isDirectFac ? '__DIRECT_FAC__' : movedAlbum.dept,
+            product: movedAlbum.product,
+            facCustomer: (isNonScFacilityAlbum(movedAlbum) || isServiceCenterClientName(movedAlbum.client))
+              ? (isServiceCenterClientName(movedAlbum.client) ? getScCustomerOfAlbum(movedAlbum) : getFacCustomerOfAlbum(movedAlbum))
+              : null
+          };
+          showFolderDashboard();
+        }
+      } else {
+        showFolderDashboard();
+      }
+      alert('โยกย้ายอัลบั้มเรียบร้อยแล้วครับ');
     }
 
     function openEditAlbumModal(albumId) {
@@ -8521,6 +9344,7 @@ function openNewAlbumModal() {
         download_photo: { label: 'โหลดรูปภาพ', cls: 'bg-sky-50 text-sky-700 border-sky-200', icon: 'download' },
         export_nas: { label: 'บันทึกลง NAS', cls: 'bg-indigo-50 text-indigo-700 border-indigo-200', icon: 'server' },
         restore_snapshot: { label: 'Reset ย้อนเวลา', cls: 'bg-amber-50 text-amber-800 border-amber-300', icon: 'history' },
+        move_album: { label: 'ย้ายอัลบั้ม', cls: 'bg-violet-50 text-violet-700 border-violet-200', icon: 'folder-symlink' },
         empty_trash: { label: 'ล้างถังขยะถาวร', cls: 'bg-red-100 text-red-800 border-red-300', icon: 'flame' }
       };
 
@@ -9281,6 +10105,139 @@ function openNewAlbumModal() {
           </button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- ==================== MODAL: ADMIN MOVE ALBUM ==================== -->
+  <div id="move-album-modal" onclick="if(event.target === this) closeMoveAlbumModal()"
+    class="hidden fixed inset-0 z-[65] bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden border border-slate-100">
+      <div class="px-6 py-4 bg-[#1B212C] text-white flex items-center justify-between">
+        <h3 class="font-semibold text-sm flex items-center gap-2">
+          <i data-lucide="folder-symlink" class="w-4 h-4 text-violet-400"></i>
+          <span>โยกย้ายอัลบั้ม (สิทธิ์ Admin)</span>
+          <span class="px-1.5 py-0.2 rounded bg-amber-400/20 text-amber-300 text-[10px] font-bold">ADMIN</span>
+        </h3>
+        <button type="button" onclick="closeMoveAlbumModal()" class="text-slate-400 hover:text-white cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form onsubmit="submitMoveAlbum(event)" class="p-6 space-y-4 max-h-[82vh] overflow-y-auto text-xs">
+        <input type="hidden" id="move-album-id" />
+        <input type="hidden" id="move-album-type" value="facility" />
+
+        <!-- Source Album Summary -->
+        <div class="p-3.5 rounded-xl bg-violet-50/80 border border-violet-200/90 space-y-1">
+          <div class="flex items-center justify-between gap-2">
+            <span class="text-[11px] font-bold text-violet-900">อัลบั้มต้นทางที่จะย้าย:</span>
+            <span id="move-album-source-photos" class="px-2 py-0.5 rounded-full bg-violet-600 text-white text-[10px] font-bold">0 รูป</span>
+          </div>
+          <p id="move-album-source-label" class="text-xs font-semibold text-slate-900 break-words">-</p>
+        </div>
+
+        <!-- Quick-Pick Existing Folder Destination -->
+        <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1.5">
+          <label class="block text-[11px] font-semibold text-slate-600">เลือกด่วนจากโฟลเดอร์ปลายทางที่มีอยู่แล้ว (ไม่บังคับ)</label>
+          <select id="move-album-quick-dest" onchange="applyMoveAlbumQuickDestination()"
+            class="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs focus:border-violet-500 outline-none">
+            <option value="">-- เลือกเพื่อกรอกปลายทางอัตโนมัติ หรือกำหนดเองด้านล่าง --</option>
+          </select>
+        </div>
+
+        <!-- Destination Structure Switch -->
+        <div>
+          <label class="block font-semibold text-slate-600 mb-1.5">โครงสร้างปลายทาง *</label>
+          <div class="grid grid-cols-2 gap-1.5 p-1 bg-[#F5F7FA] rounded-xl border border-slate-200/80">
+            <button type="button" id="move-album-type-btn-facility" onclick="setMoveAlbumType('facility')"
+              class="py-2 px-3 rounded-lg text-xs font-semibold bg-[#1B212C] text-white shadow-2xs flex items-center justify-center gap-1.5 transition cursor-pointer">
+              <i data-lucide="factory" class="w-3.5 h-3.5"></i> Facility Services
+            </button>
+            <button type="button" id="move-album-type-btn-customer" onclick="setMoveAlbumType('customer')"
+              class="py-2 px-3 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 flex items-center justify-center gap-1.5 transition cursor-pointer">
+              <i data-lucide="building-2" class="w-3.5 h-3.5"></i> Customer
+            </button>
+          </div>
+        </div>
+
+        <!-- Facility Services Branch Box -->
+        <div id="move-album-fac-wrap" class="p-3.5 rounded-xl bg-slate-50 border border-slate-200/90 space-y-3">
+          <div>
+            <label class="block font-bold text-slate-800 mb-1">หมวดใน Facility Services *</label>
+            <select id="move-album-fac-branch" onchange="onMoveAlbumBranchChange()"
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-sm font-semibold text-slate-800 focus:border-violet-500 outline-none">
+              <option value="Fire & Security Service">Fire &amp; Security Service → Teams → Product → Customer</option>
+              <option value="Air Conditioning Services">Air Conditioning Services → Product → Customer</option>
+              <option value="UPS Services">UPS Services → Product → Customer</option>
+              <option value="Service Center">Service Center → ศูนย์บริการภาค → Product → Customer</option>
+            </select>
+          </div>
+
+          <div id="move-album-fs-team-box">
+            <label class="block font-semibold text-slate-700 mb-1">Teams (Fire &amp; Security Service) *</label>
+            <input id="move-album-fs-team" type="text" list="fs-team-suggestions" placeholder="เช่น Tanee Teams, Kitsana Teams, Taywin Teams"
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-sm focus:border-violet-500 outline-none" />
+          </div>
+
+          <div id="move-album-sc-region-box" class="hidden">
+            <label class="block font-semibold text-indigo-900 mb-1">ศูนย์บริการภาค *</label>
+            <select id="move-album-sc-center"
+              class="w-full px-3.5 py-2 rounded-xl border border-indigo-200 bg-white text-sm focus:border-indigo-500 outline-none"></select>
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Customer (ชื่อลูกค้าปลายทาง) *</label>
+            <input id="move-album-fac-customer" type="text" list="customer-suggestions" placeholder="พิมพ์หรือเลือกชื่อลูกค้าปลายทาง"
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-white text-sm focus:border-violet-500 outline-none" />
+          </div>
+        </div>
+
+        <!-- Customer Mode Fields -->
+        <div id="move-album-cust-wrap" class="hidden space-y-3">
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">ชื่อลูกค้า (Customer) ปลายทาง *</label>
+            <input id="move-album-client" type="text" list="customer-suggestions" placeholder="พิมพ์หรือเลือกชื่อลูกค้า"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-violet-500 outline-none" />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">สังกัด (Department) ปลายทาง *</label>
+            <select id="move-album-dept"
+              class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-violet-500 outline-none"></select>
+          </div>
+        </div>
+
+        <!-- Product Field (Common) -->
+        <div>
+          <label class="block font-semibold text-slate-600 mb-1">Product ปลายทาง *</label>
+          <input id="move-album-product" type="text" list="product-suggestions" required placeholder="พิมพ์หรือเลือก Product ปลายทาง"
+            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-violet-500 outline-none" />
+        </div>
+
+        <!-- Date Field -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">วันที่ (ปฏิทิน)</label>
+            <input id="move-album-date-picker" type="date" onchange="syncMoveAlbumThaiDateFromPicker()"
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-violet-500 outline-none" />
+          </div>
+          <div>
+            <label class="block font-semibold text-slate-600 mb-1">วัน/เดือน/ปีพ.ศ. *</label>
+            <input id="move-album-thai-date" type="text" required placeholder="เช่น 20/11/2569"
+              class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-violet-50/40 font-mono font-semibold text-violet-800 text-sm focus:border-violet-500 outline-none" />
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+          <button type="button" onclick="closeMoveAlbumModal()" class="px-4 py-2 rounded-xl text-sm text-slate-600 hover:bg-slate-100 cursor-pointer">
+            ยกเลิก
+          </button>
+          <button type="submit"
+            class="px-5 py-2 rounded-xl text-sm font-semibold bg-violet-600 hover:bg-violet-700 text-white shadow-xs cursor-pointer flex items-center gap-1.5">
+            <i data-lucide="folder-symlink" class="w-4 h-4"></i>
+            <span>ยืนยันการย้ายอัลบั้ม</span>
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
