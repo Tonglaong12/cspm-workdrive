@@ -1735,7 +1735,7 @@ create policy "Public Access workdrive-photos" on storage.objects
         });
         const mergedSnaps = Array.from(snapMap.values())
           .sort((a, z) => (z.createdAtMs || 0) - (a.createdAtMs || 0))
-          .slice(0, 25);
+          .slice(0, 5);
         return { id: '__cspm_snapshots__', isSystemLogContainer: true, photos: [], snapshots: mergedSnaps };
       }
       if ((l && l.id === '__cspm_trash__') || (r && r.id === '__cspm_trash__')) {
@@ -2133,6 +2133,25 @@ create policy "Public Access workdrive-photos" on storage.objects
           });
           return { ...a, covers: cleanCovers };
         }
+        if (a && a.id === '__cspm_snapshots__') {
+          const cleanSnaps = (Array.isArray(a.snapshots) ? a.snapshots : []).slice(0, 5).map(s => ({
+            ...s,
+            albumsData: (Array.isArray(s.albumsData) ? s.albumsData : []).map(alb => ({
+              ...alb,
+              coverUrl: (alb && alb.coverUrl && String(alb.coverUrl).startsWith('data:')) ? '' : (alb && alb.coverUrl || ''),
+              photos: (alb && Array.isArray(alb.photos) ? alb.photos : []).map(p =>
+                (p && typeof p.dataUrl === 'string' && p.dataUrl.startsWith('data:')) ? { ...p, dataUrl: '' } : p
+              )
+            }))
+          }));
+          return { ...a, snapshots: cleanSnaps };
+        }
+        if (a && a.id === '__cspm_trash__') {
+          const cleanItems = (Array.isArray(a.items) ? a.items : []).map(it =>
+            (it && typeof it.dataUrl === 'string' && it.dataUrl.startsWith('data:')) ? { ...it, dataUrl: '' } : it
+          );
+          return { ...a, items: cleanItems };
+        }
         return {
           ...a,
           coverUrl: (a.coverUrl && a.coverUrl.startsWith('data:')) ? '' : (a.coverUrl || ''),
@@ -2270,7 +2289,7 @@ create policy "Public Access workdrive-photos" on storage.objects
           accounts: state.accounts,
           updated_at: new Date().toISOString()
         }, { onConflict: 'id' }),
-        20000, 'push'
+        55000, 'push'
       );
       if (error) throw error;
       syncBase = deepCopy(state);
@@ -2289,7 +2308,7 @@ create policy "Public Access workdrive-photos" on storage.objects
       const v0 = editVersion;
       const { data, error } = await withTimeout(
         supabaseClient.from('workdrive_state').select('*').eq('id', TEAM_ROW_ID).maybeSingle(),
-        8000, 'pull'
+        30000, 'pull'
       );
       if (error) throw error;
 
@@ -2361,9 +2380,14 @@ create policy "Public Access workdrive-photos" on storage.objects
         if (showAlert) alert('อัปเดตข้อมูลล่าสุดจากทีมเรียบร้อยแล้วครับ');
       } catch (e) {
         console.warn('Cloud sync error:', e);
-        if (showAlert) alert('ไม่สามารถดึงข้อมูลจาก Cloud ได้ กรุณาตรวจสอบการตั้งค่า Supabase หรือสัญญาณอินเทอร์เน็ต');
+        clearLiveCloudSyncProgress(false);
+        const errDetail = (e && (e.message || e.code)) ? `\n(${e.code ? e.code + ': ' : ''}${e.message || ''})` : '';
+        if (showAlert) alert('ไม่สามารถซิงก์ข้อมูลกับ Cloud ได้ กรุณาตรวจสอบการตั้งค่า Supabase หรือสัญญาณอินเทอร์เน็ต' + errDetail);
       } finally {
         isSyncingCloud = false;
+        if (!isUploadingToCloud && activeCloudSyncStatus) {
+          clearLiveCloudSyncProgress(false);
+        }
       }
       refreshSyncStatus();
       if (syncAgain) {
@@ -4556,7 +4580,9 @@ create policy "Public Access workdrive-photos" on storage.objects
     }
 
     function getScCenterOfAlbum(a) {
-      return (a.serviceCenter || a.client || 'SC สำนักงานใหญ่').trim();
+      if (a && a.serviceCenter && String(a.serviceCenter).trim()) return String(a.serviceCenter).trim();
+      if (a && a.dept && String(a.dept).trim() && !isServiceCenterDeptName(a.dept)) return String(a.dept).trim();
+      return (a && a.client ? String(a.client) : 'SC สำนักงานใหญ่').trim();
     }
 
 
@@ -7371,6 +7397,121 @@ function openNewAlbumModal() {
       }
     }
 
+    // ==================== MOVE SELECTED PHOTOS TO ANOTHER ALBUM ====================
+    function openMovePhotosModal() {
+      const sourceAlb = albums.find(a => a && !a.isSystemLogContainer && a.id === activeAlbumId);
+      if (!sourceAlb || selectedPhotoIds.size === 0) return;
+
+      const countEl = document.getElementById('move-photos-count-text');
+      if (countEl) countEl.textContent = `${selectedPhotoIds.size} รูป`;
+      const searchEl = document.getElementById('move-target-search');
+      if (searchEl) searchEl.value = '';
+
+      populateMoveTargetAlbumSelect();
+      document.getElementById('move-photos-modal').classList.remove('hidden');
+      lucide.createIcons();
+    }
+
+    function closeMovePhotosModal() {
+      const modal = document.getElementById('move-photos-modal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    function populateMoveTargetAlbumSelect() {
+      const sel = document.getElementById('move-target-album-select');
+      if (!sel) return;
+      const query = (document.getElementById('move-target-search')?.value || '').trim().toLowerCase();
+
+      const targets = albums
+        .filter(a => a && !a.isSystemLogContainer && !a.isFolderPlaceholder && a.id !== activeAlbumId)
+        .map(a => ({
+          id: a.id,
+          label: formatFullAlbumSyncLabel(a),
+          photoCount: (a.photos || []).length
+        }))
+        .filter(item => !query || item.label.toLowerCase().includes(query));
+
+      if (targets.length === 0) {
+        sel.innerHTML = `<option value="" disabled>ไม่พบอัลบั้มปลายทางอื่น</option>`;
+        return;
+      }
+
+      sel.innerHTML = targets.map(t =>
+        `<option value="${escapeHtml(t.id)}">${escapeHtml(t.label)} (${t.photoCount} รูป)</option>`
+      ).join('');
+      sel.selectedIndex = 0;
+    }
+
+    async function executeMoveSelectedPhotos() {
+      const sourceAlb = albums.find(a => a && !a.isSystemLogContainer && a.id === activeAlbumId);
+      const sel = document.getElementById('move-target-album-select');
+      const targetId = sel ? sel.value : '';
+      const targetAlb = albums.find(a => a && !a.isSystemLogContainer && a.id === targetId);
+
+      if (!sourceAlb || !targetAlb || selectedPhotoIds.size === 0) {
+        alert('กรุณาเลือกอัลบั้มปลายทางที่ต้องการย้ายรูปภาพไป');
+        return;
+      }
+
+      const btn = document.getElementById('move-photos-confirm-btn');
+      const origHtml = btn ? btn.innerHTML : '';
+      if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<span>กำลังย้ายรูป...</span>';
+      }
+
+      try {
+        const toMove = (sourceAlb.photos || []).filter(p => p && selectedPhotoIds.has(p.id));
+        if (toMove.length === 0) return;
+
+        sourceAlb.photos = (sourceAlb.photos || []).filter(p => !p || !selectedPhotoIds.has(p.id));
+        if (!Array.isArray(targetAlb.photos)) targetAlb.photos = [];
+        const existingIds = new Set(targetAlb.photos.map(p => p.id));
+        const uniqueToMove = toMove.filter(p => !existingIds.has(p.id));
+        targetAlb.photos.unshift(...uniqueToMove);
+
+        const srcLabel = formatFullAlbumSyncLabel(sourceAlb);
+        const dstLabel = formatFullAlbumSyncLabel(targetAlb);
+        setLastEditedAlbumContext(dstLabel, `ย้ายรูปภาพ ${uniqueToMove.length} รูป`);
+        recordActivityLog('move_album', {
+          albumTitle: dstLabel,
+          client: targetAlb.client,
+          dept: targetAlb.dept,
+          product: targetAlb.product,
+          thaiDate: targetAlb.thaiDate,
+          photoCount: uniqueToMove.length,
+          detail: `ย้ายรูปภาพ ${uniqueToMove.length} รูป จาก "${srcLabel}" → "${dstLabel}"`
+        });
+
+        selectedPhotoIds.clear();
+        trackDeletedAlbums();
+        normalizeAlbumTypes();
+        editVersion++;
+        setPending(true);
+        persistAlbumsLocal();
+
+        let cloudOk = true;
+        if (isCloudConnected && supabaseClient && navigator.onLine) {
+          try { cloudOk = await pushTeamStateToCloud(); } catch (err) { cloudOk = false; }
+        }
+
+        closeMovePhotosModal();
+        openAlbum(sourceAlb.id);
+        alert(cloudOk
+          ? `ย้ายรูปภาพจำนวน ${uniqueToMove.length} รูปไปยัง "${dstLabel}" เรียบร้อยแล้วครับ`
+          : `ย้ายรูปภาพในเครื่องนี้แล้ว (${uniqueToMove.length} รูป) แต่ยังซิงก์ขึ้น Cloud ไม่สำเร็จ กรุณากด "รีเฟรชข้อมูลทีม" อีกครั้งครับ`
+        );
+      } catch (err) {
+        alert('เกิดข้อผิดพลาดขณะย้ายรูปภาพ: ' + (err && err.message ? err.message : err));
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = origHtml;
+          lucide.createIcons();
+        }
+      }
+    }
+
     // ==================== ADMIN MOVE ALBUM (sarunchana.h ONLY) ====================
     let moveAlbumQuickDestMap = new Map();
 
@@ -7382,20 +7523,14 @@ function openNewAlbumModal() {
 
       const facWrap = document.getElementById('move-album-fac-wrap');
       const custWrap = document.getElementById('move-album-cust-wrap');
-      const clientInp = document.getElementById('move-album-client');
-      const facCustInp = document.getElementById('move-album-fac-customer');
 
       if (t === 'facility') {
         if (facWrap) facWrap.classList.remove('hidden');
         if (custWrap) custWrap.classList.add('hidden');
-        if (clientInp) clientInp.required = false;
-        if (facCustInp) facCustInp.required = true;
         onMoveAlbumBranchChange();
       } else {
         if (facWrap) facWrap.classList.add('hidden');
         if (custWrap) custWrap.classList.remove('hidden');
-        if (clientInp) clientInp.required = true;
-        if (facCustInp) facCustInp.required = false;
       }
       fillClientSuggestions(t);
     }
@@ -7403,20 +7538,16 @@ function openNewAlbumModal() {
     function onMoveAlbumBranchChange() {
       const branch = document.getElementById('move-album-fac-branch').value;
       const fsBox = document.getElementById('move-album-fs-team-box');
-      const fsInp = document.getElementById('move-album-fs-team');
       const scBox = document.getElementById('move-album-sc-region-box');
 
-      if (branch === 'Fire & Security Service') {
+      if (/fire\s*&\s*security/i.test(branch)) {
         if (fsBox) fsBox.classList.remove('hidden');
-        if (fsInp) fsInp.required = true;
         if (scBox) scBox.classList.add('hidden');
-      } else if (branch === 'Service Center') {
+      } else if (isServiceCenterClientName(branch)) {
         if (fsBox) fsBox.classList.add('hidden');
-        if (fsInp) fsInp.required = false;
         if (scBox) scBox.classList.remove('hidden');
       } else {
         if (fsBox) fsBox.classList.add('hidden');
-        if (fsInp) fsInp.required = false;
         if (scBox) scBox.classList.add('hidden');
       }
     }
@@ -7541,11 +7672,29 @@ function openNewAlbumModal() {
 
       const curType = getAlbumType(album);
       const isSc = isServiceCenterClientName(album.client) || album.isServiceCenter;
-      populateScCenterSelect('move-album-sc-center', isSc ? getScCenterOfAlbum(album) : '');
+      const resolvedScCenter = isSc ? (album.serviceCenter || (isServiceCenterClientName(album.client) ? album.dept : '') || getScCenterOfAlbum(album)) : '';
+      populateScCenterSelect('move-album-sc-center', resolvedScCenter);
+
+      // Ensure any custom Facility Services top-level folders also appear in the branch selector
+      const branchSel = document.getElementById('move-album-fac-branch');
+      if (branchSel) {
+        const stdBranches = ['Fire & Security Service', 'Air Conditioning Services', 'UPS Services', 'Service Center'];
+        const existingFacClients = Array.from(new Set(
+          albums.filter(a => a && !a.isSystemLogContainer && getAlbumType(a) === 'facility' && a.client).map(a => a.client)
+        ));
+        branchSel.innerHTML =
+          `<option value="Fire & Security Service">Fire &amp; Security Service → Teams → Product → Customer</option>` +
+          `<option value="Air Conditioning Services">Air Conditioning Services → Product → Customer</option>` +
+          `<option value="UPS Services">UPS Services → Product → Customer</option>` +
+          `<option value="Service Center">Service Center → ศูนย์บริการภาค → Product → Customer</option>` +
+          existingFacClients
+            .filter(c => !stdBranches.includes(c))
+            .map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)} → Product → Customer</option>`)
+            .join('');
+      }
 
       setMoveAlbumType(curType);
       if (curType === 'facility') {
-        const branchSel = document.getElementById('move-album-fac-branch');
         const cStr = String(album.client || '');
         if (isSc) {
           branchSel.value = 'Service Center';
@@ -7559,8 +7708,17 @@ function openNewAlbumModal() {
           branchSel.value = 'UPS Services';
           document.getElementById('move-album-fac-customer').value = getFacCustomerOfAlbum(album);
           document.getElementById('move-album-product').value = album.product || '';
-        } else {
+        } else if (/fire\s*&\s*security/i.test(cStr)) {
           branchSel.value = 'Fire & Security Service';
+          document.getElementById('move-album-fs-team').value = getFacDivisionOfAlbum(album);
+          document.getElementById('move-album-fac-customer').value = getFacCustomerOfAlbum(album);
+          document.getElementById('move-album-product').value = getFacTeamOfAlbum(album) || album.product || '';
+        } else {
+          if (cStr && Array.from(branchSel.options).some(o => o.value === cStr)) {
+            branchSel.value = cStr;
+          } else {
+            branchSel.value = 'Fire & Security Service';
+          }
           document.getElementById('move-album-fs-team').value = getFacDivisionOfAlbum(album);
           document.getElementById('move-album-fac-customer').value = getFacCustomerOfAlbum(album);
           document.getElementById('move-album-product').value = getFacTeamOfAlbum(album) || album.product || '';
@@ -7584,164 +7742,207 @@ function openNewAlbumModal() {
       if (modal) modal.classList.add('hidden');
     }
 
-    function submitMoveAlbum(e) {
-      e.preventDefault();
+    async function submitMoveAlbum(e) {
+      if (e && e.preventDefault) e.preventDefault();
       if (!isAdminUser()) {
         alert('เฉพาะบัญชีแอดมิน (sarunchana.h) เท่านั้นที่สามารถโยกย้ายอัลบั้มได้');
         return;
       }
 
-      const id = document.getElementById('move-album-id').value;
-      const album = albums.find(a => a && !a.isSystemLogContainer && a.id === id);
-      if (!album) return;
+      const submitBtn = document.getElementById('move-album-submit-btn');
+      const origBtnHtml = submitBtn ? submitBtn.innerHTML : '';
 
-      const oldLabel = formatFullAlbumSyncLabel(album);
-      const nextType = document.getElementById('move-album-type').value === 'customer' ? 'customer' : 'facility';
-      const nextProduct = (document.getElementById('move-album-product').value || '').trim();
-      const nextThaiDate = (document.getElementById('move-album-thai-date').value || '').trim();
-
-      if (!nextProduct || !nextThaiDate) {
-        alert('กรุณากรอกชื่อ Product และวัน/เดือน/ปีพ.ศ. ให้ครบถ้วน');
-        return;
-      }
-
-      let nextClient = '';
-      let nextDept = '';
-      let nextIsSc = false;
-      let nextScCenter = '';
-      let nextFacCustomer = '';
-
-      if (nextType === 'facility') {
-        const branch = document.getElementById('move-album-fac-branch').value;
-        nextFacCustomer = (document.getElementById('move-album-fac-customer').value || '').trim();
-        if (!nextFacCustomer) {
-          alert('กรุณากรอกชื่อลูกค้า (Customer) ปลายทาง');
+      try {
+        const id = document.getElementById('move-album-id').value;
+        const album = albums.find(a => a && !a.isSystemLogContainer && a.id === id);
+        if (!album) {
+          alert('ไม่พบข้อมูลอัลบั้มที่ต้องการย้าย');
           return;
         }
-        nextClient = branch;
-        if (branch === 'Fire & Security Service') {
-          nextDept = (document.getElementById('move-album-fs-team').value || '').trim() || 'Tanee Teams';
-        } else if (branch === 'Service Center') {
-          nextIsSc = true;
-          nextScCenter = (document.getElementById('move-album-sc-center').value || '').trim() || 'กรุงเทพ';
-          nextDept = nextScCenter;
+
+        const oldLabel = formatFullAlbumSyncLabel(album);
+        const nextType = document.getElementById('move-album-type').value === 'customer' ? 'customer' : 'facility';
+        const nextProduct = (document.getElementById('move-album-product').value || '').trim();
+        const nextThaiDate = (document.getElementById('move-album-thai-date').value || '').trim();
+
+        if (!nextProduct || !nextThaiDate) {
+          alert('กรุณากรอกชื่อ Product และวัน/เดือน/ปีพ.ศ. ให้ครบถ้วน');
+          return;
+        }
+
+        let nextClient = '';
+        let nextDept = '';
+        let nextIsSc = false;
+        let nextScCenter = '';
+        let nextFacCustomer = '';
+
+        if (nextType === 'facility') {
+          const branch = document.getElementById('move-album-fac-branch').value;
+          nextFacCustomer = (document.getElementById('move-album-fac-customer').value || '').trim();
+          if (!nextFacCustomer) {
+            alert('กรุณากรอกชื่อลูกค้า (Customer) ปลายทาง');
+            return;
+          }
+          nextClient = branch;
+          if (/fire\s*&\s*security/i.test(branch)) {
+            nextDept = (document.getElementById('move-album-fs-team').value || '').trim() || 'Tanee Teams';
+          } else if (isServiceCenterClientName(branch)) {
+            nextIsSc = true;
+            nextScCenter = (document.getElementById('move-album-sc-center').value || '').trim() || 'กรุงเทพ';
+            nextDept = nextScCenter;
+          } else {
+            nextDept = branch;
+          }
         } else {
-          nextDept = branch;
+          nextClient = (document.getElementById('move-album-client').value || '').trim();
+          nextDept = (document.getElementById('move-album-dept').value || '').trim();
+          if (!nextClient || !nextDept) {
+            alert('กรุณากรอกชื่อลูกค้าและสังกัดปลายทางให้ครบถ้วน');
+            return;
+          }
         }
-      } else {
-        nextClient = (document.getElementById('move-album-client').value || '').trim();
-        nextDept = (document.getElementById('move-album-dept').value || '').trim();
-        if (!nextClient || !nextDept) {
-          alert('กรุณากรอกชื่อลูกค้าและสังกัดปลายทางให้ครบถ้วน');
-          return;
-        }
-      }
 
-      // Check if another album already exists at the exact same destination + date
-      const duplicateTarget = albums.find(a =>
-        a && !a.isSystemLogContainer && a.id !== album.id &&
-        getAlbumType(a) === nextType &&
-        String(a.client || '').toLowerCase() === nextClient.toLowerCase() &&
-        String(a.dept || '').toLowerCase() === nextDept.toLowerCase() &&
-        String(a.product || '').toLowerCase() === nextProduct.toLowerCase() &&
-        String(a.facCustomer || '').toLowerCase() === nextFacCustomer.toLowerCase() &&
-        String(a.thaiDate || '') === nextThaiDate
-      );
-
-      let finalOpenAlbumId = album.id;
-
-      if (duplicateTarget) {
-        const mergeConfirmed = confirm(
-          `พบอัลบั้มปลายทางวันที่ ${nextThaiDate} อยู่แล้ว (${(duplicateTarget.photos || []).length} รูป)\n\n` +
-          `ต้องการ "รวมรูปภาพทั้งหมด ${(album.photos || []).length} รูป" เข้าไปในอัลบั้มปลายทางที่มีอยู่แล้วใช่หรือไม่?`
+        // Check if another album already exists at the exact same destination + date
+        const duplicateTarget = albums.find(a =>
+          a && !a.isSystemLogContainer && a.id !== album.id &&
+          getAlbumType(a) === nextType &&
+          String(a.client || '').toLowerCase() === nextClient.toLowerCase() &&
+          String(a.dept || '').toLowerCase() === nextDept.toLowerCase() &&
+          String(a.product || '').toLowerCase() === nextProduct.toLowerCase() &&
+          String(a.facCustomer || '').toLowerCase() === nextFacCustomer.toLowerCase() &&
+          String(a.thaiDate || '') === nextThaiDate
         );
-        if (!mergeConfirmed) return;
 
-        if (!Array.isArray(duplicateTarget.photos)) duplicateTarget.photos = [];
-        const existingPhotoIds = new Set(duplicateTarget.photos.map(p => p.id));
-        const photosToMerge = (album.photos || []).filter(p => p && !existingPhotoIds.has(p.id));
-        duplicateTarget.photos.unshift(...photosToMerge);
-        if (!duplicateTarget.coverUrl && album.coverUrl) {
-          duplicateTarget.coverUrl = album.coverUrl;
-          duplicateTarget.coverPosition = album.coverPosition || '50% 50%';
-        }
-        if (album.note && !duplicateTarget.note) {
-          duplicateTarget.note = album.note;
-        }
-        albums = albums.filter(a => a.id !== album.id);
-        finalOpenAlbumId = duplicateTarget.id;
+        let finalOpenAlbumId = album.id;
 
-        const newLabel = formatFullAlbumSyncLabel(duplicateTarget);
-        setLastEditedAlbumContext(newLabel, 'ย้ายและรวมอัลบั้ม');
-        recordActivityLog('move_album', {
-          albumTitle: newLabel,
-          client: duplicateTarget.client,
-          dept: duplicateTarget.dept,
-          product: duplicateTarget.product,
-          thaiDate: duplicateTarget.thaiDate,
-          photoCount: photosToMerge.length,
-          detail: `แอดมิน ${currentUser.name} ย้ายและรวมอัลบั้ม (${photosToMerge.length} รูป) จาก "${oldLabel}" → "${newLabel}"`
-        });
-      } else {
-        // Save new product suggestion if needed
-        const prodList = getProducts();
-        if (nextProduct && !prodList.some(p => p.toLowerCase() === nextProduct.toLowerCase())) {
-          prodList.unshift(nextProduct);
-          saveProducts(prodList);
-        }
+        if (duplicateTarget) {
+          const mergeConfirmed = confirm(
+            `พบอัลบั้มปลายทางวันที่ ${nextThaiDate} อยู่แล้ว (${(duplicateTarget.photos || []).length} รูป)\n\n` +
+            `ต้องการ "รวมรูปภาพทั้งหมด ${(album.photos || []).length} รูป" เข้าไปในอัลบั้มปลายทางที่มีอยู่แล้วใช่หรือไม่?`
+          );
+          if (!mergeConfirmed) return;
 
-        album.type = nextType;
-        album.client = nextClient;
-        album.dept = nextDept;
-        album.product = nextProduct;
-        album.facDivision = '';
-        album.facTeam = '';
-        album.facCustomer = nextFacCustomer;
-        album.isServiceCenter = nextIsSc;
-        album.serviceCenter = nextIsSc ? nextScCenter : '';
-        album.siteName = nextIsSc ? nextFacCustomer : '';
-        album.scCustomer = nextIsSc ? nextFacCustomer : '';
-        album.thaiDate = nextThaiDate;
+          if (!Array.isArray(duplicateTarget.photos)) duplicateTarget.photos = [];
+          const existingPhotoIds = new Set(duplicateTarget.photos.map(p => p.id));
+          const photosToMerge = (album.photos || []).filter(p => p && !existingPhotoIds.has(p.id));
+          duplicateTarget.photos.unshift(...photosToMerge);
+          if (!duplicateTarget.coverUrl && album.coverUrl) {
+            duplicateTarget.coverUrl = album.coverUrl;
+            duplicateTarget.coverPosition = album.coverPosition || '50% 50%';
+          }
+          if (album.note && !duplicateTarget.note) {
+            duplicateTarget.note = album.note;
+          }
+          albums = albums.filter(a => a.id !== album.id);
+          finalOpenAlbumId = duplicateTarget.id;
 
-        const newLabel = formatFullAlbumSyncLabel(album);
-        setLastEditedAlbumContext(newLabel, 'ย้ายอัลบั้ม');
-        recordActivityLog('move_album', {
-          albumTitle: newLabel,
-          client: album.client,
-          dept: album.dept,
-          product: album.product,
-          thaiDate: album.thaiDate,
-          photoCount: (album.photos || []).length,
-          detail: `แอดมิน ${currentUser.name} โยกย้ายอัลบั้มจาก "${oldLabel}" → "${newLabel}"`
-        });
-      }
-
-      saveAlbums();
-      closeMoveAlbumModal();
-
-      // Navigate smoothly to the moved album's new location
-      const movedAlbum = albums.find(a => a.id === finalOpenAlbumId);
-      if (movedAlbum) {
-        isServiceCenterFlow = false;
-        setCurrentAlbumType(getAlbumType(movedAlbum));
-        if (activeAlbumId) {
-          openAlbum(movedAlbum.id);
+          const newLabel = formatFullAlbumSyncLabel(duplicateTarget);
+          setLastEditedAlbumContext(newLabel, 'ย้ายและรวมอัลบั้ม');
+          recordActivityLog('move_album', {
+            albumTitle: newLabel,
+            client: duplicateTarget.client,
+            dept: duplicateTarget.dept,
+            product: duplicateTarget.product,
+            thaiDate: duplicateTarget.thaiDate,
+            photoCount: photosToMerge.length,
+            detail: `แอดมิน ${currentUser.name} ย้ายและรวมอัลบั้ม (${photosToMerge.length} รูป) จาก "${oldLabel}" → "${newLabel}"`
+          });
         } else {
-          const isDirectFac = isDirectProductCustomerFacClient(movedAlbum.client);
-          navPath = {
-            client: movedAlbum.client,
-            dept: isDirectFac ? '__DIRECT_FAC__' : movedAlbum.dept,
-            product: movedAlbum.product,
-            facCustomer: (isNonScFacilityAlbum(movedAlbum) || isServiceCenterClientName(movedAlbum.client))
-              ? (isServiceCenterClientName(movedAlbum.client) ? getScCustomerOfAlbum(movedAlbum) : getFacCustomerOfAlbum(movedAlbum))
-              : null
-          };
+          // Save new product suggestion if needed
+          const prodList = getProducts();
+          if (nextProduct && !prodList.some(p => p.toLowerCase() === nextProduct.toLowerCase())) {
+            prodList.unshift(nextProduct);
+            saveProducts(prodList);
+          }
+
+          album.type = nextType;
+          album.client = nextClient;
+          album.dept = nextDept;
+          album.product = nextProduct;
+          album.facDivision = '';
+          album.facTeam = '';
+          album.facCustomer = nextFacCustomer;
+          album.customerName = '';
+          album.isServiceCenter = nextIsSc;
+          album.serviceCenter = nextIsSc ? nextScCenter : '';
+          album.siteName = nextIsSc ? nextFacCustomer : '';
+          album.scCustomer = nextIsSc ? nextFacCustomer : '';
+          album.isFolderPlaceholder = false;
+          album.thaiDate = nextThaiDate;
+
+          const newLabel = formatFullAlbumSyncLabel(album);
+          setLastEditedAlbumContext(newLabel, 'ย้ายอัลบั้ม');
+          recordActivityLog('move_album', {
+            albumTitle: newLabel,
+            client: album.client,
+            dept: album.dept,
+            product: album.product,
+            thaiDate: album.thaiDate,
+            photoCount: (album.photos || []).length,
+            detail: `แอดมิน ${currentUser.name} โยกย้ายอัลบั้มจาก "${oldLabel}" → "${newLabel}"`
+          });
+        }
+
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span>กำลังย้ายและซิงก์...</span>';
+        }
+
+        trackDeletedAlbums();
+        normalizeAlbumTypes();
+        editVersion++;
+        setPending(true);
+        persistAlbumsLocal();
+
+        let cloudSyncedOk = true;
+        if (isCloudConnected && supabaseClient && navigator.onLine) {
+          try {
+            cloudSyncedOk = await pushTeamStateToCloud();
+          } catch (syncErr) {
+            cloudSyncedOk = false;
+            console.warn('Cloud sync after move album failed, queued:', syncErr);
+          }
+        }
+
+        closeMoveAlbumModal();
+
+        // Navigate smoothly to the moved album's new location
+        const movedAlbum = albums.find(a => a.id === finalOpenAlbumId);
+        if (movedAlbum) {
+          isServiceCenterFlow = false;
+          setCurrentAlbumType(getAlbumType(movedAlbum));
+          if (activeAlbumId) {
+            openAlbum(movedAlbum.id);
+          } else {
+            const isDirectFac = isDirectProductCustomerFacClient(movedAlbum.client);
+            navPath = {
+              client: movedAlbum.client,
+              dept: isDirectFac ? '__DIRECT_FAC__' : movedAlbum.dept,
+              product: movedAlbum.product,
+              facCustomer: (isNonScFacilityAlbum(movedAlbum) || isServiceCenterClientName(movedAlbum.client))
+                ? (isServiceCenterClientName(movedAlbum.client) ? getScCustomerOfAlbum(movedAlbum) : getFacCustomerOfAlbum(movedAlbum))
+                : null
+            };
+            showFolderDashboard();
+          }
+        } else {
           showFolderDashboard();
         }
-      } else {
-        showFolderDashboard();
+        if (cloudSyncedOk) {
+          alert('โยกย้ายอัลบั้มและซิงก์ขึ้น Cloud เรียบร้อยแล้วครับ');
+        } else {
+          alert('โยกย้ายอัลบั้มในเครื่องนี้แล้ว แต่ยังส่งขึ้น Cloud ไม่สำเร็จ กรุณากด "รีเฟรชข้อมูลทีม" อีกครั้งครับ');
+        }
+      } catch (err) {
+        console.error('submitMoveAlbum error:', err);
+        alert('เกิดข้อผิดพลาดขณะย้ายอัลบั้ม: ' + (err && err.message ? err.message : err));
+      } finally {
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = origBtnHtml;
+          lucide.createIcons();
+        }
       }
-      alert('โยกย้ายอัลบั้มเรียบร้อยแล้วครับ');
     }
 
     function openEditAlbumModal(albumId) {
@@ -8530,7 +8731,14 @@ function openNewAlbumModal() {
       const snapContainer = getSnapshotContainer();
       const cleanAlbums = albums
         .filter(a => !a.isSystemLogContainer)
-        .map(a => JSON.parse(JSON.stringify(a)));
+        .map(a => {
+          const c = JSON.parse(JSON.stringify(a));
+          if (c.coverUrl && String(c.coverUrl).startsWith('data:')) c.coverUrl = '';
+          if (Array.isArray(c.photos)) {
+            c.photos = c.photos.map(p => (p && typeof p.dataUrl === 'string' && p.dataUrl.startsWith('data:')) ? { ...p, dataUrl: '' } : p);
+          }
+          return c;
+        });
 
       const snapId = 'snap-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4);
       snapContainer.snapshots.unshift({
@@ -8544,8 +8752,8 @@ function openNewAlbumModal() {
         albumsData: cleanAlbums
       });
 
-      if (snapContainer.snapshots.length > 25) {
-        snapContainer.snapshots = snapContainer.snapshots.slice(0, 25);
+      if (snapContainer.snapshots.length > 5) {
+        snapContainer.snapshots = snapContainer.snapshots.slice(0, 5);
       }
       return snapId;
     }
@@ -10123,7 +10331,7 @@ function openNewAlbumModal() {
         </button>
       </div>
 
-      <form onsubmit="submitMoveAlbum(event)" class="p-6 space-y-4 max-h-[82vh] overflow-y-auto text-xs">
+      <form onsubmit="submitMoveAlbum(event)" novalidate class="p-6 space-y-4 max-h-[82vh] overflow-y-auto text-xs">
         <input type="hidden" id="move-album-id" />
         <input type="hidden" id="move-album-type" value="facility" />
 
@@ -10209,7 +10417,7 @@ function openNewAlbumModal() {
         <!-- Product Field (Common) -->
         <div>
           <label class="block font-semibold text-slate-600 mb-1">Product ปลายทาง *</label>
-          <input id="move-album-product" type="text" list="product-suggestions" required placeholder="พิมพ์หรือเลือก Product ปลายทาง"
+          <input id="move-album-product" type="text" list="product-suggestions" placeholder="พิมพ์หรือเลือก Product ปลายทาง"
             class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-[#F8FAFC] focus:bg-white text-sm focus:border-violet-500 outline-none" />
         </div>
 
@@ -10222,7 +10430,7 @@ function openNewAlbumModal() {
           </div>
           <div>
             <label class="block font-semibold text-slate-600 mb-1">วัน/เดือน/ปีพ.ศ. *</label>
-            <input id="move-album-thai-date" type="text" required placeholder="เช่น 20/11/2569"
+            <input id="move-album-thai-date" type="text" placeholder="เช่น 20/11/2569"
               class="w-full px-3.5 py-2 rounded-xl border border-slate-200 bg-violet-50/40 font-mono font-semibold text-violet-800 text-sm focus:border-violet-500 outline-none" />
           </div>
         </div>
@@ -10231,7 +10439,7 @@ function openNewAlbumModal() {
           <button type="button" onclick="closeMoveAlbumModal()" class="px-4 py-2 rounded-xl text-sm text-slate-600 hover:bg-slate-100 cursor-pointer">
             ยกเลิก
           </button>
-          <button type="submit"
+          <button id="move-album-submit-btn" type="submit"
             class="px-5 py-2 rounded-xl text-sm font-semibold bg-violet-600 hover:bg-violet-700 text-white shadow-xs cursor-pointer flex items-center gap-1.5">
             <i data-lucide="folder-symlink" class="w-4 h-4"></i>
             <span>ยืนยันการย้ายอัลบั้ม</span>
