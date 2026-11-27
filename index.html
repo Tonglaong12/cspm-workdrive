@@ -1746,25 +1746,32 @@ create policy "Public Access workdrive-photos" on storage.objects
         const rSet = (r && r.settings && typeof r.settings === 'object') ? r.settings : {};
         const lSet = (l && l.settings && typeof l.settings === 'object') ? l.settings : {};
         const bSet = (b && b.settings && typeof b.settings === 'object') ? b.settings : {};
-        const candidates = [lSet, rSet, bSet].filter(s => s && typeof s.showInstallBanner === 'boolean');
-        candidates.sort((a, z) => Number(z.updatedAtMs || 0) - Number(a.updatedAtMs || 0));
-        const winner = candidates[0] || {};
-        const mergedSet = { ...rSet, ...bSet, ...lSet };
-        if (typeof winner.showInstallBanner === 'boolean') {
-          mergedSet.showInstallBanner = winner.showInstallBanner;
-          mergedSet.updatedAtMs = winner.updatedAtMs || 0;
-          if (winner.updatedBy) mergedSet.updatedBy = winner.updatedBy;
-        }
+        const mergedSet = { ...rSet };
+        const allKeys = new Set([...Object.keys(rSet), ...Object.keys(lSet), ...Object.keys(bSet)]);
+        allKeys.forEach(k => {
+          const lv = lSet[k];
+          const bv = bSet[k];
+          if (JSON.stringify(lv) !== JSON.stringify(bv)) {
+            if (lv !== undefined) mergedSet[k] = lv;
+          }
+        });
         return { id: '__cspm_app_settings__', isSystemLogContainer: true, photos: [], settings: mergedSet };
       }
       if ((l && l.id === '__cspm_system_update__') || (r && r.id === '__cspm_system_update__')) {
         const rUp = (r && r.notice && typeof r.notice === 'object') ? r.notice : null;
         const lUp = (l && l.notice && typeof l.notice === 'object') ? l.notice : null;
         const bUp = (b && b.notice && typeof b.notice === 'object') ? b.notice : null;
-        const stampOf = (u) => (!u ? 0 : Math.max(Number(u.updatedAtMs || 0), Number(u.clearedAtMs || 0)));
-        const candidates = [lUp, rUp, bUp].filter(Boolean);
-        candidates.sort((a, z) => stampOf(z) - stampOf(a));
-        let chosen = candidates[0] || null;
+        const pick = (a, z) => {
+          if (!a) return z;
+          if (!z) return a;
+          const ta = a.updatedAtMs || 0;
+          const tz = z.updatedAtMs || 0;
+          return ta >= tz ? a : z;
+        };
+        let chosen = pick(lUp, rUp);
+        if (bUp && chosen && chosen.id === bUp.id && (bUp.updatedAtMs || 0) > (chosen.updatedAtMs || 0)) {
+          chosen = bUp;
+        }
         if (chosen) {
           const mergedResp = {
             ...(rUp && rUp.responses ? rUp.responses : {}),
@@ -1966,8 +1973,15 @@ create policy "Public Access workdrive-photos" on storage.objects
       if (!currentUser) return;
       updateStats();
       if (activeAlbumId) {
-        const stillExists = albums.some(a => a.id === activeAlbumId);
-        if (stillExists) {
+        const alb = albums.find(a => a.id === activeAlbumId);
+        if (alb) {
+          const metaEl = document.getElementById('detail-meta');
+          if (metaEl) {
+            const dispDiv = isNonScFacilityAlbum(alb) ? getFacDivisionOfAlbum(alb) : alb.dept;
+            const dispTeamOrProd = isNonScFacilityAlbum(alb) ? getFacTeamOfAlbum(alb) : alb.product;
+            document.getElementById('detail-dept-badge').textContent = dispDiv;
+            document.getElementById('detail-product-badge').textContent = dispTeamOrProd;
+          }
           renderPhotos();
         } else {
           navigateToLevel('product');
@@ -2393,7 +2407,9 @@ create policy "Public Access workdrive-photos" on storage.objects
 
       initSupabaseClient();
       if (isCloudConnected) {
-        await withTimeout(syncFromCloud(false, false), 4000, 'init-sync').catch(() => {});
+        // Open instantly from the saved copy; the team data is merged in the background
+        const syncPromise = syncFromCloud(false, false);
+        if (!hadLocalData) await syncPromise;
       }
 
       applyInstallBannerVisibility();
@@ -3139,7 +3155,7 @@ create policy "Public Access workdrive-photos" on storage.objects
       document.getElementById('admin-update-compose-modal').classList.add('hidden');
     }
 
-    async function publishSystemUpdateNotice() {
+    function publishSystemUpdateNotice() {
       if (!isAdminUser()) return;
       const inp = document.getElementById('admin-update-message-input');
       const msg = (inp && inp.value || '').trim();
@@ -3161,32 +3177,16 @@ create policy "Public Access workdrive-photos" on storage.objects
       lastSeenUpdateId = null;
       renderAdminUpdateResponses();
       checkSystemUpdateNoticeForUser();
-      if (isCloudConnected && supabaseClient && navigator.onLine) {
-        await pushTeamStateToCloud();
-      }
       alert('ส่งหน้าต่างแจ้งเตือนอัปเดตระบบเรียบร้อยแล้วครับ');
     }
 
-    async function clearActiveSystemUpdate() {
+    function clearActiveSystemUpdate() {
       if (!isAdminUser()) return;
-      const prev = getSystemUpdateState() || {};
-      const nowMs = Date.now();
-      const cancelledState = {
-        ...prev,
-        id: prev.id || ('upd-' + nowMs),
-        active: false,
-        message: '',
-        updatedAtMs: nowMs,
-        clearedAtMs: nowMs
-      };
-      saveSystemUpdateState(cancelledState);
+      saveSystemUpdateState(null);
       lastSeenUpdateId = null;
       const noticeModal = document.getElementById('system-update-notice-modal');
       if (noticeModal) noticeModal.classList.add('hidden');
       renderAdminUpdateResponses();
-      if (isCloudConnected && supabaseClient && navigator.onLine) {
-        await pushTeamStateToCloud();
-      }
     }
 
     function checkSystemUpdateNoticeForUser() {
@@ -3198,11 +3198,11 @@ create policy "Public Access workdrive-photos" on storage.objects
         modal.classList.add('hidden');
         return;
       }
-      if (st.id && st.id === lastSeenUpdateId) {
-        return;
-      }
       const uKey = (currentUser.name || '').trim().toLowerCase();
       const myResp = st.responses && st.responses[uKey];
+      if (myResp && myResp.choice === 'dismissed' && st.id === lastSeenUpdateId) {
+        return;
+      }
       const t1 = document.getElementById('update-marquee-text-1');
       const t2 = document.getElementById('update-marquee-text-2');
       if (t1) t1.textContent = st.message;
@@ -5648,6 +5648,13 @@ function openNewAlbumModal() {
         detail: `เพิ่มรูปภาพจำนวน ${processedPhotos.length} รูป (${sampleNames}${processedPhotos.length > 3 ? ' ...' : ''})`
       });
       saveAlbums();
+      if (isCloudConnected && supabaseClient && navigator.onLine) {
+        try {
+          await pushTeamStateToCloud();
+        } catch (syncErr) {
+          console.warn('Immediate sync after photo save failed, queued for retry:', syncErr);
+        }
+      }
 
       btn.disabled = false;
       btn.textContent = prevBtnText;
@@ -6789,14 +6796,11 @@ function openNewAlbumModal() {
       c.settings.showInstallBanner = boolVal;
       c.settings.updatedBy = currentUser ? currentUser.name : 'sarunchana.h';
       c.settings.updatedAtMs = Date.now();
-      normalizeAlbumTypes();
-      editVersion++;
-      setPending(true);
-      persistAlbumsLocal();
+      saveAlbums();
       applyInstallBannerVisibility();
       lucide.createIcons();
       if (isCloudConnected && supabaseClient && navigator.onLine) {
-        await runCloudSync({});
+        await pushTeamStateToCloud();
       }
     }
 
